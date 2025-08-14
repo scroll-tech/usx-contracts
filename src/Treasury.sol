@@ -96,10 +96,10 @@ contract InsuranceBuffer {
     uint256 public netDeposits;
 
     // renewal fraction with precision to 0.001 percent (Minimum 10% == 100000)
-    uint32 public bufferRenewalRate;
+    uint256 public bufferRenewalRate;
 
     // buffer target with precision to 0.001 percent (Minimum 5% == 50000)
-    uint32 public bufferTargetFraction;
+    uint256 public bufferTargetFraction;
 
     /*=========================== Public Functions =========================*/
 
@@ -109,11 +109,10 @@ contract InsuranceBuffer {
     /*=========================== Governance Functions =========================*/
 
     // sets renewal fraction with precision to 0.001 percent (Minimal value & default is 10% fee == 100000)
-    function setBufferRenewalRate(uint32 _bufferRenewalRate) public onlyGovernance {}
+    function setBufferRenewalRate(uint256 _bufferRenewalRate) public onlyGovernance {}
 
     // sets buffer target with precision to 0.001 percent (Minimal value & default is 5% fee == 50000)
-    // can only be increased?
-    function setBufferTargetFraction(uint32 _bufferTargetFraction) public onlyGovernance {}
+    function setBufferTargetFraction(uint256 _bufferTargetFraction) public onlyGovernance {}
 
     /*=========================== Internal Functions =========================*/
 
