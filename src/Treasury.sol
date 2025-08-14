@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
 // Consolidates all protocol-wide USDC flows, profit/loss accounting, and insurance buffer management within a single orchestrator contract.
