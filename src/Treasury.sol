@@ -15,9 +15,19 @@ pragma solidity 0.8.30;
 // Upgradeable smart contract UUPS
 // ERC7201
 
+// Diamond Standard implementation? https://eips.ethereum.org/EIPS/eip-2535
+
 contract Treasury {
 
+    /*=========================== Errors =========================*/
+
+    /*=========================== Events =========================*/
+
+    /*=========================== Modifiers =========================*/
+
     /*=========================== State Variables =========================*/
+
+    /*=========================== Constructor =========================*/
 
     /*=========================== Public Functions =========================*/
 
@@ -31,6 +41,8 @@ contract ProfitAndLossReporter {
 
     /*=========================== State Variables =========================*/
 
+    address public governanceWarchest;
+
     //  duration of epoch in blocks, (default == 216000 (30days))
     uint256 public epochDuration;
 
@@ -42,8 +54,6 @@ contract ProfitAndLossReporter {
 
     // determines increase in profits for each block
     uint256 public profitPerBlock;
-
-    address public governanceWarchest;
 
 
     /*=========================== Public Functions =========================*/
