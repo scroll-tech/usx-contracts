@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ITreasury} from "./interfaces/ITreasury.sol";
 
@@ -89,13 +90,14 @@ contract sUSX is ERC4626 {
         address _usx,
         address _treasury,
         address _governance
-        ) ERC4626(IERC20(_usx)) ERC20("sUSX Token", "sUSX") {
+    ) ERC4626(IERC20(_usx)) ERC20("sUSX Token", "sUSX") {
         if (_usx == address(0) ||
             _treasury == address(0) ||
             _governance == address(0)
-            ) revert ZeroAddress();
+        ) revert ZeroAddress();
+        
         USX = IERC20(_usx);
-        treasury = ITreasury(address(_treasury));_
+        treasury = ITreasury(_treasury);
         governance = _governance;
         
         // Set default values
@@ -174,7 +176,7 @@ contract sUSX is ERC4626 {
     // calculated using on chain USX balance and linear profit accrual (USX.balanceOf(this) + linear scaled profits from last epoch)
     function sharePrice() public view returns (uint256) {
         uint256 base    = USX.balanceOf(address(this));
-        uint256 rewards = profitLatestEpoch();
+        uint256 rewards = profitLatestEpoch; // TODO: Implement logic for this variable
         uint256 totalUSX = base + rewards;
         return totalUSX * 1e18 / this.totalSupply();
     }
@@ -220,6 +222,7 @@ contract sUSX is ERC4626 {
 
     function _applyLatestProfits() internal {}
     // TODO: Call this inside a modifier applied on all relevant user functions so it automatically updates?
+    // logic could be covered by sharePrice() calls?
     // Consider merge with _updateLastEpochTime in general updateFunction?
     // Consider function that allows the update to be applied manually at any point?
     // Keep in mind profits should only be distributed until next epoch. After that, no new profit accrual until Asset Manager has made new profitable report.

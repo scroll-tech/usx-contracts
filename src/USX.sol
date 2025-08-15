@@ -89,16 +89,16 @@ contract USX is ERC20 {
         if (!whitelistedUsers[msg.sender]) revert UserNotWhitelisted();
     
         // Check if there are any outstanding withdrawal requests needing USDC
-        uint256 usdcRequiredForWithdrawalRequests = usdcRequiredForWithdrawalRequests();
+        uint256 usdcRequired = usdcRequiredForWithdrawalRequests();
 
         // If there outstanding withdrawal requests greater than amount deposited, leave USDC on this contract to fulfill them
-        if (usdcRequiredForWithdrawalRequests > _amount) {
+        if (usdcRequired > _amount) {
             USDC.transferFrom(msg.sender, address(this), _amount);
         }
         
         // If it is less, leave USDC required on this contract and send remaining USDC to the Treasury contract
         else {
-            USDC.transferFrom(msg.sender, address(treasury), usdcRequiredForWithdrawalRequests - _amount);
+            USDC.transferFrom(msg.sender, address(treasury), usdcRequired - _amount);
         }
 
         // User receives USX
