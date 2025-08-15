@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {IUSDC} from "./IUSDC.sol";
 import {IUSX} from "./IUSX.sol";
 import {IsUSX} from "./IsUSX.sol";
 
@@ -8,12 +9,6 @@ import {IsUSX} from "./IsUSX.sol";
 // Profit & Loss Reporter: Records epoch-based performance and triggers P&L adjustments.
 // Insurance Buffer: Maintains a reserve to cover potential Asset Manager losses.
 // Asset Manager Allocator: Routes USDC deposits/withdrawals to the Asset Manager.
-
-// Receives USDC from deposits to the USX contract
-
-// Only this contract can mint/burn USX
-
-// USDC is transferred to/from Asset Manager contract
 
 // Upgradeable smart contract UUPS
 // ERC7201
@@ -83,9 +78,6 @@ contract ProfitAndLossReporter {
     }
 
     /*=========================== Governance Functions =========================*/
-
-    // duration of epoch in blocks, (default == 216000 (30days))
-    function setEpochDuration(uint256 _epochDurationBlocks) public onlyGovernance {}
 
     // fraction of success fee determining the success fee, (default 5% == 50000) with precision to 0.001 percent
     function setSuccessFeeFraction(uint256 _successFeeFraction) public onlyGovernance {
@@ -181,9 +173,6 @@ contract InsuranceBuffer {
 
     /*=========================== State Variables =========================*/
 
-    // net deposits for the current epoch
-    uint256 public netDeposits;
-
     // renewal fraction with precision to 0.001 percent (Minimum 10% == 100000)
     uint256 public bufferRenewalFraction;
 
@@ -255,6 +244,8 @@ contract AssetManagerAllocator {
 
     /*=========================== State Variables =========================*/
 
+    IUSDC public immutable USDC;
+
     // the current Asset Manager for the protocol
     address public assetManager;
 
@@ -268,6 +259,10 @@ contract AssetManagerAllocator {
     // Checks if a deposit on the sUSX contract would exceed the max protocol leverage. Returns true if deposit would be allowed, false if it would exceed the max leverage.
     function checkMaxLeverage(uint256 depositAmount) public view returns (bool) {
         // TODO
+    }
+
+    function netDeposits() public view returns (uint256) {
+        return USDC.balanceOf(address(this)) + assetManagerUSDC;
     }
 
     /*=========================== Governance Functions =========================*/

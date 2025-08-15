@@ -5,8 +5,6 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ITreasury} from "./interfaces/ITreasury.sol";
 
-    // Governance (or Asset Manager?) will monitor for unfufilled withdrawal requests and request USDC from Asset Manager as needed
-
     // Upgradeable smart contract UUPS
     // ERC7201
     // ReentrancyGuard
