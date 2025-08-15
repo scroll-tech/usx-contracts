@@ -47,6 +47,7 @@ contract ProfitAndLossReporter {
     error ZeroValueChange();
     error NotGovernance();
     error NotAssetManager();
+    error InvalidSuccessFeeFraction();
 
     /*=========================== Modifiers =========================*/
     
@@ -72,10 +73,14 @@ contract ProfitAndLossReporter {
 
     address public governanceWarchest;
 
+    uint256 public successFeeFraction;
+
     /*=========================== Public Functions =========================*/
 
     // calculates the success fee for the Goverance Warchest based on successFeeFraction
-    function successFee() public view returns (uint256) {}
+    function successFee(uint256 profitAmount) public view returns (uint256) {
+        return profitAmount * successFeeFraction / 100000;
+    }
 
     /*=========================== Governance Functions =========================*/
 
@@ -83,7 +88,10 @@ contract ProfitAndLossReporter {
     function setEpochDuration(uint256 _epochDurationBlocks) public onlyGovernance {}
 
     // fraction of success fee determining the success fee, (default 5% == 50000) with precision to 0.001 percent
-    function setSuccessFeeFraction(uint256 _successFeeFraction) public onlyGovernance {}
+    function setSuccessFeeFraction(uint256 _successFeeFraction) public onlyGovernance {
+        if (_successFeeFraction > 100000) revert InvalidSuccessFeeFraction();
+        successFeeFraction = _successFeeFraction;
+    }
 
     /*=========================== Asset Manager Functions =========================*/
 
@@ -98,12 +106,12 @@ contract ProfitAndLossReporter {
 
             // If the usxPrice() < 1 (peg is broken) then update the peg and if there are any remaining profits, distribute them
             uint256 newPeg = _updatePeg();
-            if (newPeg > 1) {
+            if (newPeg >= 1) { // TODO: Consider if should have buffer target (something like >= 0.9995)    
                 // Portion of the profits are added to the Insurance Buffer
                 uint256 insuranceBufferProfits = _topUpBuffer(grossProfit);
 
                 // Porftion of the profits are added to the Governance Warchest
-                uint256 governanceWarchestProfits = grossProfit * successFee() / 100000;
+                uint256 governanceWarchestProfits = successFee(grossProfit);
                 USX.mintUSX(governanceWarchest, governanceWarchestProfits);
 
                 // Remaining profits are distributed to sUSX contract (USX stakers)
