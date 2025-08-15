@@ -121,6 +121,8 @@ contract ProfitAndLossReporter {
             // 2. Then if losses remain, burn USX held in sUSX contract to cover loss
             if (remainingLossesAfterInsuranceBuffer > 0) {
                 uint256 remainingLossesAfterVault = _distributeLosses(remainingLossesAfterInsuranceBuffer);
+
+                // TODO: should peg be updated here? USX has been burned so the ratio should change as well?
             }
 
             // 3. Finally if neither of these cover the losses, update the peg to adjust the USX:USDC ratio and freeze withdrawal temporarily
@@ -135,8 +137,11 @@ contract ProfitAndLossReporter {
 
     // updates peg, by taking all outstanding USDC in the system (treasury & asset manager holdings) and dividing them by total supply of USX. 
     // USDCoutstanding / USXtotalSupply
-    function _updatePeg() internal returns (uint256 newPeg) {
-        //TODO
+    function _updatePeg() internal returns (uint256) {
+        uint256 totalUSDCoutstanding = USDC.balanceOf(address(this)) + assetManagerUSDC;
+        uint256 updatedPeg = USX.totalSupply() / totalUSDCoutstanding; // TODO: verify the order of vision is correct
+        USX.updatePeg(updatedPeg);
+        return updatedPeg;
     }
 
     function _distributeProfits(uint256 profits) internal {
