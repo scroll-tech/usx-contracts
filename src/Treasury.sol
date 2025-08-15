@@ -216,31 +216,45 @@ interface IAssetManager {
 
 contract AssetManagerAllocator {
 
+    /*=========================== Errors =========================*/
+
+    error ZeroAddress();
+    error InvalidMaxLeverage();
+
     /*=========================== State Variables =========================*/
 
     // the current Asset Manager for the protocol
     address public assetManager;
 
-    // (default == 10, max == 10)
+    // max leverage of the protocol with precision to 0.001 percent (default == 10%, max == 10% == 100000)
     uint256 public maxLeverage;
 
-    /*=========================== Public Functions =========================*/
-
-    function depositUSDC(uint256 _amount) public {}
+    uint256 public assetManagerUSDC; // TODO: Remember to consider USDC has 6 decimals
 
     /*=========================== Governance Functions =========================*/
 
     // sets the current Asset Manager for the protocol
-    function setAssetManager(address _assetManager) public onlyGovernance {}
+    function setAssetManager(address _assetManager) public onlyGovernance {
+        if (_assetManager == address(0)) revert ZeroAddress();
+    }
 
     // sets the max leverage for the protocol
-    function setMaxLeverage(uint256 _maxLeverage) public onlyGovernance {}
+    function setMaxLeverage(uint256 _maxLeverage) public onlyGovernance {
+        if (_maxLeverage > 100000) revert InvalidMaxLeverage();
+        maxLeverage = _maxLeverage;
+    }
 
     /*=========================== Asset Manager Functions =========================*/
 
-    function transferUSDCtoAssetManager(uint256 _amount) public onlyAssetManager {}
+    function transferUSDCtoAssetManager(uint256 _amount) public onlyAssetManager {
+        assetManagerUSDC += _amount;
+        USDC.transferFrom(address(this), address(assetManager), _amount);
+    }
 
-    function transferUSDCFromAssetManager(uint256 _amount) public onlyAssetManager {}
+    function transferUSDCFromAssetManager(uint256 _amount) public onlyAssetManager {
+        assetManagerUSDC -= _amount;
+        USDC.transferFrom(address(assetManager), address(this), _amount);
+    }
 
     /*=========================== Internal Functions =========================*/
 }
