@@ -54,7 +54,7 @@ contract USX is ERC20 {
 
     uint256 public totalOutstandingWithdrawalAmount;
 
-    uint256 public usdxPrice;
+    uint256 public usxPrice;
 
     mapping(address => bool) public whitelistedUsers;
 
@@ -112,7 +112,7 @@ contract USX is ERC20 {
         if (withdrawalsFrozen) revert WithdrawalsFrozen();
 
         // Check the USX price to determine how much USDC the user will receive
-        uint256 usdcAmount = _USXredeemed * usxPrice();
+        uint256 usdcAmount = _USXredeemed * usxPrice;
 
         // Burn the USX
         _burn(msg.sender, _USXredeemed);
@@ -173,7 +173,7 @@ contract USX is ERC20 {
     }
 
     function updatePeg(uint256 newPeg) public onlyTreasury {
-        usdxPrice = newPeg;
+        usxPrice = newPeg;
     }
 
     function freezeWithdrawals() public onlyTreasury {
