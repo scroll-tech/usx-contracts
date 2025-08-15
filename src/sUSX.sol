@@ -14,11 +14,13 @@ contract sUSX is ERC4626 {
 
     error ZeroAddress();
     error NotGovernance();
+    error NotTreasury();
     error InsufficientBalance();
     error WithdrawalAlreadyClaimed();
     error WithdrawalPeriodNotPassed();
     error NextEpochNotStarted();
     error InvalidMinWithdrawalPeriod();
+    error MaxLeverageExceeded();
 
     /*=========================== Events =========================*/
 
