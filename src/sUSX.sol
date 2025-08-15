@@ -71,6 +71,18 @@ contract sUSX is ERC4626 {
 
     uint256 public withdrawalIdCounter;
 
+    //  duration of epoch in blocks, (default == 216000 (30days))
+    uint256 public epochDuration;
+
+    // profits reported for previous period TODO: is this needed?
+    uint256 public netEpochProfits;
+
+    // current profit added at current epoch TODO: is this needed?
+    uint256 public profitLatestEpoch;
+
+    // determines increase in profits for each block
+    uint256 public profitPerBlock;
+
     mapping(uint256 => WithdrawalRequest) public withdrawalRequests;
     // TODO: Make a nested mapping with user address and withdrawalId? stores withdrawals per user instead of global
 
@@ -90,6 +102,7 @@ contract sUSX is ERC4626 {
         withdrawalPeriod = 108000;      // 15 days (assuming 12 second block time)
         withdrawalFeeFraction = 500;    // 0.5%
         minWithdrawalPeriod = 108000;   // 15 days
+        epochDuration = 216000;         // 30 days
     }
 
     /*=========================== Public Functions =========================*/
@@ -161,12 +174,24 @@ contract sUSX is ERC4626 {
 
     /*=========================== Treasury Functions =========================*/
 
-    function positiveReport(uint256 amountProfit) public onlyTreasury {}
+    // USX profits are minted over a linear period till the next epoch
+    function distributeProfits(uint256 amountProfit) public onlyTreasury {
+        // Get the next epoch time
+        uint256 nextEpochTime = lastEpochTime + epochDuration;
 
-    function negativeReport(uint256 amountLoss) public onlyTreasury {}
+        // Calculate the amount of profits to be distributed each block until the next epoch
+        profitsPerBlock = amountProfit / (nextEpochTime - block.timestamp);
+    }
 
     /*=========================== Internal Functions =========================*/
 
+    // linear increase in profits each block
     function _updateLastEpochTime() internal {} // TODO: Call this inside a modifier applied on all relevant user functions so it automatically updates?
+
+    function _applyLatestProfits() internal {}
+    // TODO: Call this inside a modifier applied on all relevant user functions so it automatically updates?
+    // Consider merge with _updateLastEpochTime in general updateFunction?
+    // Consider function that allows the update to be applied manually at any point?
+    // Keep in mind profits should only be distributed until next epoch. After that, no new profit accrual until Asset Manager has made new profitable report.
 
 }
