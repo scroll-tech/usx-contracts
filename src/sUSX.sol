@@ -87,13 +87,13 @@ contract sUSX is ERC4626 {
         address _usx,
         address _treasury,
         address _governance
-        ) ERC4626(IERC20(_usxToken)) ERC20("sUSX Token", "sUSX") {
-        if (_usxToken == address(0) ||
+        ) ERC4626(IERC20(_usx)) ERC20("sUSX Token", "sUSX") {
+        if (_usx == address(0) ||
             _treasury == address(0) ||
             _governance == address(0)
             ) revert ZeroAddress();
         USX = IERC20(_usx);
-        treasury = ITreasury(address(_treasury));
+        treasury = ITreasury(address(_treasury));_
         governance = _governance;
         
         // Set default values
