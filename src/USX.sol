@@ -135,9 +135,10 @@ contract USX is ERC20 {
         if (USDC.balanceOf(address(this)) < outstandingWithdrawalRequests[msg.sender]) revert InsufficientUSDC();
 
         // Fulfill the withdrawal request
+        uint256 usdcAmount = outstandingWithdrawalRequests[msg.sender];
         outstandingWithdrawalRequests[msg.sender] = 0;
         totalOutstandingWithdrawalAmount -= usdcAmount;
-
+        
         // Send the USDC to the user
         USDC.transfer(msg.sender, usdcAmount);
     }
