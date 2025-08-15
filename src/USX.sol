@@ -7,7 +7,6 @@ import {ITreasury} from "./interfaces/ITreasury.sol";
 
     // Upgradeable smart contract UUPS
     // ERC7201
-    // ReentrancyGuard
 
 contract USX is ERC20 {
 
