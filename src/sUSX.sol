@@ -20,6 +20,10 @@ contract sUSX is ERC4626 {
 
     error ZeroAddress();
     error NotGovernance();
+    error InsufficientBalance();
+    error WithdrawalAlreadyClaimed();
+    error WithdrawalPeriodNotPassed();
+    error NextEpochNotStarted();
 
     /*=========================== Events =========================*/
 
@@ -30,13 +34,28 @@ contract sUSX is ERC4626 {
         _;
     }
 
+    modifier onlyTreasury() {
+        if (msg.sender != treasury) revert NotTreasury();
+        _;
+    }
+
     /*=========================== State Variables =========================*/
+
+    struct WithdrawalRequest {
+        address user;                   // Address of withdrawer
+        uint256 amount;                 // sUSX amount redeemed
+        uint256 withdrawalTimestamp;    // Timestamp of the withdrawal request
+        bool claimed;                   // True = withdrawal request has been claimed
+    }
 
     // USX token reference (the underlying asset)
     IERC20 public immutableusxToken;
 
     // address that controls governance of the contract
     address public governance;
+
+    // address of the Treasury contract
+    address public treasury;
 
     // withdrawal period in blocks, (default == 108000 (15 days))
     uint256 public withdrawalPeriod;
@@ -50,15 +69,22 @@ contract sUSX is ERC4626 {
     // timestamp of the last epoch
     uint256 public lastEpochTime;
 
+    uint256 public withdrawalIdCounter;
+
+    mapping(uint256 => WithdrawalRequest) public withdrawalRequests;
+    // TODO: Make a nested mapping with user address and withdrawalId? stores withdrawals per user instead of global
+
     /*=========================== Constructor =========================*/
 
     constructor(
         address _usxToken,
         address _governance,
+        address _treasury,
         ) ERC4626(IERC20(_usxToken)) ERC20("sUSX Token", "sUSX") {
         if (_usxToken == address(0)) revert ZeroAddress();
         usxToken = IERC20(_usxToken);
         governance = _governance;
+        treasury = _treasury;
         
         // Set default values
         withdrawalPeriod = 108000;      // 15 days (assuming 12 second block time)
@@ -72,12 +98,44 @@ contract sUSX is ERC4626 {
     function deposit(uint256 USX_amount) public {}
 
     // user must wait for withdrawalPeriod to pass before unstaking (withdrawalPeriod)
-    function requestWithdraw(uint256 sUSX_amount) public {}
+    function requestWithdraw(uint256 sUSX_amount) public {
+        // Check if user has enough sUSX
+        if (balanceOf(msg.sender) < sUSX_amount) revert InsufficientBalance();
+
+        // Burn sUSX
+        _burn(msg.sender, sUSX_amount);
+
+        // Record withdrawal request
+        withdrawalRequests[withdrawalIdCounter] = WithdrawalRequest({
+            user: msg.sender,
+            amount: sUSX_amount,
+            withdrawalTimestamp: block.timestamp,
+            claimed: false
+        });
+
+        // Increment withdrawalIdCounter
+        withdrawalIdCounter++;
+    }
 
     // after withdrawalPeriod AND epoch the user made withdrawal on is finished, after Gross Profits has been counted
     // user can finish unstaking sUSX for USX at the CURRENT sharePrice
     // portion is sent to the Governance Warchest (withdrawalFee applied here)
-    function claimWithdraw() public {}
+    function claimWithdraw(uint256 withdrawalId) public {
+        // Check if the withdrawal request is unclaimed
+        if (withdrawalRequests[withdrawalId].claimed) revert WithdrawalAlreadyClaimed();
+
+        // Check if the withdrawal period has passed
+        if (withdrawalRequests[withdrawalId].withdrawalTimestamp + withdrawalPeriod > block.timestamp) revert WithdrawalPeriodNotPassed();
+
+        // Check if the next epoch has started since the withdrawal request was made
+        if (withdrawalRequests[withdrawalId].withdrawalTimestamp > lastEpochTime) revert NextEpochNotStarted();
+
+        // Get the total USX amount for the amount of sUSX being redeemed
+
+        // Distribute portion of USX to the Governance Warchest
+
+        // Send the remaining USX to the user
+    }
 
     // calculated using on chain USX balance and linear profit accrual (usxToken.balanceOf(this) + linear scaled profits from last epoch)
     function sharePrice() public view returns (uint256) {
@@ -87,9 +145,11 @@ contract sUSX is ERC4626 {
         return totalUSX * 1e18 / this.totalSupply();
     }
 
-    // TODO: Consider making state variable instead
+    // TODO: Consider making state variable instead OR just use the withdrawalFeeFraction?
     // withdrawal fee taken on all withdrawals that goes to the Governance Warchest
     function withdrawalFee() public view returns (uint256) {}
+
+    // TODO: Some kind of view function for user to check their withdrawals?
 
     /*=========================== Governance Functions =========================*/
 
@@ -99,6 +159,14 @@ contract sUSX is ERC4626 {
     // sets withdrawal fee with precision to 0.001 percent
     function setWithdrawalFeeFraction(uint256 _withdrawalFeeFraction) public onlyGovernance {}
 
+    /*=========================== Treasury Functions =========================*/
+
+    function positiveReport(uint256 amountProfit) public onlyTreasury {}
+
+    function negativeReport(uint256 amountLoss) public onlyTreasury {}
+
     /*=========================== Internal Functions =========================*/
+
+    function _updateLastEpochTime() internal {} // TODO: Call this inside a modifier applied on all relevant user functions so it automatically updates?
 
 }
