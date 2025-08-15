@@ -25,6 +25,7 @@ contract sUSX is ERC4626 {
     error WithdrawalAlreadyClaimed();
     error WithdrawalPeriodNotPassed();
     error NextEpochNotStarted();
+    error InvalidMinWithdrawalPeriod();
 
     /*=========================== Events =========================*/
 
@@ -152,7 +153,7 @@ contract sUSX is ERC4626 {
         uint256 USXAmount = withdrawalRequests[withdrawalId].amount * sharePrice() / 1e18; // TODO: verify share price applied correctly
 
         // Distribute portion of USX to the Governance Warchest
-        uint256 governanceWarchestPortion = USXAmount * treasury.successFee() / 100000;
+        uint256 governanceWarchestPortion = withdrawalFee(USXAmount);
         USX.transferFrom(address(this), treasury.governanceWarchest(), governanceWarchestPortion);
 
         // Send the remaining USX to the user
@@ -171,19 +172,28 @@ contract sUSX is ERC4626 {
         return totalUSX * 1e18 / this.totalSupply();
     }
 
-    // TODO: Consider making state variable instead OR just use the withdrawalFeeFraction?
     // withdrawal fee taken on all withdrawals that goes to the Governance Warchest
-    function withdrawalFee() public view returns (uint256) {}
-
-    // TODO: Some kind of view function for user to check their withdrawals?
+    function withdrawalFee(uint256 withdrawalAmount) public view returns (uint256) {
+        return withdrawalAmount * withdrawalFeeFraction / 100000;
+    }
 
     /*=========================== Governance Functions =========================*/
 
-    // sets withdrawal period in blocks, (Min amount (default) == 108000 (15days))
-    function setMinWithdrawalPeriod(uint256 _minWithdrawalPeriod) public onlyGovernance {}
+    // sets withdrawal period in blocks
+    function setMinWithdrawalPeriod(uint256 _minWithdrawalPeriod) public onlyGovernance {
+        if (_minWithdrawalPeriod < 108000) revert InvalidMinWithdrawalPeriod();
+        minWithdrawalPeriod = _minWithdrawalPeriod;
+    }
 
-    // sets withdrawal fee with precision to 0.001 percent
-    function setWithdrawalFeeFraction(uint256 _withdrawalFeeFraction) public onlyGovernance {}
+    // sets withdrawal fee with precision to 0.001 percent // TODO: Is it ok to have no min/max?
+    function setWithdrawalFeeFraction(uint256 _withdrawalFeeFraction) public onlyGovernance {
+        withdrawalFeeFraction = _withdrawalFeeFraction;
+    }
+
+    // duration of epoch in blocks
+    function setEpochDuration(uint256 _epochDurationBlocks) public onlyGovernance {
+        epochDuration = _epochDurationBlocks;
+    }
 
     /*=========================== Treasury Functions =========================*/
 
