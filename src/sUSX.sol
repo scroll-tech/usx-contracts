@@ -115,7 +115,19 @@ contract sUSX is ERC4626 {
     // TODO: Override base ERC4626 deposit/withdraw functions
 
     // instantly mints sUSX at sharePrice
-    function deposit(uint256 USX_amount) public {}
+    function deposit(uint256 USX_amount) public {
+        // Check if the user has enough USX
+        if (usxToken.balanceOf(msg.sender) < USX_amount) revert InsufficientBalance();
+
+        // Check if the deposit would exceed the max leverage
+        if (treasury.checkMaxLeverage(USX_amount)) revert MaxLeverageExceeded();
+
+        // Get the amount of sUSX to mint given current sharePrice
+        uint256 sUSX_amount = USX_amount * 1e18 / sharePrice();
+
+        // Mint sUSX
+        _mint(msg.sender, sUSX_amount);
+    }
 
     // user must wait for withdrawalPeriod to pass before unstaking (withdrawalPeriod)
     function requestWithdraw(uint256 sUSX_amount) public {

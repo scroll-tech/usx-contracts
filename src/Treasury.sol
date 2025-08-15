@@ -257,6 +257,13 @@ contract AssetManagerAllocator {
 
     uint256 public assetManagerUSDC; // TODO: Remember to consider USDC has 6 decimals
 
+    /*=========================== Public Functions =========================*/
+
+    // Checks if a deposit on the sUSX contract would exceed the max protocol leverage. Returns true if deposit would be allowed, false if it would exceed the max leverage.
+    function checkMaxLeverage(uint256 depositAmount) public view returns (bool) {
+        // TODO
+    }
+
     /*=========================== Governance Functions =========================*/
 
     // sets the current Asset Manager for the protocol
