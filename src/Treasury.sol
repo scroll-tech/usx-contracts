@@ -161,6 +161,11 @@ contract ProfitAndLossReporter {
 
 contract InsuranceBuffer {
 
+    /*=========================== Errors =========================*/
+
+    error InvalidBufferRenewalRate();
+    error InvalidBufferTargetFraction();
+
     /*=========================== State Variables =========================*/
 
     // net deposits for the current epoch
@@ -175,16 +180,24 @@ contract InsuranceBuffer {
     /*=========================== Public Functions =========================*/
 
     // returns current buffer target based on bufferTargetFraction and USX total supply
-    function bufferTarget() public view returns (uint256) {}
+    function bufferTarget() public view returns (uint256) {
+        return USX.totalSupply() * bufferTargetFraction / 100000;
+    }
 
     /*=========================== Governance Functions =========================*/
 
     // sets renewal fraction with precision to 0.001 percent (Minimal value & default is 10% fee == 100000)
-    function setBufferRenewalRate(uint256 _bufferRenewalRate) public onlyGovernance {}
+    function setBufferRenewalRate(uint256 _bufferRenewalRate) public onlyGovernance {
+        if (_bufferRenewalRate < 100000 || _bufferRenewalRate > 1000000) revert InvalidBufferRenewalRate();
+        bufferRenewalFraction = _bufferRenewalRate;
+    }
 
     // sets buffer target with precision to 0.001 percent (Minimal value & default is 5% fee == 50000)
     //TODO: Clarify if default is 5 or 10%?
-    function setBufferTargetFraction(uint256 _bufferTargetFraction) public onlyGovernance {}
+    function setBufferTargetFraction(uint256 _bufferTargetFraction) public onlyGovernance {
+        if (_bufferTargetFraction < 50000 || _bufferTargetFraction > 100000) revert InvalidBufferTargetFraction();
+        bufferTargetFraction = _bufferTargetFraction;
+    }
 
     /*=========================== Internal Functions =========================*/
 
