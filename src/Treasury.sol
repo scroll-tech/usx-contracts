@@ -223,16 +223,10 @@ contract InsuranceBuffer {
     }
 }
 
-// receives USDC from USX contract deposits and routes to Asset Managers contract
-
-// facilitates withdrwal requests to Asset Manager, adhering to withdrawal period (15 days)
-
-// withdrawals subject to Asset Manager specific constraints and allocation limits
-
 // standaradized interface for Asset Manager's contract
 interface IAssetManager {
-    function deposit(uint256 _amount) external;
-    function withdraw(uint256 _amount) external;
+    function deposit(uint256 _usdcAmount) external;
+    function withdraw(uint256 _usdcAmount) external;
 }
 
 contract AssetManagerAllocator {
@@ -247,7 +241,7 @@ contract AssetManagerAllocator {
     IUSDC public immutable USDC;
 
     // the current Asset Manager for the protocol
-    address public assetManager;
+    IAssetManager public assetManager;
 
     // max leverage of the protocol with precision to 0.001 percent (default == 10%, max == 10% == 100000)
     uint256 public maxLeverage;
@@ -282,12 +276,12 @@ contract AssetManagerAllocator {
 
     function transferUSDCtoAssetManager(uint256 _amount) public onlyAssetManager {
         assetManagerUSDC += _amount;
-        USDC.transferFrom(address(this), address(assetManager), _amount);
+        assetManager.deposit(_amount);
     }
 
     function transferUSDCFromAssetManager(uint256 _amount) public onlyAssetManager {
         assetManagerUSDC -= _amount;
-        USDC.transferFrom(address(assetManager), address(this), _amount);
+        assetManager.withdraw(_amount);
     }
 
     /*=========================== Internal Functions =========================*/
