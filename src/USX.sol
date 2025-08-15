@@ -141,7 +141,9 @@ contract USX is ERC20 {
         USDC.transfer(msg.sender, usdcAmount);
     }
 
-    function usxPrice() public view returns (uint256) {}
+    function usxPrice() public view returns (uint256) {
+        // TODO: implement
+    }
 
     function usdcRequiredForWithdrawalRequests() public view returns (uint256) {
         return USDC.balanceOf(address(this)) - totalOutstandingWithdrawalAmount;
@@ -168,6 +170,12 @@ contract USX is ERC20 {
     function mintUSX(address _to, uint256 _amount) public onlyTreasury {
         _mint(_to, _amount);
     }
+
+    function burnUSX(address _from, uint256 _amount) public onlyTreasury {
+        _burn(_from, _amount);
+    }
+
+    function updatePeg(uint256 newPeg) public onlyTreasury {}
 
     function freezeWithdrawals() public onlyTreasury {
         withdrawalsFrozen = true;
