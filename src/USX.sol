@@ -49,6 +49,8 @@ contract USX is ERC20 {
 
     ITreasury public treasury;
 
+    bool public withdrawalsFrozen;
+
     address public governanceWarchest;
 
     address public admin;
@@ -58,8 +60,6 @@ contract USX is ERC20 {
     mapping(address => bool) public whitelistedUsers;
 
     mapping(address => uint256) public outstandingWithdrawalRequests;
-
-    bool public withdrawalsFrozen;
 
     /*=========================== Constructor =========================*/
 
@@ -89,12 +89,17 @@ contract USX is ERC20 {
         // Check if user is whitelisted
         if (!whitelistedUsers[msg.sender]) revert UserNotWhitelisted();
     
-        // Check for qued withdrawals, leave USDC on the contract if there are any
-        uint256 
+        // Check if there are any outstanding withdrawal requests needing USDC
+        uint256 usdcRequiredForWithdrawalRequests = usdcRequiredForWithdrawalRequests();
 
-        // Outstanding net deposits are sent to the treasury contract
-        // ITreasury.depositUSDC(XXX);
-
+        // If there outstanding withdrawal requests greater than amount deposited, leave USDC on this contract to fulfill them
+        if (usdcRequiredForWithdrawalRequests > _amount) {
+            USDC.transferFrom(msg.sender, address(this), _amount);
+        }
+        // If it is less, leave USDC required on this contract and send remaining USDC to the Treasury contract
+        else {
+            USDC.transferFrom(msg.sender, address(treasury), usdcRequiredForWithdrawalRequests - _amount);
+        }
         // User receives USX
         _mint(msg.sender, _amount);
     }
