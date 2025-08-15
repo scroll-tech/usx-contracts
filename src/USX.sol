@@ -57,6 +57,8 @@ contract USX is ERC20 {
 
     uint256 public totalOutstandingWithdrawalAmount;
 
+    uint256 public usdxPrice;
+
     mapping(address => bool) public whitelistedUsers;
 
     mapping(address => uint256) public outstandingWithdrawalRequests;
@@ -96,10 +98,12 @@ contract USX is ERC20 {
         if (usdcRequiredForWithdrawalRequests > _amount) {
             USDC.transferFrom(msg.sender, address(this), _amount);
         }
+        
         // If it is less, leave USDC required on this contract and send remaining USDC to the Treasury contract
         else {
             USDC.transferFrom(msg.sender, address(treasury), usdcRequiredForWithdrawalRequests - _amount);
         }
+
         // User receives USX
         _mint(msg.sender, _amount);
     }
@@ -141,10 +145,6 @@ contract USX is ERC20 {
         USDC.transfer(msg.sender, usdcAmount);
     }
 
-    function usxPrice() public view returns (uint256) {
-        // TODO: implement
-    }
-
     function usdcRequiredForWithdrawalRequests() public view returns (uint256) {
         return USDC.balanceOf(address(this)) - totalOutstandingWithdrawalAmount;
     }
@@ -175,7 +175,9 @@ contract USX is ERC20 {
         _burn(_from, _amount);
     }
 
-    function updatePeg(uint256 newPeg) public onlyTreasury {}
+    function updatePeg(uint256 newPeg) public onlyTreasury {
+        usdxPrice = newPeg;
+    }
 
     function freezeWithdrawals() public onlyTreasury {
         withdrawalsFrozen = true;
