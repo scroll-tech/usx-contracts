@@ -216,9 +216,15 @@ contract InsuranceBuffer {
 
     // tops up insurance buffer
     // it is triggered within every reportProfitAndLoss() call reports positive rewards while insurance buffer is less then bufferTarget(). Tries to replenish buffer up to amount from first netDeposits from the latest epoch, then netEpochProfits
-    function topUpBuffer(uint256 _amount) internal returns (uint256 insuranceBufferAccrual) {
-        insuranceBufferAccrual = grossProfit * bufferTargetFraction + netDepositsThisEpoch;
-        USX.mintUSX(address(this), insuranceBufferAccrual);
+    function topUpBuffer(uint256 _totalProfit) internal returns (uint256 insuranceBufferAccrual) {
+        // Check if the buffer is less than the buffer target
+        if (USX.balanceOf(address(this)) < bufferTarget()) {
+            // Calculate the amount of USX to mint to the buffer
+            insuranceBufferAccrual = (_totalProfit * bufferRenewalFraction / 100000) + netDeposits();
+
+            // Mint USX to the buffer
+            USX.mintUSX(address(this), insuranceBufferAccrual);
+        }
     }
 
     // deplete insurance buffer
