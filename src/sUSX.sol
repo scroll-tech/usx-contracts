@@ -78,7 +78,7 @@ contract sUSX is ERC4626 {
     uint256 public profitLatestEpoch;
 
     // determines increase in profits for each block
-    uint256 public profitPerBlock;
+    uint256 public profitsPerBlock;
 
     mapping(uint256 => WithdrawalRequest) public withdrawalRequests;
     // TODO: Make a nested mapping with user address and withdrawalId? stores withdrawals per user instead of global
