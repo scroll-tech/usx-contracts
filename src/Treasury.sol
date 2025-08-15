@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {IUSDC} from "./IUSDC.sol";
-import {IUSX} from "./IUSX.sol";
-import {IsUSX} from "./IsUSX.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IUSX} from "./interfaces/IUSX.sol";
+import {IsUSX} from "./interfaces/IsUSX.sol";
 
 // Consolidates all protocol-wide USDC flows, profit/loss accounting, and insurance buffer management within a single orchestrator contract.
 // Profit & Loss Reporter: Records epoch-based performance and triggers P&L adjustments.
@@ -62,6 +62,8 @@ contract ProfitAndLossReporter {
 
     IsUSX public immutable sUSX;
 
+    IERC20 public immutable USDC;
+
     address public governance;
 
     address public assetManager;
@@ -116,19 +118,19 @@ contract ProfitAndLossReporter {
             uint256 grossLoss = uint256(grossValueChange);
 
             // 1. Subtract loss from the Insurance Buffer module
-            uint256 remainingLossesAfterInsuranceBuffer = _slashInBuffer(grossLoss);
+            uint256 remainingLossesAfterInsuranceBuffer = _slashBuffer(grossLoss);
 
             // 2. Then if losses remain, burn USX held in sUSX contract to cover loss
             if (remainingLossesAfterInsuranceBuffer > 0) {
                 uint256 remainingLossesAfterVault = _distributeLosses(remainingLossesAfterInsuranceBuffer);
 
                 // TODO: should peg be updated here? USX has been burned so the ratio should change as well?
-            }
-
-            // 3. Finally if neither of these cover the losses, update the peg to adjust the USX:USDC ratio and freeze withdrawal temporarily
-            if (remainingLossesAfterVault > 0) {
+                
+                // 3. Finally if neither of these cover the losses, update the peg to adjust the USX:USDC ratio and freeze withdrawal temporarily
+                if (remainingLossesAfterVault > 0) {
                 _updatePeg();
                 USX.freezeWithdrawals();
+                }
             }
         }
     }
@@ -205,7 +207,7 @@ contract InsuranceBuffer {
 
     // tops up insurance buffer
     // it is triggered within every reportProfitAndLoss() call reports positive rewards while insurance buffer is less then bufferTarget(). Tries to replenish buffer up to amount from first netDeposits from the latest epoch, then netEpochProfits
-    function topUpBuffer(uint256 _totalProfit) internal returns (uint256 insuranceBufferAccrual) {
+    function _topUpBuffer(uint256 _totalProfit) internal returns (uint256 insuranceBufferAccrual) {
         // Check if the buffer is less than the buffer target
         if (USX.balanceOf(address(this)) < bufferTarget()) {
             // Calculate the amount of USX to mint to the buffer
@@ -238,7 +240,7 @@ contract AssetManagerAllocator {
 
     /*=========================== State Variables =========================*/
 
-    IUSDC public immutable USDC;
+    IERC20 public immutable USDC;
 
     // the current Asset Manager for the protocol
     IAssetManager public assetManager;
