@@ -8,7 +8,6 @@ import {ITreasury} from "./interfaces/ITreasury.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-// Upgradeable smart contract UUPS
 // ERC7201
 
 contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
@@ -24,8 +23,12 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     error NextEpochNotStarted();
     error InvalidMinWithdrawalPeriod();
     error MaxLeverageExceeded();
+    error TreasuryAlreadySet();
 
     /*=========================== Events =========================*/
+
+    event TreasurySet(address indexed treasury);
+    event GovernanceTransferred(address indexed oldGovernance, address indexed newGovernance);
 
     /*=========================== Modifiers =========================*/
 
@@ -99,7 +102,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         address _governance
     ) public initializer {
         if (_usx == address(0) ||
-            _treasury == address(0) ||
             _governance == address(0)
         ) revert ZeroAddress();
         
@@ -116,6 +118,18 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         withdrawalFeeFraction = 500;    // 0.5%
         minWithdrawalPeriod = 108000;   // 15 days
         epochDuration = 216000;         // 30 days
+    }
+
+    /**
+     * @dev Set the initial Treasury address - can only be called once when treasury is address(0)
+     * @param _treasury Address of the Treasury contract
+     */
+    function setInitialTreasury(address _treasury) external onlyGovernance {
+        if (_treasury == address(0)) revert ZeroAddress();
+        if (treasury != ITreasury(address(0))) revert TreasuryAlreadySet();
+        
+        treasury = ITreasury(_treasury);
+        emit TreasurySet(_treasury);
     }
 
     /*=========================== Public Functions =========================*/
@@ -213,6 +227,19 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     // duration of epoch in blocks
     function setEpochDuration(uint256 _epochDurationBlocks) public onlyGovernance {
         epochDuration = _epochDurationBlocks;
+    }
+
+    /**
+     * @dev Set new governance address
+     * @param newGovernance Address of new governance
+     */
+    function setGovernance(address newGovernance) external onlyGovernance {
+        if (newGovernance == address(0)) revert ZeroAddress();
+        
+        address oldGovernance = governance;
+        governance = newGovernance;
+        
+        emit GovernanceTransferred(oldGovernance, newGovernance);
     }
 
     /*=========================== Treasury Functions =========================*/

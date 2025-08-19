@@ -44,13 +44,15 @@ contract TreasuryDiamond is TreasuryStorage, UUPSUpgradeable, Initializable {
      * @param _sUSX Address of sUSX vault
      * @param _governance Address of governance
      * @param _governanceWarchest Address of governance warchest
+     * @param _assetManager Address of asset manager
      */
     function initialize(
         address _USDC,
         address _USX,
         address _sUSX,
         address _governance,
-        address _governanceWarchest
+        address _governanceWarchest,
+        address _assetManager
     ) public initializer {
         if (_USDC == address(0) || _USX == address(0) || _sUSX == address(0) || 
             _governance == address(0) || _governanceWarchest == address(0)) {
@@ -62,6 +64,7 @@ contract TreasuryDiamond is TreasuryStorage, UUPSUpgradeable, Initializable {
         sUSX = IsUSX(_sUSX);
         governance = _governance;
         governanceWarchest = _governanceWarchest;
+        assetManager = _assetManager;
         
         // Set default values
         successFeeFraction = 50000;      // 5%
@@ -159,6 +162,19 @@ contract TreasuryDiamond is TreasuryStorage, UUPSUpgradeable, Initializable {
         delete facetFunctionSelectors[_oldFacet];
         
         emit FacetReplaced(selectors[0], _oldFacet, _newFacet);
+    }
+    
+    /**
+     * @dev Set new governance address
+     * @param newGovernance Address of new governance
+     */
+    function setGovernance(address newGovernance) external onlyGovernance {
+        if (newGovernance == address(0)) revert ZeroAddress();
+        
+        address oldGovernance = governance;
+        governance = newGovernance;
+        
+        emit GovernanceTransferred(oldGovernance, newGovernance);
     }
     
     /*=========================== Fallback =========================*/

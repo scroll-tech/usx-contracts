@@ -18,10 +18,6 @@ contract TreasuryStorage {
     // Core contract errors
     error ZeroAddress();
     
-    // Treasury initialization errors
-    error TreasuryAlreadyInitialized();
-    error InvalidParameter();
-    
     // Asset Manager errors
     error InvalidMaxLeverage();
     
@@ -32,8 +28,6 @@ contract TreasuryStorage {
     // Profit/Loss Reporter errors
     error ZeroValueChange();
     error InvalidSuccessFeeFraction();
-    error InvalidEpochDuration();
-    error EpochNotStarted();
     
     // Access control errors
     error NotGovernance();
@@ -53,6 +47,10 @@ contract TreasuryStorage {
     uint256 public bufferTargetFraction;        // Buffer target fraction (default 5% == 50000)    
     uint256 public assetManagerUSDC;            // USDC allocated to Asset Manager
     // (TODO: Remember to consider USDC has 6 decimals)
+
+    /*=========================== Events =========================*/
+    
+    event GovernanceTransferred(address indexed oldGovernance, address indexed newGovernance);
 
     /*=========================== Modifiers =========================*/
     
