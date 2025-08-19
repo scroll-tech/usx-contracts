@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ITreasury} from "./interfaces/ITreasury.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 // Upgradeable smart contract UUPS
 // ERC7201
 
-contract sUSX is ERC4626 {
+contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     /*=========================== Errors =========================*/
 
@@ -50,7 +52,7 @@ contract sUSX is ERC4626 {
     IERC20 public USX;
 
     // treasury contract
-    ITreasury public immutable treasury;
+    ITreasury public treasury;
 
     // address that controls governance of the contract
     address public governance;
@@ -84,17 +86,26 @@ contract sUSX is ERC4626 {
     mapping(uint256 => WithdrawalRequest) public withdrawalRequests;
     // TODO: Make a nested mapping with user address and withdrawalId? stores withdrawals per user instead of global
 
-    /*=========================== Constructor =========================*/
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
-    constructor(
+    /*=========================== Initialization =========================*/
+
+    function initialize(
         address _usx,
         address _treasury,
         address _governance
-    ) ERC4626(IERC20(_usx)) ERC20("sUSX Token", "sUSX") {
+    ) public initializer {
         if (_usx == address(0) ||
             _treasury == address(0) ||
             _governance == address(0)
         ) revert ZeroAddress();
+        
+        // Initialize ERC4626 and ERC20
+        __ERC4626_init(IERC20(_usx));
+        __ERC20_init("sUSX Token", "sUSX");
         
         USX = IERC20(_usx);
         treasury = ITreasury(_treasury);
@@ -227,4 +238,11 @@ contract sUSX is ERC4626 {
     // Consider function that allows the update to be applied manually at any point?
     // Keep in mind profits should only be distributed until next epoch. After that, no new profit accrual until Asset Manager has made new profitable report.
 
+    /*=========================== UUPS Functions =========================*/
+
+    /**
+     * @dev Authorize upgrade to new implementation
+     * @param newImplementation Address of new implementation
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyGovernance {}
 }

@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ITreasury} from "./interfaces/ITreasury.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
     // Upgradeable smart contract UUPS
     // ERC7201
 
-contract USX is ERC20 {
+contract USX is ERC20Upgradeable, UUPSUpgradeable {
 
     /*=========================== Errors =========================*/
 
@@ -42,7 +44,7 @@ contract USX is ERC20 {
 
     /*=========================== State Variables =========================*/
 
-    IERC20 public immutable USDC;
+    IERC20 public USDC;
 
     ITreasury public treasury;
 
@@ -60,19 +62,27 @@ contract USX is ERC20 {
 
     mapping(address => uint256) public outstandingWithdrawalRequests;
 
-    /*=========================== Constructor =========================*/
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
-    constructor(
+    /*=========================== Initialization =========================*/
+
+    function initialize(
         address _USDC,
         address _treasury,
         address _governanceWarchest,
         address _admin
-    ) ERC20("USX Token", "USX") {
+    ) public initializer {
         if (_USDC == address(0) ||
             _treasury == address(0) ||
             _governanceWarchest == address(0) ||
             _admin == address(0)
-            ) revert ZeroAddress();
+        ) revert ZeroAddress();
+        
+        // Initialize ERC20
+        __ERC20_init("USX Token", "USX");
         
         USDC = IERC20(_USDC);
         treasury = ITreasury(_treasury);
@@ -183,4 +193,11 @@ contract USX is ERC20 {
 
     /*=========================== Internal Functions =========================*/
 
+    /*=========================== UUPS Functions =========================*/
+
+    /**
+     * @dev Authorize upgrade to new implementation
+     * @param newImplementation Address of new implementation
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyGovernance {}
 }
