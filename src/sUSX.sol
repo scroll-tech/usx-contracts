@@ -24,6 +24,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     error InvalidMinWithdrawalPeriod();
     error MaxLeverageExceeded();
     error TreasuryAlreadySet();
+    error USXTransferFailed();
 
     /*=========================== Events =========================*/
 
@@ -188,11 +189,13 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
         // Distribute portion of USX to the Governance Warchest
         uint256 governanceWarchestPortion = withdrawalFee(USXAmount);
-        USX.transferFrom(address(this), treasury.governanceWarchest(), governanceWarchestPortion);
+        bool success = USX.transferFrom(address(this), treasury.governanceWarchest(), governanceWarchestPortion);
+        if (!success) revert USXTransferFailed();
 
         // Send the remaining USX to the user
         uint256 userPortion = USXAmount - governanceWarchestPortion;
-        USX.transferFrom(address(this), withdrawalRequests[withdrawalId].user, userPortion);
+        success = USX.transferFrom(address(this), withdrawalRequests[withdrawalId].user, userPortion);
+        if (!success) revert USXTransferFailed();
 
         // Mark the withdrawal as claimed
         withdrawalRequests[withdrawalId].claimed = true;

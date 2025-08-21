@@ -22,6 +22,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     error NoOutstandingWithdrawalRequests();
     error InsufficientUSDC();
     error TreasuryAlreadySet();
+    error USDCTransferFailed();
 
     /*=========================== Events =========================*/
 
@@ -117,12 +118,14 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
 
         // If there outstanding withdrawal requests greater than amount deposited, leave USDC on this contract to fulfill them
         if (usdcRequired > _amount) {
-            USDC.transferFrom(msg.sender, address(this), _amount);
+            bool success = USDC.transferFrom(msg.sender, address(this), _amount);
+            if (!success) revert USDCTransferFailed();
         }
         
         // If it is less, leave USDC required on this contract and send remaining USDC to the Treasury contract
         else {
-            USDC.transferFrom(msg.sender, address(treasury), usdcRequired - _amount);
+            bool success = USDC.transferFrom(msg.sender, address(treasury), usdcRequired - _amount);
+            if (!success) revert USDCTransferFailed();
         }
 
         // User receives USX
