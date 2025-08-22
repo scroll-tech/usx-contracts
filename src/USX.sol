@@ -49,21 +49,13 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     /*=========================== State Variables =========================*/
 
     IERC20 public USDC;
-
     ITreasury public treasury;
-
     bool public withdrawalsFrozen;
-
     address public governanceWarchest;
-
     address public admin;
-
     uint256 public totalOutstandingWithdrawalAmount;
-
     uint256 public usxPrice;
-
     mapping(address => bool) public whitelistedUsers;
-
     mapping(address => uint256) public outstandingWithdrawalRequests;
 
     /// @custom:oz-upgrades-unsafe-allow constructor

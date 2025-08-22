@@ -46,32 +46,15 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         bool claimed;                   // True = withdrawal request has been claimed
     }
 
-    // USX token reference (the underlying asset)
-    IERC20 public USX;
-
-    // treasury contract
-    ITreasury public treasury;
-
-    // address that controls governance of the contract
-    address public governance;
-
-    // withdrawal period in blocks, (default == 108000 (15 days))
-    uint256 public withdrawalPeriod;
-    
-    // fraction of withdrawals determining the withdrawal fee, (default 0.5% == 500) with precision to 0.001 percent
-    uint256 public withdrawalFeeFraction;
-
-    // withdrawal period in blocks, (default == 108000 (15 days))
-    uint256 public minWithdrawalPeriod;
-
-    // block number of the last epoch
-    uint256 public lastEpochBlock;
-
-    uint256 public withdrawalIdCounter;
-
-    //  duration of epoch in blocks, (default == 216000 (30days))
-    uint256 public epochDuration;
-
+    IERC20 public USX; // USX token reference (the underlying asset)
+    ITreasury public treasury;     // treasury contract
+    address public governance;    // address that controls governance of the contract
+    uint256 public withdrawalPeriod;    // withdrawal period in blocks, (default == 108000 (15 days))
+    uint256 public withdrawalFeeFraction;    // fraction of withdrawals determining the withdrawal fee, (default 0.5% == 500) with precision to 0.001 percent
+    uint256 public minWithdrawalPeriod;     // withdrawal period in blocks, (default == 108000 (15 days))
+    uint256 public lastEpochBlock;     // block number of the last epoch
+    uint256 public withdrawalIdCounter; 
+    uint256 public epochDuration;     //  duration of epoch in blocks, (default == 216000 (30days))
     mapping(uint256 => WithdrawalRequest) public withdrawalRequests;
     // TODO: Make a nested mapping with user address and withdrawalId? stores withdrawals per user instead of global
 
