@@ -33,21 +33,6 @@ contract TreasuryStorage {
     error NotGovernance();
     error NotAssetManager();
     
-    /*=========================== State Variables =========================*/
-    
-    IUSX public USX;                           // USX token contract
-    IsUSX public sUSX;                         // sUSX vault contract
-    IERC20 public USDC;                        // USDC token contract
-    address public governance;                  // Governance address
-    address public assetManager;                // The current Asset Manager for the protocol
-    address public governanceWarchest;          // Governance warchest address
-    uint256 public successFeeFraction;          // Success fee fraction (default 5% == 50000)
-    uint256 public maxLeverage;                 // Max leverage (default 10% == 100000)
-    uint256 public bufferRenewalFraction;       // Buffer renewal fraction (default 10% == 100000)
-    uint256 public bufferTargetFraction;        // Buffer target fraction (default 5% == 50000)    
-    uint256 public assetManagerUSDC;            // USDC allocated to Asset Manager
-    // (TODO: Remember to consider USDC has 6 decimals)
-
     /*=========================== Events =========================*/
     
     event GovernanceTransferred(address indexed oldGovernance, address indexed newGovernance);
@@ -65,4 +50,19 @@ contract TreasuryStorage {
         if (msg.sender != assetManager) revert NotAssetManager();
         _;
     }
+
+    /*=========================== State Variables =========================*/
+    
+    IUSX public USX;                           // USX token contract
+    IsUSX public sUSX;                         // sUSX vault contract
+    IERC20 public USDC;                        // USDC token contract
+    address public governance;                  // Governance address
+    address public assetManager;                // The current Asset Manager for the protocol
+    address public governanceWarchest;          // Governance warchest address
+    uint256 public successFeeFraction;          // Success fee fraction (default 5% == 50000)
+    uint256 public maxLeverage;                 // Max leverage (default 10% == 100000)
+    uint256 public bufferRenewalFraction;       // Buffer renewal fraction (default 10% == 100000)
+    uint256 public bufferTargetFraction;        // Buffer target fraction (default 5% == 50000)    
+    uint256 public assetManagerUSDC;            // USDC allocated to Asset Manager
+    // (TODO: Remember to consider USDC has 6 decimals)
 }
