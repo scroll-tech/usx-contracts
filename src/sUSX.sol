@@ -37,11 +37,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         _;
     }
 
-    modifier onlyTreasury() {
-        if (msg.sender != address(treasury)) revert NotTreasury();
-        _;
-    }
-
     /*=========================== State Variables =========================*/
 
     struct WithdrawalRequest {
@@ -196,17 +191,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         governance = newGovernance;
         
         emit GovernanceTransferred(oldGovernance, newGovernance);
-    }
-
-    /*=========================== Treasury Functions =========================*/
-
-    // USX profits are minted over a linear period till the next epoch
-    function distributeProfits(uint256 amountProfit) public onlyTreasury {
-        // Get the next epoch block
-        uint256 nextEpochBlock = lastEpochBlock + epochDuration;
-
-        // Calculate the amount of profits to be distributed each block until the next epoch
-        profitsPerBlock = amountProfit / (nextEpochBlock - lastEpochBlock);
     }
 
     /*=========================== Internal Functions =========================*/

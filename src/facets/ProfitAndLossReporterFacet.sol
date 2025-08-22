@@ -105,7 +105,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
 
     function _distributeProfits(uint256 profits) internal {
         // Distribute the remaining profits to the sUSX contract
-        sUSX.distributeProfits(profits);
+        USX.mintUSX(address(sUSX), profits);
     }
 
     function _distributeLosses(uint256 losses) internal returns (uint256 remainingLosses) {
