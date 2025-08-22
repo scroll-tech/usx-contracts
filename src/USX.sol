@@ -62,7 +62,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     constructor() {
         _disableInitializers();
     }
-s
+
     /*=========================== Initialization =========================*/
 
     function initialize(
