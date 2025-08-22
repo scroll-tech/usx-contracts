@@ -187,7 +187,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         address owner,
         uint256 assets,
         uint256 shares
-    ) internal override returns (uint256) {
+    ) internal override {
         // Check if user has enough sUSX shares
         if (balanceOf(owner) < shares) revert InsufficientBalance();
 
@@ -204,9 +204,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
         // Increment withdrawalIdCounter
         withdrawalIdCounter++;
-
-        // Return the shares that were burned
-        return shares;
     }
 
     // override default ERC4626 to use sharePrice
