@@ -54,8 +54,8 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         USX.mintUSX(governanceWarchest, governanceWarchestProfits);
 
         // Remaining profits are distributed to sUSX contract (USX stakers)
-        uint256 stakerprofits = grossProfit - insuranceBufferProfits - governanceWarchestProfits;
-        _distributeProfits(stakerprofits);
+        uint256 stakerProfits = grossProfit - insuranceBufferProfits - governanceWarchestProfits;
+        _distributeProfits(stakerProfits);
 
         // Update netEpochProfits
         netEpochProfits = stakerProfits;
