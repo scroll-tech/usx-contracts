@@ -22,7 +22,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     error WithdrawalPeriodNotPassed();
     error NextEpochNotStarted();
     error InvalidMinWithdrawalPeriod();
-    error MaxLeverageExceeded();
     error TreasuryAlreadySet();
     error USXTransferFailed();
 
@@ -135,43 +134,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     /*=========================== Public Functions =========================*/
 
-    // TODO: Override base ERC4626 deposit/withdraw functions
-
-    // instantly mints sUSX at sharePrice
-    function deposit(uint256 USX_amount) public {
-        // Check if the user has enough USX
-        if (USX.balanceOf(msg.sender) < USX_amount) revert InsufficientBalance();
-
-        // Check if the deposit would exceed the max leverage
-        if (treasury.checkMaxLeverage(USX_amount)) revert MaxLeverageExceeded();
-
-        // Get the amount of sUSX to mint given current sharePrice
-        uint256 sUSX_amount = USX_amount * 1e18 / sharePrice();
-
-        // Mint sUSX
-        _mint(msg.sender, sUSX_amount);
-    }
-
-    // user must wait for withdrawalPeriod to pass before unstaking (withdrawalPeriod)
-    function requestWithdraw(uint256 sUSX_amount) public {
-        // Check if user has enough sUSX
-        if (balanceOf(msg.sender) < sUSX_amount) revert InsufficientBalance();
-
-        // Burn sUSX
-        _burn(msg.sender, sUSX_amount);
-
-        // Record withdrawal request
-        withdrawalRequests[withdrawalIdCounter] = WithdrawalRequest({
-            user: msg.sender,
-            amount: sUSX_amount,
-            withdrawalTimestamp: block.timestamp,
-            claimed: false
-        });
-
-        // Increment withdrawalIdCounter
-        withdrawalIdCounter++;
-    }
-
     // after withdrawalPeriod AND epoch the user made withdrawal on is finished, after Gross Profits has been counted
     // portion is sent to the Governance Warchest (withdrawalFee applied here)
     function claimWithdraw(uint256 withdrawalId) public {
@@ -257,6 +219,38 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     }
 
     /*=========================== Internal Functions =========================*/
+
+    // user must wait for withdrawalPeriod to pass before unstaking (withdrawalPeriod)
+    // "requestWithdraw" function
+    // override default ERC4626 for the 2 step withdrawal process in protocol
+    function _withdraw(uint256 assets, address receiver, address owner) internal override returns (uint256 shares) {
+        // Check if user has enough sUSX
+        if (balanceOf(owner) < sUSX_amount) revert InsufficientBalance();
+
+        // Burn sUSX
+        _burn(owner, sUSX_amount);
+
+        // Record withdrawal request
+        withdrawalRequests[withdrawalIdCounter] = WithdrawalRequest({
+            user: receiver,
+            amount: sUSX_amount,
+            withdrawalTimestamp: block.timestamp,
+            claimed: false
+        });
+
+        // Increment withdrawalIdCounter
+        withdrawalIdCounter++;
+    }
+
+    // override default ERC4626 to use sharePrice
+    function _convertToShares(uint256 assets) internal view override returns (uint256 shares) {
+        return assets * 1e18 / sharePrice();
+    }
+
+    // override default ERC4626 to use sharePrice
+    function _convertToAssets(uint256 shares) internal view override returns (uint256 assets) {
+        return shares * sharePrice() / 1e18;
+    }
 
     // linear increase in profits each block
     function _updateLastEpochTime() internal {} // TODO: Call this inside a modifier applied on all relevant user functions so it automatically updates?
