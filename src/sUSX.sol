@@ -181,23 +181,32 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     // user must wait for withdrawalPeriod to pass before unstaking (withdrawalPeriod)
     // "requestWithdraw" function
     // override default ERC4626 for the 2 step withdrawal process in protocol
-    function _withdraw(uint256 assets, address receiver, address owner) internal override returns (uint256 shares) {
-        // Check if user has enough sUSX
-        if (balanceOf(owner) < sUSX_amount) revert InsufficientBalance();
+    function _withdraw(
+        address caller,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares
+    ) internal override returns (uint256) {
+        // Check if user has enough sUSX shares
+        if (balanceOf(owner) < shares) revert InsufficientBalance();
 
-        // Burn sUSX
-        _burn(owner, sUSX_amount);
+        // Burn sUSX shares
+        _burn(owner, shares);
 
         // Record withdrawal request
         withdrawalRequests[withdrawalIdCounter] = WithdrawalRequest({
             user: receiver,
-            amount: sUSX_amount,
+            amount: assets,
             withdrawalBlock: block.number,
             claimed: false
         });
 
         // Increment withdrawalIdCounter
         withdrawalIdCounter++;
+
+        // Return the shares that were burned
+        return shares;
     }
 
     // override default ERC4626 to use sharePrice
