@@ -7,6 +7,13 @@ import {AssetManagerAllocatorFacet} from "./AssetManagerAllocatorFacet.sol";
 
 contract InsuranceBufferFacet is TreasuryStorage {
     
+    /*=========================== Modifiers =========================*/
+    
+    modifier onlyTreasury() {
+        require(msg.sender == address(this), "Only Treasury facets can call this function");
+        _;
+    }
+    
     /*=========================== Public Functions =========================*/
     
     // returns current buffer target based on bufferTargetFraction and USX total supply
@@ -28,11 +35,11 @@ contract InsuranceBufferFacet is TreasuryStorage {
         bufferTargetFraction = _bufferTargetFraction;
     }
 
-    /*=========================== Internal Functions =========================*/
+    /*=========================== Treasury Functions =========================*/
 
     // tops up insurance buffer
     // it is triggered within every reportProfitAndLoss() call reports positive rewards while insurance buffer is less then bufferTarget(). Tries to replenish buffer up to amount from first netDeposits from the latest epoch, then netEpochProfits
-    function _topUpBuffer(uint256 _totalProfit) internal returns (uint256 insuranceBufferAccrual) {
+    function topUpBuffer(uint256 _totalProfit) public onlyTreasury returns (uint256 insuranceBufferAccrual) {
         // Check if the buffer is less than the buffer target
         if (USX.balanceOf(address(this)) < bufferTarget()) {
             // Calculate the amount of USX to mint to the buffer
@@ -45,7 +52,7 @@ contract InsuranceBufferFacet is TreasuryStorage {
 
     // deplete insurance buffer
     // it is triggered within every reportProfitAndLoss() call reports a loss. Tries to drain buffer up to amount. If amount <= bufferSize, then it drains the buffer, if amount > bufferSize than the USX:USDC peg is broken to reflect the loss.
-    function _slashBuffer(uint256 _amount) internal returns (uint256 remainingLosses) {
+    function slashBuffer(uint256 _amount) public onlyTreasury returns (uint256 remainingLosses) {
         uint256 bufferSize = USX.balanceOf(address(this));
         // Insurance Buffer can absorb the loss
         if (_amount <= bufferSize) {

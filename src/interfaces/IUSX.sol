@@ -18,7 +18,7 @@ interface IUSX {
     function unfreezeWithdrawals() external;
     
     // State getters
-    function usdxPrice() external view returns (uint256);
+    function usxPrice() external view returns (uint256);
     function withdrawalsFrozen() external view returns (bool);
     function governanceWarchest() external view returns (address);
 }

@@ -16,4 +16,6 @@ interface IsUSX {
     // State getters
     function USX() external view returns (address);
     function treasury() external view returns (address);
+    function lastEpochBlock() external view returns (uint256);
+    function epochDuration() external view returns (uint256);
 }

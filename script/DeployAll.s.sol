@@ -112,16 +112,17 @@ contract DeployAll is Script {
         TreasuryDiamond treasury = TreasuryDiamond(payable(treasuryProxy));
         
         // Add Profit/Loss facet
-        bytes4[] memory profitLossSelectors = new bytes4[](2);
-        profitLossSelectors[0] = ProfitAndLossReporterFacet.makeAssetManagerReport.selector;
-        profitLossSelectors[1] = ProfitAndLossReporterFacet.setSuccessFeeFraction.selector;
+        bytes4[] memory profitLossSelectors = new bytes4[](3);
+        profitLossSelectors[0] = ProfitAndLossReporterFacet.reportProfits.selector;
+        profitLossSelectors[1] = ProfitAndLossReporterFacet.reportLosses.selector;
+        profitLossSelectors[2] = ProfitAndLossReporterFacet.setSuccessFeeFraction.selector;
         treasury.addFacet(address(profitLossFacet), profitLossSelectors);
         console.log("Added Profit/Loss facet");
         
         // Add Insurance Buffer facet
         bytes4[] memory insuranceBufferSelectors = new bytes4[](5);
-        insuranceBufferSelectors[0] = InsuranceBufferFacet._topUpBuffer.selector;
-        insuranceBufferSelectors[1] = InsuranceBufferFacet._slashBuffer.selector;
+        insuranceBufferSelectors[0] = InsuranceBufferFacet.topUpBuffer.selector;
+        insuranceBufferSelectors[1] = InsuranceBufferFacet.slashBuffer.selector;
         insuranceBufferSelectors[2] = InsuranceBufferFacet.bufferTarget.selector;
         insuranceBufferSelectors[3] = InsuranceBufferFacet.setBufferRenewalRate.selector;
         insuranceBufferSelectors[4] = InsuranceBufferFacet.setBufferTargetFraction.selector;

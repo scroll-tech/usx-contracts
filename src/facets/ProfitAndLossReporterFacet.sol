@@ -47,7 +47,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         // TODO: Check remaining profits?
 
         // Portion of the profits are added to the Insurance Buffer
-        uint256 insuranceBufferProfits = InsuranceBufferFacet(address(this))._topUpBuffer(grossProfit);
+        uint256 insuranceBufferProfits = InsuranceBufferFacet(address(this)).topUpBuffer(grossProfit);
 
         // Porftion of the profits are added to the Governance Warchest
         uint256 governanceWarchestProfits = successFee(grossProfit);
@@ -70,7 +70,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         assetManagerUSDC = totalBalance;
 
         // 1. Subtract loss from the Insurance Buffer module
-        uint256 remainingLossesAfterInsuranceBuffer = InsuranceBufferFacet(address(this))._slashBuffer(grossLoss);
+        uint256 remainingLossesAfterInsuranceBuffer = InsuranceBufferFacet(address(this)).slashBuffer(grossLoss);
 
         // 2. Then if losses remain, burn USX held in sUSX contract to cover loss
         if (remainingLossesAfterInsuranceBuffer > 0) {
