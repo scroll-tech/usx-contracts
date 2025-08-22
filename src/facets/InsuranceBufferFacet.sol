@@ -46,6 +46,17 @@ contract InsuranceBufferFacet is TreasuryStorage {
     // deplete insurance buffer
     // it is triggered within every reportProfitAndLoss() call reports a loss. Tries to drain buffer up to amount. If amount <= bufferSize, then it drains the buffer, if amount > bufferSize than the USX:USDC peg is broken to reflect the loss.
     function _slashBuffer(uint256 _amount) internal returns (uint256 remainingLosses) {
-        // TODO: Implement
+        uint256 bufferSize = USX.balanceOf(address(this));
+        // Insurance Buffer can absorb the loss
+        if (_amount <= bufferSize) {
+            // Deduct the amount from the buffer
+            USX.burnUSX(address(this), _amount);
+            remainingLosses = 0;
+        // Insurance Buffer is not sufficient to absorb the loss
+        } else {
+            // If the amount is greater than the buffer size, burn the buffer and return the remaining losses
+            USX.burnUSX(address(this), bufferSize);
+            remainingLosses = _amount - bufferSize;
+        }
     }
 }
