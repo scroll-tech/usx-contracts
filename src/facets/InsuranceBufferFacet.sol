@@ -7,6 +7,13 @@ import {AssetManagerAllocatorFacet} from "./AssetManagerAllocatorFacet.sol";
 
 contract InsuranceBufferFacet is TreasuryStorage {
     
+    /*=========================== Public Functions =========================*/
+    
+    // returns current buffer target based on bufferTargetFraction and USX total supply
+    function bufferTarget() public view returns (uint256) {
+        return USX.totalSupply() * bufferTargetFraction / 100000;
+    }
+
     /*=========================== Governance Functions =========================*/
     
     // sets renewal fraction with precision to 0.001 percent (Minimal value & default is 10% fee == 100000)
@@ -20,17 +27,12 @@ contract InsuranceBufferFacet is TreasuryStorage {
         if (_bufferTargetFraction < 50000) revert InvalidBufferTargetFraction();
         bufferTargetFraction = _bufferTargetFraction;
     }
-    
+
     /*=========================== Internal Functions =========================*/
-    
-    // returns current buffer target based on bufferTargetFraction and USX total supply
-    function bufferTarget() public view returns (uint256) {
-        return USX.totalSupply() * bufferTargetFraction / 100000;
-    }
-    
+
     // tops up insurance buffer
     // it is triggered within every reportProfitAndLoss() call reports positive rewards while insurance buffer is less then bufferTarget(). Tries to replenish buffer up to amount from first netDeposits from the latest epoch, then netEpochProfits
-    function _topUpBuffer(uint256 _totalProfit) external returns (uint256 insuranceBufferAccrual) {
+    function _topUpBuffer(uint256 _totalProfit) internal returns (uint256 insuranceBufferAccrual) {
         // Check if the buffer is less than the buffer target
         if (USX.balanceOf(address(this)) < bufferTarget()) {
             // Calculate the amount of USX to mint to the buffer
@@ -43,7 +45,7 @@ contract InsuranceBufferFacet is TreasuryStorage {
 
     // deplete insurance buffer
     // it is triggered within every reportProfitAndLoss() call reports a loss. Tries to drain buffer up to amount. If amount <= bufferSize, then it drains the buffer, if amount > bufferSize than the USX:USDC peg is broken to reflect the loss.
-    function _slashBuffer(uint256 _amount) external returns (uint256 remainingLosses) {
-
+    function _slashBuffer(uint256 _amount) internal returns (uint256 remainingLosses) {
+        // TODO: Implement
     }
 }
