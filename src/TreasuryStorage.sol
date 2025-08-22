@@ -29,6 +29,8 @@ contract TreasuryStorage {
     // Profit/Loss Reporter errors
     error ZeroValueChange();
     error InvalidSuccessFeeFraction();
+    error ProfitsDetectedUseReportProfitsFunction();
+    error LossesDetectedUseReportLossesFunction();
     
     // Access control errors
     error NotGovernance();
@@ -67,4 +69,5 @@ contract TreasuryStorage {
     uint256 public assetManagerUSDC;            // USDC allocated to Asset Manager
     // (TODO: Remember to consider USDC has 6 decimals)
     // TODO: assetManagerUSDC may need to be updated at each asset manager report
+    uint256 public netEpochProfits;     // profits reported for previous epoch, after deducting Insurance Buffer and Governance Warchest fees
 }

@@ -72,19 +72,13 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     // timestamp of the last epoch
     uint256 public lastEpochTime;
 
+    // block number of the last epoch
+    uint256 public lastEpochBlock;
+
     uint256 public withdrawalIdCounter;
 
     //  duration of epoch in blocks, (default == 216000 (30days))
     uint256 public epochDuration;
-
-    // profits reported for previous period TODO: is this needed?
-    uint256 public netEpochProfits;
-
-    // current profit added at current epoch TODO: is this needed?
-    uint256 public profitLatestEpoch;
-
-    // determines increase in profits for each block
-    uint256 public profitsPerBlock;
 
     mapping(uint256 => WithdrawalRequest) public withdrawalRequests;
     // TODO: Make a nested mapping with user address and withdrawalId? stores withdrawals per user instead of global
@@ -147,7 +141,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         if (withdrawalRequests[withdrawalId].withdrawalTimestamp > lastEpochTime) revert NextEpochNotStarted();
 
         // Get the total USX amount for the amount of sUSX being redeemed
-        uint256 USXAmount = withdrawalRequests[withdrawalId].amount * sharePrice() / 1e18; // TODO: verify share price applied correctly
+        uint256 USXAmount = withdrawalRequests[withdrawalId].amount * sharePrice() / 1e18;
 
         // Distribute portion of USX to the Governance Warchest
         uint256 governanceWarchestPortion = withdrawalFee(USXAmount);
@@ -166,7 +160,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     // calculated using on chain USX balance and linear profit accrual (USX.balanceOf(this) + linear scaled profits from last epoch)
     function sharePrice() public view returns (uint256) {
         uint256 base    = USX.balanceOf(address(this));
-        uint256 rewards = profitLatestEpoch; // TODO: Implement logic for this variable
+        uint256 rewards = treasury.profitLatestEpoch();
         uint256 totalUSX = base + rewards;
         return totalUSX * 1e18 / this.totalSupply();
     }
@@ -211,11 +205,11 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     // USX profits are minted over a linear period till the next epoch
     function distributeProfits(uint256 amountProfit) public onlyTreasury {
-        // Get the next epoch time
-        uint256 nextEpochTime = lastEpochTime + epochDuration;
+        // Get the next epoch block
+        uint256 nextEpochBlock = lastEpochBlock + epochDuration;
 
         // Calculate the amount of profits to be distributed each block until the next epoch
-        profitsPerBlock = amountProfit / (nextEpochTime - block.timestamp);
+        profitsPerBlock = amountProfit / (nextEpochBlock - lastEpochBlock);
     }
 
     /*=========================== Internal Functions =========================*/
@@ -255,12 +249,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     // linear increase in profits each block
     function _updateLastEpochTime() internal {} // TODO: Call this inside a modifier applied on all relevant user functions so it automatically updates?
 
-    function _applyLatestProfits() internal {}
-    // TODO: Call this inside a modifier applied on all relevant user functions so it automatically updates?
-    // logic could be covered by sharePrice() calls?
-    // Consider merge with _updateLastEpochTime in general updateFunction?
-    // Consider function that allows the update to be applied manually at any point?
-    // Keep in mind profits should only be distributed until next epoch. After that, no new profit accrual until Asset Manager has made new profitable report.
+    function _updateLastEpochBlock() internal {} // TODO: Implement
 
     /*=========================== UUPS Functions =========================*/
 

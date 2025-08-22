@@ -15,52 +15,71 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
     function successFee(uint256 profitAmount) public view returns (uint256) {
         return profitAmount * successFeeFraction / 100000;
     }
-    
+
+    // calculates cumulative profit for previous epoch
+    function profitLatestEpoch() public view returns (uint256 profit) {
+        uint256 blocks = block.number - sUSX.lastEpochBlock();
+        return profitPerBlock() * blocks;
+    }
+
+    // calculates the profit per block for the current epoch, to be added to USX balance over time in sharePrice() function
+    function profitPerBlock() public view returns (uint256) {
+        uint256 blocksRemainingInEpoch = sUSX.lastEpochBlock() + sUSX.epochDuration() - block.number;
+        return netEpochProfits / blocksRemainingInEpoch;
+    }
+
     /*=========================== Asset Manager Functions =========================*/
     
-    // reports profit or loss for the Asset Manager
-    // TODO: Consider just this one function or two seperate functions for reportProfits and reportLosses?
-    function makeAssetManagerReport(int256 grossValueChange) public {
-        if (msg.sender != assetManager) revert NotAssetManager();
-        if (grossValueChange == 0) revert ZeroValueChange(); // TODO: Should this be allowed? Highly unlikely edge case.
+    // Asset Manager reports total balance of USDC they hold, profits calculated from that
+    function reportProfits(uint256 totalBalance) public onlyAssetManager {
+        if (totalBalance < assetManagerUSDC) revert LossesDetectedUseReportLossesFunction();
+        uint256 grossProfit = totalBalance - assetManagerUSDC;
+        if (grossProfit == 0) revert ZeroValueChange(); // TODO: Should this be allowed? Highly unlikely edge case.
+
+        // Update the assetManagerUSDC to the new balance
+        assetManagerUSDC = totalBalance;
         
-        // Profit Reported
-        if (grossValueChange > 0) {
-            uint256 grossProfit = uint256(grossValueChange);
+        // If the usxPrice() < 1 (peg is broken) then update the peg and if there are any remaining profits, distribute them
+        if (USX.usxPrice() < 1) {
+            _updatePeg();
+        }
 
-            // If the usxPrice() < 1 (peg is broken) then update the peg and if there are any remaining profits, distribute them
-            uint256 newPeg = _updatePeg();
-            if (newPeg >= 1) { // TODO: Consider if should have buffer target (something like >= 0.9995)    
-                // Portion of the profits are added to the Insurance Buffer
-                uint256 insuranceBufferProfits = InsuranceBufferFacet(address(this))._topUpBuffer(grossProfit);
+        // TODO: Check remaining profits?
 
-                // Porftion of the profits are added to the Governance Warchest
-                uint256 governanceWarchestProfits = successFee(grossProfit);
-                USX.mintUSX(governanceWarchest, governanceWarchestProfits);
+        // Portion of the profits are added to the Insurance Buffer
+        uint256 insuranceBufferProfits = InsuranceBufferFacet(address(this))._topUpBuffer(grossProfit);
 
-                // Remaining profits are distributed to sUSX contract (USX stakers)
-                uint256 stakerprofits = grossProfit - insuranceBufferProfits - governanceWarchestProfits;
-                _distributeProfits(stakerprofits);
-            }
+        // Porftion of the profits are added to the Governance Warchest
+        uint256 governanceWarchestProfits = successFee(grossProfit);
+        USX.mintUSX(governanceWarchest, governanceWarchestProfits);
 
-        // Loss Reported
-        } else {
-            uint256 grossLoss = uint256(-grossValueChange);
+        // Remaining profits are distributed to sUSX contract (USX stakers)
+        uint256 stakerprofits = grossProfit - insuranceBufferProfits - governanceWarchestProfits;
+        _distributeProfits(stakerprofits);
 
-            // 1. Subtract loss from the Insurance Buffer module
-            uint256 remainingLossesAfterInsuranceBuffer = InsuranceBufferFacet(address(this))._slashBuffer(grossLoss);
+        // Update netEpochProfits
+        netEpochProfits = stakerProfits;
+    }
 
-            // 2. Then if losses remain, burn USX held in sUSX contract to cover loss
-            if (remainingLossesAfterInsuranceBuffer > 0) {
-                uint256 remainingLossesAfterVault = _distributeLosses(remainingLossesAfterInsuranceBuffer);
+    function reportLosses(uint256 totalBalance) public onlyAssetManager {
+        if (totalBalance > assetManagerUSDC) revert ProfitsDetectedUseReportProfitsFunction();
+        uint256 grossLoss = assetManagerUSDC - totalBalance;
+        if (grossLoss == 0) revert ZeroValueChange(); // TODO: Should this be allowed? Highly unlikely edge case.
 
-                // TODO: should peg be updated here? USX has been burned so the ratio should change as well?
-                
-                // 3. Finally if neither of these cover the losses, update the peg to adjust the USX:USDC ratio and freeze withdrawal temporarily
-                if (remainingLossesAfterVault > 0) {
-                    _updatePeg();
-                    USX.freezeWithdrawals();
-                }
+        // Update the assetManagerUSDC to the new balance
+        assetManagerUSDC = totalBalance;
+
+        // 1. Subtract loss from the Insurance Buffer module
+        uint256 remainingLossesAfterInsuranceBuffer = InsuranceBufferFacet(address(this))._slashBuffer(grossLoss);
+
+        // 2. Then if losses remain, burn USX held in sUSX contract to cover loss
+        if (remainingLossesAfterInsuranceBuffer > 0) {
+            uint256 remainingLossesAfterVault = _distributeLosses(remainingLossesAfterInsuranceBuffer);
+            
+            // 3. Finally if neither of these cover the losses, update the peg to adjust the USX:USDC ratio and freeze withdrawal temporarily
+            if (remainingLossesAfterVault > 0) {
+                _updatePeg();
+                USX.freezeWithdrawals();
             }
         }
     }
@@ -79,7 +98,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
     // USDCoutstanding / USXtotalSupply
     function _updatePeg() internal returns (uint256) {
         uint256 totalUSDCoutstanding = USDC.balanceOf(address(this)) + assetManagerUSDC;
-        uint256 updatedPeg = USX.totalSupply() / totalUSDCoutstanding; // TODO: verify the order of vision is correct
+        uint256 updatedPeg = totalUSDCoutstanding / USX.totalSupply();
         USX.updatePeg(updatedPeg);
         return updatedPeg;
     }
