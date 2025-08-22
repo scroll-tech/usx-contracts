@@ -47,7 +47,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     struct WithdrawalRequest {
         address user;                   // Address of withdrawer
         uint256 amount;                 // sUSX amount redeemed
-        uint256 withdrawalTimestamp;    // Timestamp of the withdrawal request
+        uint256 withdrawalBlock;        // Block number of the withdrawal request
         bool claimed;                   // True = withdrawal request has been claimed
     }
 
@@ -68,9 +68,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     // withdrawal period in blocks, (default == 108000 (15 days))
     uint256 public minWithdrawalPeriod;
-
-    // timestamp of the last epoch
-    uint256 public lastEpochTime;
 
     // block number of the last epoch
     uint256 public lastEpochBlock;
@@ -135,10 +132,10 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         if (withdrawalRequests[withdrawalId].claimed) revert WithdrawalAlreadyClaimed();
 
         // Check if the withdrawal period has passed
-        if (withdrawalRequests[withdrawalId].withdrawalTimestamp + withdrawalPeriod > block.timestamp) revert WithdrawalPeriodNotPassed();
+        if (withdrawalRequests[withdrawalId].withdrawalBlock + withdrawalPeriod > block.number) revert WithdrawalPeriodNotPassed();
 
         // Check if the next epoch has started since the withdrawal request was made
-        if (withdrawalRequests[withdrawalId].withdrawalTimestamp > lastEpochTime) revert NextEpochNotStarted();
+        if (withdrawalRequests[withdrawalId].withdrawalBlock > lastEpochBlock) revert NextEpochNotStarted();
 
         // Get the total USX amount for the amount of sUSX being redeemed
         uint256 USXAmount = withdrawalRequests[withdrawalId].amount * sharePrice() / 1e18;
@@ -228,7 +225,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         withdrawalRequests[withdrawalIdCounter] = WithdrawalRequest({
             user: receiver,
             amount: sUSX_amount,
-            withdrawalTimestamp: block.timestamp,
+            withdrawalBlock: block.number,
             claimed: false
         });
 
@@ -245,9 +242,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     function _convertToAssets(uint256 shares) internal view override returns (uint256 assets) {
         return shares * sharePrice() / 1e18;
     }
-
-    // linear increase in profits each block
-    function _updateLastEpochTime() internal {} // TODO: Call this inside a modifier applied on all relevant user functions so it automatically updates?
 
     function _updateLastEpochBlock() internal {} // TODO: Implement
 
