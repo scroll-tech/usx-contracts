@@ -8,7 +8,7 @@ import {TreasuryStorage} from "./TreasuryStorage.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IUSX} from "./interfaces/IUSX.sol";
 import {IsUSX} from "./interfaces/IsUSX.sol";
-import {IAssetManager} from "./interfaces/IAssetManager.sol"; // TODO: Remove, or integrate.
+import {IAssetManager} from "./interfaces/IAssetManager.sol";
 
 contract TreasuryDiamond is TreasuryStorage, UUPSUpgradeable, Initializable {
     
