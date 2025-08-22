@@ -20,6 +20,7 @@ contract TreasuryStorage {
     
     // Asset Manager errors
     error InvalidMaxLeverage();
+    error MaxLeverageExceeded();
     
     // Insurance Buffer errors
     error InvalidBufferRenewalRate();
@@ -65,4 +66,5 @@ contract TreasuryStorage {
     uint256 public bufferTargetFraction;        // Buffer target fraction (default 5% == 50000)    
     uint256 public assetManagerUSDC;            // USDC allocated to Asset Manager
     // (TODO: Remember to consider USDC has 6 decimals)
+    // TODO: assetManagerUSDC may need to be updated at each asset manager report
 }

@@ -14,9 +14,16 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
     
     /*=========================== Public Functions =========================*/
     
-    // Checks if a deposit on the sUSX contract would exceed the max protocol leverage. Returns true if deposit would be allowed, false if it would exceed the max leverage.
+    // Checks if a deposit on the sUSX contract would exceed the max protocol leverage.
+    // e.g. maxLeverage of 10 means treasury will allocate to Asset Manager no more USDC than x10 USX held by vault
+    // Returns true if deposit would be allowed, false if it would exceed the max leverage.
     function checkMaxLeverage(uint256 depositAmount) public view returns (bool) {
-        // TODO
+        uint256 maxAllocation = maxLeverage * USX.balanceOf(address(sUSX));
+        uint256 currentAllocationOfAssetManager = assetManagerUSDC;
+        if (currentAllocationOfAssetManager + depositAmount > maxAllocation) {
+            return false;
+        }
+        return true;
     }
 
     function netDeposits() public view returns (uint256) {
@@ -41,6 +48,10 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
     
     function transferUSDCtoAssetManager(uint256 _amount) external {
         if (msg.sender != assetManager) revert NotAssetManager();
+
+        // Check if the transfer would exceed the max leverage
+        if (!checkMaxLeverage(_amount)) revert MaxLeverageExceeded();
+
         assetManagerUSDC += _amount;
         IAssetManager(assetManager).deposit(_amount);
     }
