@@ -62,7 +62,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     constructor() {
         _disableInitializers();
     }
-
+s
     /*=========================== Initialization =========================*/
 
     function initialize(
@@ -212,8 +212,6 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     function freezeWithdrawals() public onlyTreasury {
         withdrawalsFrozen = true;
     }
-
-    /*=========================== Internal Functions =========================*/
 
     /*=========================== UUPS Functions =========================*/
 
