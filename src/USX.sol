@@ -105,18 +105,19 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         // Check if user is whitelisted
         if (!whitelistedUsers[msg.sender]) revert UserNotWhitelisted();
     
-        // Check if there are any outstanding withdrawal requests needing USDC
-        uint256 usdcRequired = usdcRequiredForWithdrawalRequests();
-
-        // If there outstanding withdrawal requests greater than amount deposited, leave USDC on this contract to fulfill them
-        if (usdcRequired > _amount) {
-            bool success = USDC.transferFrom(msg.sender, address(this), _amount);
+        // Calculate USDC distribution: keep what's needed for withdrawal requests, send excess to treasury
+        uint256 usdcForContract = _amount <= totalOutstandingWithdrawalAmount ? _amount : totalOutstandingWithdrawalAmount;
+        uint256 usdcForTreasury = _amount - usdcForContract;
+        
+        // Transfer USDC to contract (if needed for withdrawal requests)
+        if (usdcForContract > 0) {
+            bool success = USDC.transferFrom(msg.sender, address(this), usdcForContract);
             if (!success) revert USDCTransferFailed();
         }
         
-        // If it is less, leave USDC required on this contract and send remaining USDC to the Treasury contract
-        else {
-            bool success = USDC.transferFrom(msg.sender, address(treasury), usdcRequired - _amount);
+        // Transfer excess USDC to treasury
+        if (usdcForTreasury > 0) {
+            bool success = USDC.transferFrom(msg.sender, address(treasury), usdcForTreasury);
             if (!success) revert USDCTransferFailed();
         }
 
@@ -160,10 +161,6 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         
         // Send the USDC to the user
         USDC.transfer(msg.sender, usdcAmount);
-    }
-
-    function usdcRequiredForWithdrawalRequests() public view returns (uint256) {
-        return USDC.balanceOf(address(this)) - totalOutstandingWithdrawalAmount;
     }
 
     /*=========================== Governance Functions =========================*/
