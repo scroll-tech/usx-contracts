@@ -13,34 +13,39 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
     
     // calculates the success fee for the Goverance Warchest based on successFeeFraction
     function successFee(uint256 profitAmount) public view returns (uint256) {
-        return profitAmount * successFeeFraction / 100000;
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        return profitAmount * $.successFeeFraction / 100000;
     }
 
     // calculates cumulative profit for previous epoch
     function profitLatestEpoch() public view returns (uint256 profit) {
-        uint256 blocks = block.number - sUSX.lastEpochBlock();
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        uint256 blocks = block.number - $.sUSX.lastEpochBlock();
         return profitPerBlock() * blocks;
     }
 
     // calculates the profit per block for the current epoch, to be added to USX balance over time in sharePrice() function
     function profitPerBlock() public view returns (uint256) {
-        uint256 blocksRemainingInEpoch = sUSX.lastEpochBlock() + sUSX.epochDuration() - block.number;
-        return netEpochProfits / blocksRemainingInEpoch;
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        uint256 blocksRemainingInEpoch = $.sUSX.lastEpochBlock() + $.sUSX.epochDuration() - block.number;
+        return $.netEpochProfits / blocksRemainingInEpoch;
     }
 
     /*=========================== Asset Manager Functions =========================*/
     
     // Asset Manager reports total balance of USDC they hold, profits calculated from that
     function reportProfits(uint256 totalBalance) public onlyAssetManager {
-        if (totalBalance < assetManagerUSDC) revert LossesDetectedUseReportLossesFunction();
-        uint256 grossProfit = totalBalance - assetManagerUSDC;
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        
+        if (totalBalance < $.assetManagerUSDC) revert LossesDetectedUseReportLossesFunction();
+        uint256 grossProfit = totalBalance - $.assetManagerUSDC;
         if (grossProfit == 0) revert ZeroValueChange(); // TODO: Should this be allowed? Highly unlikely edge case.
 
         // Update the assetManagerUSDC to the new balance
-        assetManagerUSDC = totalBalance;
+        $.assetManagerUSDC = totalBalance;
         
         // If the usxPrice() < 1 (peg is broken) then update the peg and if there are any remaining profits, distribute them
-        if (USX.usxPrice() < 1) {
+        if ($.USX.usxPrice() < 1) {
             _updatePeg();
         }
 
@@ -52,7 +57,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         // Porftion of the profits are added to the Governance Warchest
         uint256 governanceWarchestProfits = successFee(grossProfit);
         uint256 governanceWarchestUSX = governanceWarchestProfits * DECIMAL_SCALE_FACTOR;
-        USX.mintUSX(governanceWarchest, governanceWarchestUSX);
+        $.USX.mintUSX($.governanceWarchest, governanceWarchestUSX);
 
         // Remaining profits are distributed to sUSX contract (USX stakers)
         uint256 stakerProfits = grossProfit - insuranceBufferProfits - governanceWarchestProfits;
@@ -60,16 +65,18 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         _distributeProfits(stakerProfitsUSX);
 
         // Update netEpochProfits
-        netEpochProfits = stakerProfits;
+        $.netEpochProfits = stakerProfits;
     }
 
     function reportLosses(uint256 totalBalance) public onlyAssetManager {
-        if (totalBalance > assetManagerUSDC) revert ProfitsDetectedUseReportProfitsFunction();
-        uint256 grossLoss = assetManagerUSDC - totalBalance;
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        
+        if (totalBalance > $.assetManagerUSDC) revert ProfitsDetectedUseReportProfitsFunction();
+        uint256 grossLoss = $.assetManagerUSDC - totalBalance;
         if (grossLoss == 0) revert ZeroValueChange(); // TODO: Should this be allowed? Highly unlikely edge case.
 
         // Update the assetManagerUSDC to the new balance
-        assetManagerUSDC = totalBalance;
+        $.assetManagerUSDC = totalBalance;
 
         // 1. Subtract loss from the Insurance Buffer module
         uint256 remainingLossesAfterInsuranceBuffer = InsuranceBufferFacet(address(this)).slashBuffer(grossLoss);
@@ -81,7 +88,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
             // 3. Finally if neither of these cover the losses, update the peg to adjust the USX:USDC ratio and freeze withdrawal temporarily
             if (remainingLossesAfterVault > 0) {
                 _updatePeg();
-                USX.freezeWithdrawals();
+                $.USX.freezeWithdrawals();
             }
         }
     }
@@ -91,7 +98,8 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
     // fraction of success fee determining the success fee, (default 5% == 50000) with precision to 0.001 percent
     function setSuccessFeeFraction(uint256 _successFeeFraction) external onlyGovernance {
         if (_successFeeFraction > 100000) revert InvalidSuccessFeeFraction();
-        successFeeFraction = _successFeeFraction;
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        $.successFeeFraction = _successFeeFraction;
     }
     
     /*=========================== Internal Functions =========================*/
@@ -100,30 +108,33 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
     // USDCoutstanding / USXtotalSupply
     // Note: USDC has 6 decimals, USX has 18 decimals, so we need to scale USDC up by 10^12
     function _updatePeg() internal returns (uint256) {
-        uint256 totalUSDCoutstanding = USDC.balanceOf(address(this)) + assetManagerUSDC;
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        uint256 totalUSDCoutstanding = $.USDC.balanceOf(address(this)) + $.assetManagerUSDC;
         uint256 scaledUSDC = totalUSDCoutstanding * DECIMAL_SCALE_FACTOR;
-        uint256 updatedPeg = scaledUSDC / USX.totalSupply();
-        USX.updatePeg(updatedPeg);
+        uint256 updatedPeg = scaledUSDC / $.USX.totalSupply();
+        $.USX.updatePeg(updatedPeg);
         return updatedPeg;
     }
 
     function _distributeProfits(uint256 profits) internal {
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         // Distribute the remaining profits to the sUSX contract
-        USX.mintUSX(address(sUSX), profits);
+        $.USX.mintUSX(address($.sUSX), profits);
     }
 
     function _distributeLosses(uint256 losses) internal returns (uint256 remainingLosses) {
-        address vaultAddress = address(sUSX);
-        uint256 vaultUSXBalance = USX.balanceOf(vaultAddress);
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        address vaultAddress = address($.sUSX);
+        uint256 vaultUSXBalance = $.USX.balanceOf(vaultAddress);
         
         // Convert USDC losses to USX: losses (6 decimals) * DECIMAL_SCALE_FACTOR (10^12) = USX (18 decimals)
         uint256 lossesUSX = losses * DECIMAL_SCALE_FACTOR;
         
         if (vaultUSXBalance > lossesUSX) {
-            USX.burnUSX(vaultAddress, lossesUSX);
+            $.USX.burnUSX(vaultAddress, lossesUSX);
             remainingLosses = 0;
         } else {
-            USX.burnUSX(vaultAddress, vaultUSXBalance);
+            $.USX.burnUSX(vaultAddress, vaultUSXBalance);
             // Convert remaining USX back to USDC: remaining USX / DECIMAL_SCALE_FACTOR
             remainingLosses = (lossesUSX - vaultUSXBalance) / DECIMAL_SCALE_FACTOR;
         }

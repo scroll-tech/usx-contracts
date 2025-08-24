@@ -59,18 +59,19 @@ contract TreasuryDiamond is TreasuryStorage, UUPSUpgradeable, Initializable {
             revert ZeroAddress();
         }
         
-        USDC = IERC20(_USDC);
-        USX = IUSX(_USX);
-        sUSX = IsUSX(_sUSX);
-        governance = _governance;
-        governanceWarchest = _governanceWarchest;
-        assetManager = _assetManager;
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        $.USDC = IERC20(_USDC);
+        $.USX = IUSX(_USX);
+        $.sUSX = IsUSX(_sUSX);
+        $.governance = _governance;
+        $.governanceWarchest = _governanceWarchest;
+        $.assetManager = _assetManager;
         
         // Set default values
-        successFeeFraction = 50000;      // 5%
-        maxLeverageFraction = 100000;    // 10%
-        bufferRenewalFraction = 100000;  // 10%
-        bufferTargetFraction = 50000;    // 5%
+        $.successFeeFraction = 50000;      // 5%
+        $.maxLeverageFraction = 100000;    // 10%
+        $.bufferRenewalFraction = 100000;  // 10%
+        $.bufferTargetFraction = 50000;    // 5%
         
         emit TreasuryInitialized(_USDC, _USX, _sUSX);
     }
@@ -171,8 +172,9 @@ contract TreasuryDiamond is TreasuryStorage, UUPSUpgradeable, Initializable {
     function setGovernance(address newGovernance) external onlyGovernance {
         if (newGovernance == address(0)) revert ZeroAddress();
         
-        address oldGovernance = governance;
-        governance = newGovernance;
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        address oldGovernance = $.governance;
+        $.governance = newGovernance;
         
         emit GovernanceTransferred(oldGovernance, newGovernance);
     }

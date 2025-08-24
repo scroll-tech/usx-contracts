@@ -16,11 +16,12 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
     
     // Returns the maximum USDC allocation allowed based on current leverage settings
     function maxLeverage() public view returns (uint256) {
-        uint256 vaultValue = USX.balanceOf(address(sUSX));
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        uint256 vaultValue = $.USX.balanceOf(address($.sUSX));
         
         // maxLeverageFraction is in basis points (e.g., 100000 = 10%)
         // So maxAllocation = maxLeverageFraction * vaultValue / 100000
-        return (maxLeverageFraction * vaultValue) / 100000;
+        return ($.maxLeverageFraction * vaultValue) / 100000;
     }
     
     // Checks if a deposit on the sUSX contract would exceed the max protocol leverage.
@@ -28,7 +29,8 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
     // Returns true if deposit would be allowed, false if it would exceed the max leverage.
     function checkMaxLeverage(uint256 depositAmount) public view returns (bool) {
         uint256 maxAllocation = maxLeverage();
-        uint256 currentAllocationOfAssetManager = assetManagerUSDC;
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        uint256 currentAllocationOfAssetManager = $.assetManagerUSDC;
         if (currentAllocationOfAssetManager + depositAmount > maxAllocation) {
             return false;
         }
@@ -36,7 +38,8 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
     }
 
     function netDeposits() public view returns (uint256) {
-        return USDC.balanceOf(address(this)) + assetManagerUSDC;
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        return $.USDC.balanceOf(address(this)) + $.assetManagerUSDC;
     }
 
     /*=========================== Governance Functions =========================*/
@@ -44,30 +47,34 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
     // sets the current Asset Manager for the protocol
     function setAssetManager(address _assetManager) external onlyGovernance {
         if (_assetManager == address(0)) revert ZeroAddress();
-        assetManager = _assetManager;
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        $.assetManager = _assetManager;
     }
 
     // sets the max leverage fraction for the protocol
     function setMaxLeverageFraction(uint256 _maxLeverageFraction) external onlyGovernance {
         if (_maxLeverageFraction > 100000) revert InvalidMaxLeverageFraction();
-        maxLeverageFraction = _maxLeverageFraction;
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        $.maxLeverageFraction = _maxLeverageFraction;
     }
     
     /*=========================== Asset Manager Functions =========================*/
     
     function transferUSDCtoAssetManager(uint256 _amount) external {
-        if (msg.sender != assetManager) revert NotAssetManager();
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        if (msg.sender != $.assetManager) revert NotAssetManager();
 
         // Check if the transfer would exceed the max leverage
         if (!checkMaxLeverage(_amount)) revert MaxLeverageExceeded();
 
-        assetManagerUSDC += _amount;
-        IAssetManager(assetManager).deposit(_amount);
+        $.assetManagerUSDC += _amount;
+        IAssetManager($.assetManager).deposit(_amount);
     }
 
     function transferUSDCFromAssetManager(uint256 _amount) external {
-        if (msg.sender != assetManager) revert NotAssetManager();
-        assetManagerUSDC -= _amount;
-        IAssetManager(assetManager).withdraw(_amount);
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        if (msg.sender != $.assetManager) revert NotAssetManager();
+        $.assetManagerUSDC -= _amount;
+        IAssetManager($.assetManager).withdraw(_amount);
     }
 }

@@ -32,31 +32,46 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     /*=========================== Modifiers =========================*/
 
     modifier onlyGovernance() {
-        if (msg.sender != governanceWarchest) revert NotGovernance();
+        if (msg.sender != _getStorage().governanceWarchest) revert NotGovernance();
         _;
     }
 
     modifier onlyAdmin() {
-        if (msg.sender != admin) revert NotAdmin();
+        if (msg.sender != _getStorage().admin) revert NotAdmin();
         _;
     }
 
     modifier onlyTreasury() {
-        if (msg.sender != address(treasury)) revert NotTreasury();
+        if (msg.sender != address(_getStorage().treasury)) revert NotTreasury();
         _;
     }
 
-    /*=========================== State Variables =========================*/
+    /*=========================== Storage =========================*/
 
-    IERC20 public USDC;
-    ITreasury public treasury;
-    bool public withdrawalsFrozen;
-    address public governanceWarchest;
-    address public admin;
-    uint256 public totalOutstandingWithdrawalAmount;
-    uint256 public usxPrice;
-    mapping(address => bool) public whitelistedUsers;
-    mapping(address => uint256) public outstandingWithdrawalRequests;
+    /// @custom:storage-location erc7201:usx.main
+    struct USXStorage {
+        IERC20 USDC;
+        ITreasury treasury;
+        bool withdrawalsFrozen;
+        address governanceWarchest;
+        address admin;
+        uint256 totalOutstandingWithdrawalAmount;
+        uint256 usxPrice;
+        mapping(address => bool) whitelistedUsers;
+        mapping(address => uint256) outstandingWithdrawalRequests;
+    }
+
+    // keccak256(abi.encode(uint256(keccak256("usx.main")) - 1)) & ~bytes32(uint256(0xff));
+    bytes32 private constant USX_STORAGE_LOCATION =
+        0x0c53c51c00000000000000000000000000000000000000000000000000000000;
+
+    function _getStorage() private pure returns (USXStorage storage $) {
+        assembly {
+            $.slot := USX_STORAGE_LOCATION
+        }
+    }
+
+
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -79,11 +94,12 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         // Initialize ERC20
         __ERC20_init("USX Token", "USX");
         
-        USDC = IERC20(_USDC);
-        treasury = ITreasury(_treasury);
-        governanceWarchest = _governanceWarchest;
-        admin = _admin;
-        usxPrice = 1e18;
+        USXStorage storage $ = _getStorage();
+        $.USDC = IERC20(_USDC);
+        $.treasury = ITreasury(_treasury);
+        $.governanceWarchest = _governanceWarchest;
+        $.admin = _admin;
+        $.usxPrice = 1e18;
     }
 
     /**
@@ -92,9 +108,10 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
      */
     function setInitialTreasury(address _treasury) external onlyGovernance {
         if (_treasury == address(0)) revert ZeroAddress();
-        if (treasury != ITreasury(address(0))) revert TreasuryAlreadySet();
+        USXStorage storage $ = _getStorage();
+        if ($.treasury != ITreasury(address(0))) revert TreasuryAlreadySet();
         
-        treasury = ITreasury(_treasury);
+        $.treasury = ITreasury(_treasury);
         emit TreasurySet(_treasury);
     }
 
@@ -103,22 +120,24 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     /// @notice Deposit USDC to get USX
     /// @param _amount The amount of USDC to deposit
     function deposit(uint256 _amount) public {
+        USXStorage storage $ = _getStorage();
+        
         // Check if user is whitelisted
-        if (!whitelistedUsers[msg.sender]) revert UserNotWhitelisted();
+        if (!$.whitelistedUsers[msg.sender]) revert UserNotWhitelisted();
     
         // Calculate USDC distribution: keep what's needed for withdrawal requests, send excess to treasury
-        uint256 usdcForContract = _amount <= totalOutstandingWithdrawalAmount ? _amount : totalOutstandingWithdrawalAmount;
+        uint256 usdcForContract = _amount <= $.totalOutstandingWithdrawalAmount ? _amount : $.totalOutstandingWithdrawalAmount;
         uint256 usdcForTreasury = _amount - usdcForContract;
         
         // Transfer USDC to contract (if needed for withdrawal requests)
         if (usdcForContract > 0) {
-            bool success = USDC.transferFrom(msg.sender, address(this), usdcForContract);
+            bool success = $.USDC.transferFrom(msg.sender, address(this), usdcForContract);
             if (!success) revert USDCTransferFailed();
         }
         
         // Transfer excess USDC to treasury
         if (usdcForTreasury > 0) {
-            bool success = USDC.transferFrom(msg.sender, address(treasury), usdcForTreasury);
+            bool success = $.USDC.transferFrom(msg.sender, address($.treasury), usdcForTreasury);
             if (!success) revert USDCTransferFailed();
         }
 
@@ -129,8 +148,10 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     /// @notice Redeem USX to get USDC (begin withdrawal request)
     /// @param _USXredeemed The amount of USX to redeem
     function requestUSDC(uint256 _USXredeemed) public {
+        USXStorage storage $ = _getStorage();
+        
         // Check if withdrawals are frozen
-        if (withdrawalsFrozen) revert WithdrawalsFrozen();
+        if ($.withdrawalsFrozen) revert WithdrawalsFrozen();
 
         // Check the USX price to determine how much USDC the user will receive
         // For 1:1 exchange rate: 1 USX = 1 USDC
@@ -142,8 +163,8 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         _burn(msg.sender, _USXredeemed);
 
         // Record the outstanding withdrawal request
-        totalOutstandingWithdrawalAmount += usdcAmount;
-        outstandingWithdrawalRequests[msg.sender] += usdcAmount;
+        $.totalOutstandingWithdrawalAmount += usdcAmount;
+        $.outstandingWithdrawalRequests[msg.sender] += usdcAmount;
 
         // TODO: Consider automatically sending USDC to user if available
 
@@ -152,25 +173,28 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     // TODO: Consider allowing partial claims as well
     /// @notice Claim USDC (fulfill withdrawal request)
     function claimUSDC() public {
+        USXStorage storage $ = _getStorage();
+        
         // Check if user has outstanding withdrawal requests
-        if (outstandingWithdrawalRequests[msg.sender] == 0) revert NoOutstandingWithdrawalRequests();
+        if ($.outstandingWithdrawalRequests[msg.sender] == 0) revert NoOutstandingWithdrawalRequests();
 
         // Check if the treasury has enough USDC to fulfill the request
-        if (USDC.balanceOf(address(this)) < outstandingWithdrawalRequests[msg.sender]) revert InsufficientUSDC();
+        if ($.USDC.balanceOf(address(this)) < $.outstandingWithdrawalRequests[msg.sender]) revert InsufficientUSDC();
 
         // Fulfill the withdrawal request
-        uint256 usdcAmount = outstandingWithdrawalRequests[msg.sender];
-        outstandingWithdrawalRequests[msg.sender] = 0;
-        totalOutstandingWithdrawalAmount -= usdcAmount;
+        uint256 usdcAmount = $.outstandingWithdrawalRequests[msg.sender];
+        $.outstandingWithdrawalRequests[msg.sender] = 0;
+        $.totalOutstandingWithdrawalAmount -= usdcAmount;
         
         // Send the USDC to the user
-        USDC.transfer(msg.sender, usdcAmount);
+        $.USDC.transfer(msg.sender, usdcAmount);
     }
 
     /*=========================== Governance Functions =========================*/
 
     function unfreezeWithdrawals() public onlyGovernance {
-        withdrawalsFrozen = false;
+        USXStorage storage $ = _getStorage();
+        $.withdrawalsFrozen = false;
     }
 
     /**
@@ -180,8 +204,9 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     function setGovernance(address newGovernance) external onlyGovernance {
         if (newGovernance == address(0)) revert ZeroAddress();
         
-        address oldGovernance = governanceWarchest;
-        governanceWarchest = newGovernance;
+        USXStorage storage $ = _getStorage();
+        address oldGovernance = $.governanceWarchest;
+        $.governanceWarchest = newGovernance;
         
         emit GovernanceTransferred(oldGovernance, newGovernance);
     }
@@ -193,7 +218,8 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     /// @param _isWhitelisted Whether to whitelist the user
     function whitelistUser(address _user, bool _isWhitelisted) public onlyAdmin {
         if (_user == address(0)) revert ZeroAddress();
-        whitelistedUsers[_user] = _isWhitelisted;
+        USXStorage storage $ = _getStorage();
+        $.whitelistedUsers[_user] = _isWhitelisted;
     }
 
     /*=========================== Treasury Functions =========================*/
@@ -207,11 +233,13 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     }
 
     function updatePeg(uint256 newPeg) public onlyTreasury {
-        usxPrice = newPeg;
+        USXStorage storage $ = _getStorage();
+        $.usxPrice = newPeg;
     }
 
     function freezeWithdrawals() public onlyTreasury {
-        withdrawalsFrozen = true;
+        USXStorage storage $ = _getStorage();
+        $.withdrawalsFrozen = true;
     }
 
     /*=========================== UUPS Functions =========================*/
@@ -221,4 +249,42 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
      * @param newImplementation Address of new implementation
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyGovernance {}
+
+    /*=========================== View Functions =========================*/
+
+    function USDC() public view returns (IERC20) {
+        return _getStorage().USDC;
+    }
+
+    function treasury() public view returns (ITreasury) {
+        return _getStorage().treasury;
+    }
+
+    function withdrawalsFrozen() public view returns (bool) {
+        return _getStorage().withdrawalsFrozen;
+    }
+
+    function governanceWarchest() public view returns (address) {
+        return _getStorage().governanceWarchest;
+    }
+
+    function admin() public view returns (address) {
+        return _getStorage().admin;
+    }
+
+    function totalOutstandingWithdrawalAmount() public view returns (uint256) {
+        return _getStorage().totalOutstandingWithdrawalAmount;
+    }
+
+    function usxPrice() public view returns (uint256) {
+        return _getStorage().usxPrice;
+    }
+
+    function whitelistedUsers(address user) public view returns (bool) {
+        return _getStorage().whitelistedUsers[user];
+    }
+
+    function outstandingWithdrawalRequests(address user) public view returns (uint256) {
+        return _getStorage().outstandingWithdrawalRequests[user];
+    }
 }
