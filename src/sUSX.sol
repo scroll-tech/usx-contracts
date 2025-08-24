@@ -206,7 +206,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         // Record withdrawal request
         withdrawalRequests[withdrawalIdCounter] = WithdrawalRequest({
             user: receiver,
-            amount: assets,
+            amount: shares,
             withdrawalBlock: block.number,
             claimed: false
         });
