@@ -30,11 +30,17 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     event TreasurySet(address indexed treasury);
     event GovernanceTransferred(address indexed oldGovernance, address indexed newGovernance);
+    event EpochAdvanced(uint256 oldEpochBlock, uint256 newEpochBlock, address indexed caller);
 
     /*=========================== Modifiers =========================*/
 
     modifier onlyGovernance() {
         if (msg.sender != governance) revert NotGovernance();
+        _;
+    }
+
+    modifier updateEpoch() {
+        _updateLastEpochBlock();
         _;
     }
 
@@ -88,6 +94,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         withdrawalFeeFraction = 500;    // 0.5%
         minWithdrawalPeriod = 108000;   // 15 days
         epochDuration = 216000;         // 30 days
+        lastEpochBlock = block.number;  // Set to current block number
     }
 
     /**
@@ -106,7 +113,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     // after withdrawalPeriod AND epoch the user made withdrawal on is finished, after Gross Profits has been counted
     // portion is sent to the Governance Warchest (withdrawalFee applied here)
-    function claimWithdraw(uint256 withdrawalId) public {
+    function claimWithdraw(uint256 withdrawalId) public updateEpoch {
         // Check if the withdrawal request is unclaimed
         if (withdrawalRequests[withdrawalId].claimed) revert WithdrawalAlreadyClaimed();
 
@@ -134,6 +141,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     }
 
     // calculated using on chain USX balance and linear profit accrual (USX.balanceOf(this) + linear scaled profits from last epoch)
+    // TODO: should have the updatEpoch modifier, but this requires making it not a view function
     function sharePrice() public view returns (uint256) {
         uint256 supply = totalSupply();
         
@@ -197,6 +205,9 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         uint256 assets,
         uint256 shares
     ) internal override {
+        // Update epochs before processing withdrawal
+        _updateLastEpochBlock();
+        
         // Check if user has enough sUSX shares
         if (balanceOf(owner) < shares) revert InsufficientBalance();
 
@@ -225,7 +236,17 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         return shares * sharePrice() / 1e18;
     }
 
-    function _updateLastEpochBlock() internal {} // TODO: Implement
+    // updates lastEpochBlock to the current epoch start block if an epoch has finished
+    function _updateLastEpochBlock() internal {
+        uint256 currentEpochStart = (block.number / epochDuration) * epochDuration;
+        
+        // Update if we're in a new epoch
+        if (currentEpochStart > lastEpochBlock) {
+            uint256 oldEpochBlock = lastEpochBlock;
+            lastEpochBlock = currentEpochStart;
+            emit EpochAdvanced(oldEpochBlock, currentEpochStart, msg.sender);
+        }
+    }
 
     /*=========================== UUPS Functions =========================*/
 

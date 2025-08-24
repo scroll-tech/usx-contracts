@@ -54,5 +54,6 @@ contract sUSXTest is Test {
     function test_initial_state() public {
         assertEq(susx.totalSupply(), 0);
         assertEq(susx.withdrawalIdCounter(), 0);
+        assertEq(susx.lastEpochBlock(), 0); // Should be set to deployment block (0)
     }
 }
