@@ -83,6 +83,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         treasury = ITreasury(_treasury);
         governanceWarchest = _governanceWarchest;
         admin = _admin;
+        usxPrice = 1e18;
     }
 
     /**
@@ -122,7 +123,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         }
 
         // User receives USX
-        _mint(msg.sender, _amount);
+        _mint(msg.sender, _amount * 1e12); // Scale USDC (6 decimals) to USX (18 decimals)
     }
 
     /// @notice Redeem USX to get USDC (begin withdrawal request)
@@ -132,7 +133,10 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         if (withdrawalsFrozen) revert WithdrawalsFrozen();
 
         // Check the USX price to determine how much USDC the user will receive
-        uint256 usdcAmount = _USXredeemed * usxPrice;
+        // For 1:1 exchange rate: 1 USX = 1 USDC
+        // Since USX has 18 decimals and USDC has 6 decimals,
+        // we need to scale down by 10^12 to convert from USX to USDC
+        uint256 usdcAmount = _USXredeemed / 1e12;
 
         // Burn the USX
         _burn(msg.sender, _USXredeemed);

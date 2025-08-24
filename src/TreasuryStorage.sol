@@ -67,6 +67,6 @@ contract TreasuryStorage {
     uint256 public bufferRenewalFraction;       // Buffer renewal fraction (default 10% == 100000)
     uint256 public bufferTargetFraction;        // Buffer target fraction (default 5% == 50000)    
     uint256 public assetManagerUSDC;            // USDC allocated to Asset Manager
-    // (TODO: Remember to consider USDC has 6 decimals)
-    uint256 public netEpochProfits;     // profits reported for previous epoch, after deducting Insurance Buffer and Governance Warchest fees
+    uint256 public netEpochProfits;             // profits reported for previous epoch, after deducting Insurance Buffer and Governance Warchest fees
+    uint256 public constant DECIMAL_SCALE_FACTOR = 10**12; // Decimal scaling: 10^12. USDC is 6 decimals, USX is 18 decimals (18 - 6 = 12)
 }

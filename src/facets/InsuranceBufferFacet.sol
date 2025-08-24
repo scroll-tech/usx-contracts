@@ -43,10 +43,15 @@ contract InsuranceBufferFacet is TreasuryStorage {
         // Check if the buffer is less than the buffer target
         if (USX.balanceOf(address(this)) < bufferTarget()) {
             // Calculate the amount of USX to mint to the buffer
-            insuranceBufferAccrual = (_totalProfit * bufferRenewalFraction / 100000) + AssetManagerAllocatorFacet(address(this)).netDeposits();
+            uint256 totalProfitUSX = _totalProfit * DECIMAL_SCALE_FACTOR;
+            uint256 netDepositsUSX = AssetManagerAllocatorFacet(address(this)).netDeposits() * DECIMAL_SCALE_FACTOR;
+            
+            uint256 insuranceBufferAccrualUSX = (totalProfitUSX * bufferRenewalFraction / 100000) + netDepositsUSX;
 
             // Mint USX to the buffer
-            USX.mintUSX(address(this), insuranceBufferAccrual);
+            USX.mintUSX(address(this), insuranceBufferAccrualUSX);
+            
+            insuranceBufferAccrual = insuranceBufferAccrualUSX / DECIMAL_SCALE_FACTOR;
         }
     }
 
@@ -54,16 +59,19 @@ contract InsuranceBufferFacet is TreasuryStorage {
     // it is triggered within every reportProfitAndLoss() call reports a loss. Tries to drain buffer up to amount. If amount <= bufferSize, then it drains the buffer, if amount > bufferSize than the USX:USDC peg is broken to reflect the loss.
     function slashBuffer(uint256 _amount) public onlyTreasury returns (uint256 remainingLosses) {
         uint256 bufferSize = USX.balanceOf(address(this));
+        // Convert USDC amount to USX: _amount (6 decimals) * DECIMAL_SCALE_FACTOR (10^12) = USX (18 decimals)
+        uint256 amountUSX = _amount * DECIMAL_SCALE_FACTOR;
+        
         // Insurance Buffer can absorb the loss
-        if (_amount <= bufferSize) {
-            // Deduct the amount from the buffer
-            USX.burnUSX(address(this), _amount);
+        if (amountUSX <= bufferSize) {
+            USX.burnUSX(address(this), amountUSX);
             remainingLosses = 0;
         // Insurance Buffer is not sufficient to absorb the loss
         } else {
             // If the amount is greater than the buffer size, burn the buffer and return the remaining losses
             USX.burnUSX(address(this), bufferSize);
-            remainingLosses = _amount - bufferSize;
+            // Convert remaining USX back to USDC: remaining USX / DECIMAL_SCALE_FACTOR
+            remainingLosses = (amountUSX - bufferSize) / DECIMAL_SCALE_FACTOR;
         }
     }
 }

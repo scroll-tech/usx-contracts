@@ -51,11 +51,13 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
 
         // Porftion of the profits are added to the Governance Warchest
         uint256 governanceWarchestProfits = successFee(grossProfit);
-        USX.mintUSX(governanceWarchest, governanceWarchestProfits);
+        uint256 governanceWarchestUSX = governanceWarchestProfits * DECIMAL_SCALE_FACTOR;
+        USX.mintUSX(governanceWarchest, governanceWarchestUSX);
 
         // Remaining profits are distributed to sUSX contract (USX stakers)
         uint256 stakerProfits = grossProfit - insuranceBufferProfits - governanceWarchestProfits;
-        _distributeProfits(stakerProfits);
+        uint256 stakerProfitsUSX = stakerProfits * DECIMAL_SCALE_FACTOR;
+        _distributeProfits(stakerProfitsUSX);
 
         // Update netEpochProfits
         netEpochProfits = stakerProfits;
@@ -96,9 +98,11 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
     
     // updates peg, by taking all outstanding USDC in the system (treasury & asset manager holdings) and dividing them by total supply of USX. 
     // USDCoutstanding / USXtotalSupply
+    // Note: USDC has 6 decimals, USX has 18 decimals, so we need to scale USDC up by 10^12
     function _updatePeg() internal returns (uint256) {
         uint256 totalUSDCoutstanding = USDC.balanceOf(address(this)) + assetManagerUSDC;
-        uint256 updatedPeg = totalUSDCoutstanding / USX.totalSupply();
+        uint256 scaledUSDC = totalUSDCoutstanding * DECIMAL_SCALE_FACTOR;
+        uint256 updatedPeg = scaledUSDC / USX.totalSupply();
         USX.updatePeg(updatedPeg);
         return updatedPeg;
     }
@@ -112,13 +116,16 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         address vaultAddress = address(sUSX);
         uint256 vaultUSXBalance = USX.balanceOf(vaultAddress);
         
-        // Apply the losses to the sUSX contract (USX burned immediately)
-        if (vaultUSXBalance > losses) {
-            USX.burnUSX(vaultAddress, losses);
+        // Convert USDC losses to USX: losses (6 decimals) * DECIMAL_SCALE_FACTOR (10^12) = USX (18 decimals)
+        uint256 lossesUSX = losses * DECIMAL_SCALE_FACTOR;
+        
+        if (vaultUSXBalance > lossesUSX) {
+            USX.burnUSX(vaultAddress, lossesUSX);
             remainingLosses = 0;
         } else {
             USX.burnUSX(vaultAddress, vaultUSXBalance);
-            remainingLosses = losses - vaultUSXBalance;
+            // Convert remaining USX back to USDC: remaining USX / DECIMAL_SCALE_FACTOR
+            remainingLosses = (lossesUSX - vaultUSXBalance) / DECIMAL_SCALE_FACTOR;
         }
     }
 }
