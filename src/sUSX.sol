@@ -177,6 +177,19 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         return withdrawalAmount * $.withdrawalFeeFraction / 100000;
     }
 
+    // Manual epoch advancement
+    function advanceEpochs() external {
+        SUSXStorage storage $ = _getStorage();
+        uint256 currentEpochStart = (block.number / $.epochDuration) * $.epochDuration;
+        
+        // Update if we're in a new epoch OR if we're at the beginning and need to initialize
+        if (currentEpochStart > $.lastEpochBlock || ($.lastEpochBlock == 0 && block.number > 0)) {
+            uint256 oldEpochBlock = $.lastEpochBlock;
+            $.lastEpochBlock = currentEpochStart;
+            emit EpochAdvanced(oldEpochBlock, currentEpochStart, msg.sender);
+        }
+    }
+
     /*=========================== Governance Functions =========================*/
 
     // sets withdrawal period in blocks
@@ -263,19 +276,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         
         // Update if we're in a new epoch
         if (currentEpochStart > $.lastEpochBlock) {
-            uint256 oldEpochBlock = $.lastEpochBlock;
-            $.lastEpochBlock = currentEpochStart;
-            emit EpochAdvanced(oldEpochBlock, currentEpochStart, msg.sender);
-        }
-    }
-
-    // Manual epoch advancement (anyone can call)
-    function advanceEpochs() external {
-        SUSXStorage storage $ = _getStorage();
-        uint256 currentEpochStart = (block.number / $.epochDuration) * $.epochDuration;
-        
-        // Update if we're in a new epoch OR if we're at the beginning and need to initialize
-        if (currentEpochStart > $.lastEpochBlock || ($.lastEpochBlock == 0 && block.number > 0)) {
             uint256 oldEpochBlock = $.lastEpochBlock;
             $.lastEpochBlock = currentEpochStart;
             emit EpochAdvanced(oldEpochBlock, currentEpochStart, msg.sender);
