@@ -7,8 +7,6 @@ import {ITreasury} from "./interfaces/ITreasury.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-    // ERC7201
-
 contract USX is ERC20Upgradeable, UUPSUpgradeable {
 
     /*=========================== Errors =========================*/

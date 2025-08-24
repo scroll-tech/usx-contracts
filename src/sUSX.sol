@@ -9,8 +9,6 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-// ERC7201
-
 contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     /*=========================== Errors =========================*/
