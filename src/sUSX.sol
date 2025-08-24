@@ -135,10 +135,18 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     // calculated using on chain USX balance and linear profit accrual (USX.balanceOf(this) + linear scaled profits from last epoch)
     function sharePrice() public view returns (uint256) {
-        uint256 base    = USX.balanceOf(address(this));
+        uint256 supply = totalSupply();
+        
+        // Handle the first deposit case
+        if (supply == 0) {
+            return 1e18; // 1:1 ratio for first deposit
+        }
+        
+        uint256 base = USX.balanceOf(address(this));
         uint256 rewards = treasury.profitLatestEpoch();
         uint256 totalUSX = base + rewards;
-        return totalUSX * 1e18 / this.totalSupply();
+        
+        return totalUSX * 1e18 / supply;
     }
 
     // withdrawal fee taken on all withdrawals that goes to the Governance Warchest
