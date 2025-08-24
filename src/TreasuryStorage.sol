@@ -19,7 +19,7 @@ contract TreasuryStorage {
     error ZeroAddress();
     
     // Asset Manager errors
-    error InvalidMaxLeverage();
+    error InvalidMaxLeverageFraction();
     error MaxLeverageExceeded();
     
     // Insurance Buffer errors
@@ -63,7 +63,7 @@ contract TreasuryStorage {
     address public assetManager;                // The current Asset Manager for the protocol
     address public governanceWarchest;          // Governance warchest address
     uint256 public successFeeFraction;          // Success fee fraction (default 5% == 50000)
-    uint256 public maxLeverage;                 // Max leverage (default 10% == 100000)
+    uint256 public maxLeverageFraction;         // Max leverage fraction (default 10% == 100000)
     uint256 public bufferRenewalFraction;       // Buffer renewal fraction (default 10% == 100000)
     uint256 public bufferTargetFraction;        // Buffer target fraction (default 5% == 50000)    
     uint256 public assetManagerUSDC;            // USDC allocated to Asset Manager

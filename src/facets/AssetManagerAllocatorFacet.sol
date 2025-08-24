@@ -14,11 +14,20 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
     
     /*=========================== Public Functions =========================*/
     
+    // Returns the maximum USDC allocation allowed based on current leverage settings
+    function maxLeverage() public view returns (uint256) {
+        uint256 vaultValue = USX.balanceOf(address(sUSX));
+        
+        // maxLeverageFraction is in basis points (e.g., 100000 = 10%)
+        // So maxAllocation = maxLeverageFraction * vaultValue / 100000
+        return (maxLeverageFraction * vaultValue) / 100000;
+    }
+    
     // Checks if a deposit on the sUSX contract would exceed the max protocol leverage.
     // e.g. maxLeverage of 10 means treasury will allocate to Asset Manager no more USDC than x10 USX held by vault
     // Returns true if deposit would be allowed, false if it would exceed the max leverage.
     function checkMaxLeverage(uint256 depositAmount) public view returns (bool) {
-        uint256 maxAllocation = maxLeverage * USX.balanceOf(address(sUSX));
+        uint256 maxAllocation = maxLeverage();
         uint256 currentAllocationOfAssetManager = assetManagerUSDC;
         if (currentAllocationOfAssetManager + depositAmount > maxAllocation) {
             return false;
@@ -38,10 +47,10 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
         assetManager = _assetManager;
     }
 
-    // sets the max leverage for the protocol
-    function setMaxLeverage(uint256 _maxLeverage) external onlyGovernance {
-        if (_maxLeverage > 100000) revert InvalidMaxLeverage();
-        maxLeverage = _maxLeverage;
+    // sets the max leverage fraction for the protocol
+    function setMaxLeverageFraction(uint256 _maxLeverageFraction) external onlyGovernance {
+        if (_maxLeverageFraction > 100000) revert InvalidMaxLeverageFraction();
+        maxLeverageFraction = _maxLeverageFraction;
     }
     
     /*=========================== Asset Manager Functions =========================*/

@@ -132,7 +132,7 @@ contract DeployAll is Script {
         // Add Asset Manager facet
         bytes4[] memory assetManagerSelectors = new bytes4[](6);
         assetManagerSelectors[0] = AssetManagerAllocatorFacet.setAssetManager.selector;
-        assetManagerSelectors[1] = AssetManagerAllocatorFacet.setMaxLeverage.selector;
+        assetManagerSelectors[1] = AssetManagerAllocatorFacet.setMaxLeverageFraction.selector;
         assetManagerSelectors[2] = AssetManagerAllocatorFacet.checkMaxLeverage.selector;
         assetManagerSelectors[3] = AssetManagerAllocatorFacet.netDeposits.selector;
         assetManagerSelectors[4] = AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector;

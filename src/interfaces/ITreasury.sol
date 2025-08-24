@@ -6,6 +6,7 @@ interface ITreasury {
     function governanceWarchest() external view returns (address);
     
     // Asset Manager functions
+    function maxLeverage() external view returns (uint256);
     function checkMaxLeverage(uint256 depositAmount) external view returns (bool);
     function netDeposits() external view returns (uint256);
     function transferUSDCtoAssetManager(uint256 _amount) external;

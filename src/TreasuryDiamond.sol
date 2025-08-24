@@ -68,7 +68,7 @@ contract TreasuryDiamond is TreasuryStorage, UUPSUpgradeable, Initializable {
         
         // Set default values
         successFeeFraction = 50000;      // 5%
-        maxLeverage = 100000;            // 10%
+        maxLeverageFraction = 100000;    // 10%
         bufferRenewalFraction = 100000;  // 10%
         bufferTargetFraction = 50000;    // 5%
         
