@@ -21,6 +21,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     error WithdrawalPeriodNotPassed();
     error NextEpochNotStarted();
     error InvalidMinWithdrawalPeriod();
+    error InvalidWithdrawalFeeFraction();
     error TreasuryAlreadySet();
     error USXTransferFailed();
 
@@ -199,8 +200,9 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         $.minWithdrawalPeriod = _minWithdrawalPeriod;
     }
 
-    // sets withdrawal fee with precision to 0.001 percent // TODO: Is it ok to have no min/max?
+    // sets withdrawal fee with precision to 0.001 percent
     function setWithdrawalFeeFraction(uint256 _withdrawalFeeFraction) public onlyGovernance {
+        if (_withdrawalFeeFraction > 20000) revert InvalidWithdrawalFeeFraction();
         SUSXStorage storage $ = _getStorage();
         $.withdrawalFeeFraction = _withdrawalFeeFraction;
     }
