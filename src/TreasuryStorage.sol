@@ -35,6 +35,7 @@ contract TreasuryStorage {
     // Access control errors
     error NotGovernance();
     error NotAssetManager();
+    error NotTreasury();
     
     /*=========================== Events =========================*/
     
@@ -51,6 +52,12 @@ contract TreasuryStorage {
     // Modifier to restrict access to asset manager functions
     modifier onlyAssetManager() {
         if (msg.sender != _getStorage().assetManager) revert NotAssetManager();
+        _;
+    }
+
+    // Modifier to restrict access to treasury functions
+    modifier onlyTreasury() {
+        if (msg.sender != address(this)) revert NotTreasury();
         _;
     }
 

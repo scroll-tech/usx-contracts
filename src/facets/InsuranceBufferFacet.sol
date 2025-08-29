@@ -7,13 +7,6 @@ import {AssetManagerAllocatorFacet} from "./AssetManagerAllocatorFacet.sol";
 
 contract InsuranceBufferFacet is TreasuryStorage {
     
-    /*=========================== Modifiers =========================*/
-    
-    modifier onlyTreasury() {
-        require(msg.sender == address(this), "Only Treasury facets can call this function");
-        _;
-    }
-    
     /*=========================== Public Functions =========================*/
     
     // returns current buffer target based on bufferTargetFraction and USX total supply
@@ -41,6 +34,7 @@ contract InsuranceBufferFacet is TreasuryStorage {
     /*=========================== Treasury Functions =========================*/
 
     // tops up insurance buffer
+    /// @param _totalProfit - total profit from the latest epoch in USDC
     // it is triggered within every reportProfitAndLoss() call reports positive rewards while insurance buffer is less then bufferTarget(). Tries to replenish buffer up to amount from first netDeposits from the latest epoch, then netEpochProfits
     function topUpBuffer(uint256 _totalProfit) public onlyTreasury returns (uint256 insuranceBufferAccrual) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
@@ -48,15 +42,17 @@ contract InsuranceBufferFacet is TreasuryStorage {
         // Check if the buffer is less than the buffer target
         if ($.USX.balanceOf(address(this)) < bufferTarget()) {
             // Calculate the amount of USX to mint to the buffer
-            uint256 totalProfitUSX = _totalProfit * DECIMAL_SCALE_FACTOR;
-            uint256 netDepositsUSX = AssetManagerAllocatorFacet(address(this)).netDeposits() * DECIMAL_SCALE_FACTOR;
+            uint256 totalProfitUSDC = _totalProfit;
+            uint256 netDepositsUSDC = AssetManagerAllocatorFacet(address(this)).netDeposits();
             
-            uint256 insuranceBufferAccrualUSX = (totalProfitUSX * $.bufferRenewalFraction / 100000) + netDepositsUSX;
+            uint256 insuranceBufferAccrualUSDC = (totalProfitUSDC * $.bufferRenewalFraction / 100000) + netDepositsUSDC;
 
             // Mint USX to the buffer
-            $.USX.mintUSX(address(this), insuranceBufferAccrualUSX);
+            $.USX.mintUSX(address(this), insuranceBufferAccrualUSDC * DECIMAL_SCALE_FACTOR);
             
-            insuranceBufferAccrual = insuranceBufferAccrualUSX / DECIMAL_SCALE_FACTOR;
+            insuranceBufferAccrual = insuranceBufferAccrualUSDC;
+        } else {
+            insuranceBufferAccrual = 0;
         }
     }
 
