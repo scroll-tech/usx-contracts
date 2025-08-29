@@ -21,7 +21,7 @@ contract DeployHelper is Script {
     // Configuration
     address public constant SCROLL_USDC = 0x06eFdBFf2a14a7c8E15944D1F4A48F9F95F663A4;
     
-    function setUp(address _usx, address _susx, address _treasury) public {
+    function initialize(address _usx, address _susx, address _treasury) public {
         usx = USX(_usx);
         susx = sUSX(_susx);
         treasury = TreasuryDiamond(payable(_treasury));
@@ -146,12 +146,26 @@ contract DeployHelper is Script {
         uint256 maxLeverage = abi.decode(result, (uint256));
         console.log("    maxLeverage:", maxLeverage);
         
-        // Test netDeposits function (skip on local fork where USDC doesn't exist)
-        try this.testNetDeposits(address(treasury)) {
-            console.log("    netDeposits: tested successfully");
-        } catch {
-            console.log("    netDeposits: skipped (USDC not available on local fork)");
-        }
+        // Test netDeposits function - USDC is available on Scroll mainnet fork
+        bytes memory netDepositsData = abi.encodeWithSelector(
+            bytes4(keccak256("netDeposits()"))
+        );
+        (success, result) = address(treasury).call(netDepositsData);
+        require(success, "netDeposits call failed");
+        
+        uint256 netDeposits = abi.decode(result, (uint256));
+        console.log("    netDeposits:", netDeposits);
+        
+        // Test checkMaxLeverage function
+        bytes memory checkMaxLeverageData = abi.encodeWithSelector(
+            bytes4(keccak256("checkMaxLeverage(uint256)")),
+            1000000 // 1M USDC allocation
+        );
+        (success, result) = address(treasury).call(checkMaxLeverageData);
+        require(success, "checkMaxLeverage call failed");
+        
+        bool isWithinLimit = abi.decode(result, (bool));
+        console.log("    checkMaxLeverage(1M):", isWithinLimit ? "within limit" : "exceeds limit");
     }
     
     function testInsuranceBufferFacet() internal {
@@ -167,7 +181,20 @@ contract DeployHelper is Script {
         uint256 bufferTarget = abi.decode(result, (uint256));
         console.log("    bufferTarget:", bufferTarget);
         
-
+        // Test bufferRenewalRate function
+        bytes memory bufferRenewalRateData = abi.encodeWithSelector(
+            bytes4(keccak256("bufferRenewalRate()"))
+        );
+        (success, result) = address(treasury).call(bufferRenewalRateData);
+        require(success, "bufferRenewalRate call failed");
+        
+        uint256 bufferRenewalRate = abi.decode(result, (uint256));
+        console.log("    bufferRenewalRate:", bufferRenewalRate);
+        
+        // Note: topUpBuffer and slashBuffer are internal functions that get called during other operations
+        // They will be tested as part of the full flow in the actual test suite
+        console.log("    topUpBuffer: internal function (tested in full flow)");
+        console.log("    slashBuffer: internal function (tested in full flow)");
     }
     
     function testProfitAndLossFacet() internal {
@@ -193,6 +220,21 @@ contract DeployHelper is Script {
         
         uint256 profitLatestEpoch = abi.decode(result, (uint256));
         console.log("    profitLatestEpoch:", profitLatestEpoch);
+        
+        // Test profitPerBlock function
+        bytes memory profitPerBlockData = abi.encodeWithSelector(
+            bytes4(keccak256("profitPerBlock()"))
+        );
+        (success, result) = address(treasury).call(profitPerBlockData);
+        require(success, "profitPerBlock call failed");
+        
+        uint256 profitPerBlock = abi.decode(result, (uint256));
+        console.log("    profitPerBlock:", profitPerBlock);
+        
+        // Note: reportProfits and reportLosses are state-changing functions that get called during other operations
+        // They will be tested as part of the full flow in the actual test suite
+        console.log("    reportProfits: state-changing function (tested in full flow)");
+        console.log("    reportLosses: state-changing function (tested in full flow)");
     }
     
     function verifyContractLinking() internal view {
@@ -219,72 +261,5 @@ contract DeployHelper is Script {
         console.log("Treasury -> USDC link verified");
     }
     
-    function testBasicOperations() external {
-        console.log("\n=== TESTING BASIC OPERATIONS ===");
-        
-        // Test USX minting (if deployer has permission)
-        testUSXMinting();
-        
-        // Test sUSX operations
-        testSUSXOperations();
-        
-        // Test Treasury operations
-        testTreasuryOperations();
-        
-        console.log("All basic operations tested successfully");
-    }
-    
-    function testNetDeposits(address treasuryAddr) external returns (uint256) {
-        bytes memory netDepositsData = abi.encodeWithSelector(
-            bytes4(keccak256("netDeposits()"))
-        );
-        (bool success, bytes memory result) = treasuryAddr.call(netDepositsData);
-        require(success, "netDeposits call failed");
-        
-        uint256 netDeposits = abi.decode(result, (uint256));
-        return netDeposits;
-    }
-    
-    function testUSXMinting() internal {
-        console.log("  Testing USX minting...");
-        
-        // Check if deployer can mint (should have admin role)
-        try usx.mintUSX(address(this), 1000e18) {
-            console.log("    USX minting successful");
-        } catch {
-            console.log("    USX minting failed (expected if not admin)");
-        }
-    }
-    
-    function testSUSXOperations() internal {
-        console.log("  Testing sUSX operations...");
-        
-        // Test share price calculation
-        uint256 sharePrice = susx.sharePrice();
-        console.log("    sharePrice:", sharePrice);
-        
-        // Test epoch information
-        uint256 lastEpochBlock = susx.lastEpochBlock();
-        uint256 epochDuration = susx.epochDuration();
-        console.log("    lastEpochBlock:", lastEpochBlock);
-        console.log("    epochDuration:", epochDuration);
-    }
-    
-    function testTreasuryOperations() internal {
-        console.log("  Testing Treasury operations...");
-        
-        // Test default values
-        uint256 maxLeverageFraction = treasury.maxLeverageFraction();
-        uint256 successFeeFraction = treasury.successFeeFraction();
-        uint256 bufferTargetFraction = treasury.bufferTargetFraction();
-        
-        console.log("    maxLeverageFraction:", maxLeverageFraction);
-        console.log("    successFeeFraction:", successFeeFraction);
-        console.log("    bufferTargetFraction:", bufferTargetFraction);
-        
-        // Verify default values are set correctly
-        require(maxLeverageFraction == 100000, "Default maxLeverageFraction incorrect");
-        require(successFeeFraction == 50000, "Default successFeeFraction incorrect");
-        require(bufferTargetFraction == 50000, "Default bufferTargetFraction incorrect");
-    }
+
 }

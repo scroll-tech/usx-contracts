@@ -46,13 +46,23 @@ contract DeployScroll is Script {
     
     function setUp() public {
         // Load configuration from environment variables
-        deployer = vm.addr(vm.envUint("PRIVATE_KEY"));
+        // For testing, use governance address as deployer to avoid access control issues
+        deployer = vm.envAddress("GOVERNANCE_ADDRESS");
         usdcAddress = vm.envAddress("USDC_ADDRESS");
         governance = vm.envAddress("GOVERNANCE_ADDRESS");
         governanceWarchest = vm.envAddress("GOVERNANCE_WARCHEST_ADDRESS");
         assetManager = vm.envAddress("ASSET_MANAGER_ADDRESS");
         admin = vm.envAddress("ADMIN_ADDRESS");
         deploymentTarget = vm.envString("DEPLOYMENT_TARGET");
+        
+        // Debug logging
+        console.log("Environment variables read:");
+        console.log("GOVERNANCE_ADDRESS:", governance);
+        console.log("GOVERNANCE_WARCHEST_ADDRESS:", governanceWarchest);
+        console.log("ASSET_MANAGER_ADDRESS:", assetManager);
+        console.log("ADMIN_ADDRESS:", admin);
+        console.log("USDC_ADDRESS:", usdcAddress);
+        console.log("DEPLOYMENT_TARGET:", deploymentTarget);
         
         // Set RPC URL based on deployment target
         if (keccak256(abi.encodePacked(deploymentTarget)) == keccak256(abi.encodePacked("mainnet"))) {
@@ -217,53 +227,53 @@ contract DeployScroll is Script {
         
         // Add Facets to Diamond
         console.log("3.3. Adding Facets to Diamond...");
-        addFacetsToDiamond();
-    }
-    
-    function addFacetsToDiamond() internal {
+        
+        // Create local treasury interface
         TreasuryDiamond treasury = TreasuryDiamond(payable(treasuryProxy));
         
-        // Add facets as governance
-        vm.startBroadcast(governance);
-        
-        // Add Profit/Loss Facet
-        console.log("3.3.1. Adding Profit/Loss Facet...");
-        bytes4[] memory profitLossSelectors = new bytes4[](4);
-        profitLossSelectors[0] = ProfitAndLossReporterFacet.successFee.selector;
-        profitLossSelectors[1] = ProfitAndLossReporterFacet.reportProfits.selector;
-        profitLossSelectors[2] = ProfitAndLossReporterFacet.reportLosses.selector;
-        profitLossSelectors[3] = ProfitAndLossReporterFacet.profitLatestEpoch.selector;
-        
-        treasury.addFacet(profitLossFacet, profitLossSelectors);
-        console.log("Profit/Loss Facet added");
-        
-        // Add Insurance Buffer Facet
-        console.log("3.3.2. Adding Insurance Buffer Facet...");
-        bytes4[] memory insuranceSelectors = new bytes4[](5);
-        insuranceSelectors[0] = InsuranceBufferFacet.bufferTarget.selector;
-        insuranceSelectors[1] = InsuranceBufferFacet.setBufferRenewalRate.selector;
-        insuranceSelectors[2] = InsuranceBufferFacet.setBufferTargetFraction.selector;
-        insuranceSelectors[3] = InsuranceBufferFacet.topUpBuffer.selector;
-        insuranceSelectors[4] = InsuranceBufferFacet.slashBuffer.selector;
-        
-        treasury.addFacet(insuranceBufferFacet, insuranceSelectors);
-        console.log("Insurance Buffer Facet added");
-        
-        // Add Asset Manager Facet
-        console.log("3.3.3. Adding Asset Manager Facet...");
+        // Add AssetManagerAllocatorFacet
+        console.log("3.3.1. Adding AssetManagerAllocatorFacet...");
         bytes4[] memory assetManagerSelectors = new bytes4[](7);
         assetManagerSelectors[0] = AssetManagerAllocatorFacet.maxLeverage.selector;
-        assetManagerSelectors[1] = AssetManagerAllocatorFacet.setMaxLeverageFraction.selector;
-        assetManagerSelectors[2] = AssetManagerAllocatorFacet.setAssetManager.selector;
-        assetManagerSelectors[3] = AssetManagerAllocatorFacet.checkMaxLeverage.selector;
-        assetManagerSelectors[4] = AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector;
-        assetManagerSelectors[5] = AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector;
-        assetManagerSelectors[6] = AssetManagerAllocatorFacet.netDeposits.selector;
+        assetManagerSelectors[1] = AssetManagerAllocatorFacet.checkMaxLeverage.selector;
+        assetManagerSelectors[2] = AssetManagerAllocatorFacet.netDeposits.selector;
+        assetManagerSelectors[3] = AssetManagerAllocatorFacet.setAssetManager.selector;
+        assetManagerSelectors[4] = AssetManagerAllocatorFacet.setMaxLeverageFraction.selector;
+        assetManagerSelectors[5] = AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector;
+        assetManagerSelectors[6] = AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector;
         
+        vm.prank(governance);
         treasury.addFacet(assetManagerFacet, assetManagerSelectors);
-        console.log("Asset Manager Facet added");
+        console.log("AssetManagerAllocatorFacet added");
         
-        vm.stopBroadcast();
+        // Add InsuranceBufferFacet
+        console.log("3.3.2. Adding InsuranceBufferFacet...");
+        bytes4[] memory insuranceBufferSelectors = new bytes4[](5);
+        insuranceBufferSelectors[0] = InsuranceBufferFacet.bufferTarget.selector;
+        insuranceBufferSelectors[1] = InsuranceBufferFacet.topUpBuffer.selector;
+        insuranceBufferSelectors[2] = InsuranceBufferFacet.slashBuffer.selector;
+        insuranceBufferSelectors[3] = InsuranceBufferFacet.setBufferTargetFraction.selector;
+        insuranceBufferSelectors[4] = InsuranceBufferFacet.setBufferRenewalRate.selector;
+        
+        vm.prank(governance);
+        treasury.addFacet(insuranceBufferFacet, insuranceBufferSelectors);
+        console.log("InsuranceBufferFacet added");
+        
+        // Add ProfitAndLossReporterFacet
+        console.log("3.3.3. Adding ProfitAndLossReporterFacet...");
+        bytes4[] memory profitLossSelectors = new bytes4[](6);
+        profitLossSelectors[0] = ProfitAndLossReporterFacet.successFee.selector;
+        profitLossSelectors[1] = ProfitAndLossReporterFacet.profitLatestEpoch.selector;
+        profitLossSelectors[2] = ProfitAndLossReporterFacet.profitPerBlock.selector;
+        profitLossSelectors[3] = ProfitAndLossReporterFacet.reportProfits.selector;
+        profitLossSelectors[4] = ProfitAndLossReporterFacet.reportLosses.selector;
+        profitLossSelectors[5] = ProfitAndLossReporterFacet.setSuccessFeeFraction.selector;
+        
+        vm.prank(governance);
+        treasury.addFacet(profitLossFacet, profitLossSelectors);
+        console.log("ProfitAndLossReporterFacet added");
+        
+        // Note: vm.stopBroadcast() is not needed here since we're not in a broadcast context
     }
     
     function verifyDeployment() internal {

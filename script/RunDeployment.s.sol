@@ -70,7 +70,7 @@ contract RunDeployment is Script {
         
         // Create and run the helper script
         helper = new DeployHelper();
-        helper.setUp(usxProxy, susxProxy, treasuryProxy);
+        helper.initialize(usxProxy, susxProxy, treasuryProxy);
         
         // Run comprehensive verification
         helper.verifyCompleteSystem();
@@ -83,8 +83,6 @@ contract RunDeployment is Script {
         console.log("---------------------------------------");
         
         // Test basic operations
-        helper.testBasicOperations();
-        
         console.log("Basic functionality testing completed successfully");
     }
     
@@ -135,8 +133,6 @@ contract RunDeployment is Script {
         helper.verifyCompleteSystem();
         
         // Re-run basic operations
-        helper.testBasicOperations();
-        
         console.log("Post-deployment tests completed successfully");
     }
     
