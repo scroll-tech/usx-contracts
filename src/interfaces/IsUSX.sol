@@ -18,4 +18,7 @@ interface IsUSX {
     function treasury() external view returns (address);
     function lastEpochBlock() external view returns (uint256);
     function epochDuration() external view returns (uint256);
+    
+    // Epoch management
+    function updateLastEpochBlock() external;
 }
