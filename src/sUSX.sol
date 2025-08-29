@@ -29,7 +29,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     event TreasurySet(address indexed treasury);
     event GovernanceTransferred(address indexed oldGovernance, address indexed newGovernance);
-    event EpochAdvanced(uint256 oldEpochBlock, uint256 newEpochBlock, address indexed caller);
+    event EpochAdvanced(uint256 oldEpochBlock, uint256 newEpochBlock);
 
     /*=========================== Modifiers =========================*/
 
@@ -38,8 +38,8 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         _;
     }
 
-    modifier updateEpoch() {
-        _updateLastEpochBlock();
+    modifier onlyTreasury() {
+        if (msg.sender != address(_getStorage().treasury)) revert NotTreasury();
         _;
     }
 
@@ -126,7 +126,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     // after withdrawalPeriod AND epoch the user made withdrawal on is finished, after Gross Profits has been counted
     // portion is sent to the Governance Warchest (withdrawalFee applied here)
-    function claimWithdraw(uint256 withdrawalId) public updateEpoch {
+    function claimWithdraw(uint256 withdrawalId) public {
         SUSXStorage storage $ = _getStorage();
         
         // Check if the withdrawal request is unclaimed
@@ -178,19 +178,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         return withdrawalAmount * $.withdrawalFeeFraction / 100000;
     }
 
-    // Manual epoch advancement
-    function advanceEpochs() external {
-        SUSXStorage storage $ = _getStorage();
-        uint256 currentEpochStart = (block.number / $.epochDuration) * $.epochDuration;
-        
-        // Update if we're in a new epoch OR if we're at the beginning and need to initialize
-        if (currentEpochStart > $.lastEpochBlock || ($.lastEpochBlock == 0 && block.number > 0)) {
-            uint256 oldEpochBlock = $.lastEpochBlock;
-            $.lastEpochBlock = currentEpochStart;
-            emit EpochAdvanced(oldEpochBlock, currentEpochStart, msg.sender);
-        }
-    }
-
     /*=========================== Governance Functions =========================*/
 
     // sets withdrawal period in blocks
@@ -227,6 +214,18 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         emit GovernanceTransferred(oldGovernance, newGovernance);
     }
 
+    /*=========================== Treasury Functions =========================*/
+
+    // updates lastEpochBlock to the current epoch start block
+    function updateLastEpochBlock() external onlyTreasury {
+        SUSXStorage storage $ = _getStorage();
+        uint256 currentEpochStart = (block.number / $.epochDuration) * $.epochDuration;
+        
+        uint256 oldEpochBlock = $.lastEpochBlock;
+        $.lastEpochBlock = currentEpochStart;
+        emit EpochAdvanced(oldEpochBlock, currentEpochStart);
+    }
+
     /*=========================== Internal Functions =========================*/
 
     // user must wait for withdrawalPeriod to pass before unstaking (withdrawalPeriod)
@@ -238,10 +237,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         address owner,
         uint256 assets,
         uint256 shares
-    ) internal override {
-        // Update epochs before processing withdrawal
-        _updateLastEpochBlock();
-        
+    ) internal override {        
         // Check if user has enough sUSX shares
         if (balanceOf(owner) < shares) revert InsufficientBalance();
 
@@ -269,19 +265,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     // override default ERC4626 to use sharePrice
     function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256 assets) {
         return shares * sharePrice() / 1e18;
-    }
-
-    // updates lastEpochBlock to the current epoch start block if an epoch has finished
-    function _updateLastEpochBlock() internal {
-        SUSXStorage storage $ = _getStorage();
-        uint256 currentEpochStart = (block.number / $.epochDuration) * $.epochDuration;
-        
-        // Update if we're in a new epoch
-        if (currentEpochStart > $.lastEpochBlock) {
-            uint256 oldEpochBlock = $.lastEpochBlock;
-            $.lastEpochBlock = currentEpochStart;
-            emit EpochAdvanced(oldEpochBlock, currentEpochStart, msg.sender);
-        }
     }
 
     /*=========================== UUPS Functions =========================*/

@@ -36,6 +36,8 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
     // Asset Manager reports total balance of USDC they hold, profits calculated from that
     function reportProfits(uint256 totalBalance) public onlyAssetManager {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        // Next epoch is started
+        _updateLastEpochBlock();
         
         if (totalBalance < $.assetManagerUSDC) revert LossesDetectedUseReportLossesFunction();
         uint256 grossProfit = totalBalance - $.assetManagerUSDC;
@@ -70,6 +72,8 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
 
     function reportLosses(uint256 totalBalance) public onlyAssetManager {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        // Next epoch is started
+        _updateLastEpochBlock();
         
         if (totalBalance > $.assetManagerUSDC) revert ProfitsDetectedUseReportProfitsFunction();
         uint256 grossLoss = $.assetManagerUSDC - totalBalance;
@@ -138,5 +142,10 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
             // Convert remaining USX back to USDC: remaining USX / DECIMAL_SCALE_FACTOR
             remainingLosses = (lossesUSX - vaultUSXBalance) / DECIMAL_SCALE_FACTOR;
         }
+    }
+
+    function _updateLastEpochBlock() internal {
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        $.sUSX.updateLastEpochBlock();
     }
 }
