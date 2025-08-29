@@ -41,7 +41,6 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         
         if (totalBalance < $.assetManagerUSDC) revert LossesDetectedUseReportLossesFunction();
         uint256 grossProfit = totalBalance - $.assetManagerUSDC;
-        if (grossProfit == 0) revert ZeroValueChange(); // TODO: Should this be allowed? Highly unlikely edge case.
 
         // Update the assetManagerUSDC to the new balance
         $.assetManagerUSDC = totalBalance;
@@ -77,7 +76,6 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         
         if (totalBalance > $.assetManagerUSDC) revert ProfitsDetectedUseReportProfitsFunction();
         uint256 grossLoss = $.assetManagerUSDC - totalBalance;
-        if (grossLoss == 0) revert ZeroValueChange(); // TODO: Should this be allowed? Highly unlikely edge case.
 
         // Update the assetManagerUSDC to the new balance
         $.assetManagerUSDC = totalBalance;
