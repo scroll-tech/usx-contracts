@@ -124,6 +124,10 @@ contract DeployTestSetup is Test {
         // Approve USDC spending for USX contract
         vm.prank(user);
         usdc.approve(address(usx), type(uint256).max);
+        
+        // Approve MockAssetManager to spend USDC from treasury
+        vm.prank(address(treasury));
+        usdc.approve(address(mockAssetManager), type(uint256).max);
         console.log("  USDC approvals set");
         
         console.log("  Whitelisting test user...");
