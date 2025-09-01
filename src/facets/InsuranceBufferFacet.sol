@@ -2,8 +2,6 @@
 pragma solidity 0.8.30;
 
 import {TreasuryStorage} from "../TreasuryStorage.sol";
-import {IUSX} from "../interfaces/IUSX.sol";
-import {AssetManagerAllocatorFacet} from "./AssetManagerAllocatorFacet.sol";
 
 /// @title InsuranceBufferFacet
 /// @notice Handles the Insurance Buffer logic, managing how it is renewed and depleted

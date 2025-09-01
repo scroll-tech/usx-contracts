@@ -4,9 +4,6 @@ pragma solidity 0.8.30;
 import {Test, console} from "forge-std/Test.sol";
 import {DeployTestSetup} from "../script/DeployTestSetup.sol";
 import {USX} from "../src/USX.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
-import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
 
 contract USXTest is DeployTestSetup {
     uint256 public constant INITIAL_BALANCE = 1000e6; // 1000 USDC

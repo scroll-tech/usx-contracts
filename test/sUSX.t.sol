@@ -6,7 +6,9 @@ import {DeployTestSetup} from "../script/DeployTestSetup.sol";
 import {sUSX} from "../src/sUSX.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
 import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+// Define ERC4626 error locally since it's not exported
+error ERC4626ExceededMaxWithdraw(address owner, uint256 assets, uint256 max);
 
 contract sUSXTest is DeployTestSetup {
     uint256 public constant INITIAL_BALANCE = 1000e18; // 1000 USX

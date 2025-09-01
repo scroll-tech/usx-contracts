@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import {Test, console} from "forge-std/Test.sol";
 import {DeployScroll} from "../script/DeployScroll.s.sol";
-import {DeployHelper} from "../script/DeployHelper.s.sol";
 import {TreasuryDiamond} from "../src/TreasuryDiamond.sol";
 import {USX} from "../src/USX.sol";
 import {sUSX} from "../src/sUSX.sol";

@@ -2,9 +2,6 @@
 pragma solidity 0.8.30;
 
 import {TreasuryStorage} from "../TreasuryStorage.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IUSX} from "../interfaces/IUSX.sol";
-import {IsUSX} from "../interfaces/IsUSX.sol";
 import {InsuranceBufferFacet} from "./InsuranceBufferFacet.sol";
 import {AssetManagerAllocatorFacet} from "./AssetManagerAllocatorFacet.sol";
 

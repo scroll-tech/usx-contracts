@@ -6,10 +6,10 @@ import {DeployTestSetup} from "../script/DeployTestSetup.sol";
 import {InsuranceBufferFacet} from "../src/facets/InsuranceBufferFacet.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
 import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
-import {TreasuryStorage} from "../src/TreasuryStorage.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract InsuranceBufferFacetTest is DeployTestSetup {
+    // Constants for testing
+    uint256 public constant DECIMAL_SCALE_FACTOR = 10**12; // Decimal scaling: 10^12. USDC is 6 decimals, USX is 18 decimals (18 - 6 = 12)
     
     function setUp() public override {
         super.setUp(); // Runs the deployment script and sets up contracts

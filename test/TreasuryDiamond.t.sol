@@ -6,7 +6,8 @@ import {DeployTestSetup} from "../script/DeployTestSetup.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
 import {InsuranceBufferFacet} from "../src/facets/InsuranceBufferFacet.sol";
 import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {TreasuryDiamond} from "../src/TreasuryDiamond.sol";
+import {TreasuryStorage} from "../src/TreasuryStorage.sol";
 
 contract TreasuryDiamondTest is DeployTestSetup {
     function setUp() public override {

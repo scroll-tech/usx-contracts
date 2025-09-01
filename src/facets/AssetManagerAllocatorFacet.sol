@@ -2,7 +2,6 @@
 pragma solidity 0.8.30;
 
 import {TreasuryStorage} from "../TreasuryStorage.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // Standaradized interface for Asset Manager's contract
 interface IAssetManager {
