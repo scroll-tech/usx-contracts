@@ -9,12 +9,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract AssetManagerAllocatorFacetTest is DeployTestSetup {
     
     function setUp() public override {
-        super.setUp(); // Runs the deployment script and sets up contracts with MockAssetManager
+        super.setUp(); // Runs the deployment script and sets up contracts
         
         // Give treasury some USDC to work with
         deal(SCROLL_USDC, address(treasury), 10000e6); // 10,000 USDC
         
-        // Give MockAssetManager USDC approval to receive transfers from treasury
+        // Give asset manager USDC approval to receive transfers from treasury
         vm.prank(address(treasury));
         usdc.approve(address(mockAssetManager), type(uint256).max);
     }
@@ -601,7 +601,7 @@ contract AssetManagerAllocatorFacetTest is DeployTestSetup {
         vm.prank(newAssetManager);
         (bool transferSuccess,) = address(treasury).call(transferData);
         
-        // Note: This may fail due to complex internal logic and mocking requirements
+        // Note: This may fail due to complex internal logic requirements
         // We're testing the basic workflow structure
     }
 }

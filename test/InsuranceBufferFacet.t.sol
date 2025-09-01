@@ -5,30 +5,11 @@ import {Test, console} from "forge-std/Test.sol";
 import {DeployTestSetup} from "../script/DeployTestSetup.sol";
 import {InsuranceBufferFacet} from "../src/facets/InsuranceBufferFacet.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
+import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
 import {TreasuryStorage} from "../src/TreasuryStorage.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-// This mock is necessary to simulate external asset manager interactions
-contract RealAssetManager {
-    uint256 public totalDeposits;
-    uint256 public totalWithdrawals;
-    
-    function deposit(uint256 _usdcAmount) external {
-        totalDeposits += _usdcAmount;
-        emit DepositCalled(_usdcAmount);
-    }
-    
-    function withdraw(uint256 _usdcAmount) external {
-        totalWithdrawals += _usdcAmount;
-        emit WithdrawCalled(_usdcAmount);
-    }
-    
-    event DepositCalled(uint256 amount);
-    event WithdrawCalled(uint256 amount);
-}
-
 contract InsuranceBufferFacetTest is DeployTestSetup {
-    RealAssetManager public realAssetManager;
     
     function setUp() public override {
         super.setUp(); // Runs the deployment script and sets up contracts
@@ -253,7 +234,7 @@ contract InsuranceBufferFacetTest is DeployTestSetup {
     /*=========================== topUpBuffer Integration Tests =========================*/
     
     function test_topUpBuffer_through_reportProfits_success() public {
-        // Test topUpBuffer functionality through reportProfits integration
+        // Test topUpBuffer functionality through REAL profit reporting flow
         // First, create realistic USX balances through user deposits
         vm.prank(user);
         usx.deposit(1000000e6); // 1,000,000 USDC deposit to get USX
@@ -273,15 +254,23 @@ contract InsuranceBufferFacetTest is DeployTestSetup {
         
         uint256 initialBufferSize = usx.balanceOf(address(treasury));
         
-        // Since we can't easily set assetManagerUSDC through transferUSDCtoAssetManager,
-        // we'll test the topUpBuffer logic by directly calling reportProfits with a small profit
-        // This will test the topUpBuffer function through its proper integration path
+        // Transfer USDC to asset manager (this is how profits are actually generated)
+        vm.prank(assetManager);
+        bytes memory transferData = abi.encodeWithSelector(
+            AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
+            100000e6 // 100,000 USDC transferred to asset manager
+        );
+        (bool transferSuccess,) = address(treasury).call(transferData);
+        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
         
-        // Report a small profit: 0 + 100,000 = 100,000 USDC total balance
+        // Asset manager now has 100,000 USDC and "invests" it to generate profits
+        // Asset manager earns 50,000 USDC profit (total balance now 150,000 USDC)
+        
+        // Asset manager reports the new total balance (including profits)
         vm.prank(assetManager);
         bytes memory reportProfitsData = abi.encodeWithSelector(
-            bytes4(keccak256("reportProfits(uint256)")),
-            100000e6 // 100,000 USDC total balance (0 initial + 100k profit)
+            ProfitAndLossReporterFacet.reportProfits.selector,
+            150000e6 // 150,000 USDC total balance (100k initial + 50k profit)
         );
         (bool reportProfitsSuccess,) = address(treasury).call(reportProfitsData);
         
@@ -298,14 +287,17 @@ contract InsuranceBufferFacetTest is DeployTestSetup {
             console.log("  Initial buffer size:", initialBufferSize);
             console.log("  Final buffer size:", finalBufferSize);
             console.log("  Buffer target:", bufferTarget);
-            console.log("  Profit reported:", 100000e6 / 1e6, "USDC");
+            console.log("  Real profit reported:", 50e6 / 1e6, "USDC");
+            console.log("  Insurance buffer portion (10%):", 5e6 / 1e6, "USDC");
+            console.log("  Governance warchest portion (5%):", 2500000, "USDC");
+            console.log("  Stakers portion (85%):", 42500000, "USDC");
         } else {
             console.log("Buffer already at or above target, no top-up needed");
         }
     }
 
     function test_topUpBuffer_through_reportProfits_large_profit() public {
-        // Test topUpBuffer with large profits to ensure it handles large amounts correctly
+        // Test topUpBuffer with large profits
         // First, create realistic USX balances through user deposits
         vm.prank(user);
         usx.deposit(2000000e6); // 2,000,000 USDC deposit to get USX
@@ -325,11 +317,20 @@ contract InsuranceBufferFacetTest is DeployTestSetup {
         
         uint256 initialBufferSize = usx.balanceOf(address(treasury));
         
-        // Report large profits: 0 + 500,000 = 500,000 USDC total balance
+        // Transfer USDC to asset manager
+        vm.prank(assetManager);
+        bytes memory transferData = abi.encodeWithSelector(
+            AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
+            200000e6 // 200,000 USDC transferred to asset manager
+        );
+        (bool transferSuccess,) = address(treasury).call(transferData);
+        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        
+        // Asset manager earns 300,000 USDC profit (total balance now 500,000 USDC)
         vm.prank(assetManager);
         bytes memory reportProfitsData = abi.encodeWithSelector(
-            bytes4(keccak256("reportProfits(uint256)")),
-            500000e6 // 500,000 USDC total balance (0 initial + 500k profit)
+            ProfitAndLossReporterFacet.reportProfits.selector,
+            500000e6 // 500,000 USDC total balance (200k initial + 300k profit)
         );
         (bool reportProfitsSuccess,) = address(treasury).call(reportProfitsData);
         
@@ -345,7 +346,7 @@ contract InsuranceBufferFacetTest is DeployTestSetup {
             console.log("  Initial buffer size:", initialBufferSize);
             console.log("  Final buffer size:", finalBufferSize);
             console.log("  Buffer target:", bufferTarget);
-            console.log("  Large profit reported:", 500000e6 / 1e6, "USDC");
+            console.log("  Real large profit reported:", 300e6 / 1e6, "USDC");
         }
     }
 
@@ -390,11 +391,20 @@ contract InsuranceBufferFacetTest is DeployTestSetup {
             console.log("Temporarily lowered buffer target to force top-up test");
         }
         
-        // Report small profits: 0 + 10,000 = 10,000 USDC total balance
+        // Transfer USDC to asset manager
+        vm.prank(assetManager);
+        bytes memory transferData = abi.encodeWithSelector(
+            AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
+            5000e6 // 5,000 USDC transferred to asset manager
+        );
+        (bool transferSuccess,) = address(treasury).call(transferData);
+        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        
+        // Asset manager earns 5,000 USDC profit (total balance now 10,000 USDC)
         vm.prank(assetManager);
         bytes memory reportProfitsData = abi.encodeWithSelector(
-            bytes4(keccak256("reportProfits(uint256)")),
-            10000e6 // 10,000 USDC total balance (0 initial + 10k profit)
+            ProfitAndLossReporterFacet.reportProfits.selector,
+            10000e6 // 10,000 USDC total balance (5k initial + 5k profit)
         );
         (bool reportProfitsSuccess,) = address(treasury).call(reportProfitsData);
         
@@ -410,7 +420,7 @@ contract InsuranceBufferFacetTest is DeployTestSetup {
             console.log("  Initial buffer size:", initialBufferSize);
             console.log("  Final buffer size:", finalBufferSize);
             console.log("  Buffer target:", bufferTarget);
-            console.log("  Small profit reported:", 10000e6 / 1e6, "USDC");
+            console.log("  Real small profit reported:", 5e6 / 1e6, "USDC");
         } else {
             console.log("Buffer already at or above target, no top-up needed");
         }
@@ -448,11 +458,20 @@ contract InsuranceBufferFacetTest is DeployTestSetup {
         
         uint256 initialBufferSize = usx.balanceOf(address(treasury));
         
-        // Report zero profit: 0 + 0 = 0 USDC total balance
+        // Transfer USDC to asset manager
+        vm.prank(assetManager);
+        bytes memory transferData = abi.encodeWithSelector(
+            AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
+            10000e6 // 10,000 USDC transferred to asset manager
+        );
+        (bool transferSuccess,) = address(treasury).call(transferData);
+        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        
+        // Asset manager reports same balance (no profit earned)
         vm.prank(assetManager);
         bytes memory reportProfitsData = abi.encodeWithSelector(
-            bytes4(keccak256("reportProfits(uint256)")),
-            0 // 0 USDC total balance (0 initial + 0k profit)
+            ProfitAndLossReporterFacet.reportProfits.selector,
+            10000e6 // 10,000 USDC total balance (10k initial + 0k profit)
         );
         (bool reportProfitsSuccess,) = address(treasury).call(reportProfitsData);
         
@@ -466,7 +485,7 @@ contract InsuranceBufferFacetTest is DeployTestSetup {
         console.log("  Initial buffer size:", initialBufferSize);
         console.log("  Final buffer size:", finalBufferSize);
         console.log("  Buffer target:", bufferTarget);
-        console.log("  Profit reported: 0 USDC");
+        console.log("  Real profit reported: 0 USDC");
         
         // With zero profit, buffer size should remain the same
         assertEq(finalBufferSize, initialBufferSize, "Buffer size should remain the same with zero profit");

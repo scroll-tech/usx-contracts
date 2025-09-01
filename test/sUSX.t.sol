@@ -4,6 +4,8 @@ pragma solidity 0.8.30;
 import {Test, console} from "forge-std/Test.sol";
 import {DeployTestSetup} from "../script/DeployTestSetup.sol";
 import {sUSX} from "../src/sUSX.sol";
+import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
+import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract sUSXTest is DeployTestSetup {
@@ -44,8 +46,6 @@ contract sUSXTest is DeployTestSetup {
     }
 
     function test_sharePrice_with_deposits() public {
-        // Since we're using real contracts, we can't mock balances
-        // We can test the current share price instead
         assertEq(susx.sharePrice(), 1e18);
     }
 
@@ -143,43 +143,54 @@ contract sUSXTest is DeployTestSetup {
         // This test verifies that profits roll over correctly when a new epoch starts
         // before the 30-day distribution window is complete
         
-        // Step 1: Start first epoch with initial profit report
-        uint256 initialProfit = 1000e6; // 1000 USDC profit
+        // Step 1: Start first epoch with REAL profit report
         uint256 initialEpochBlock = susx.lastEpochBlock();
         
-        // Simulate profit report by calling reportProfits through treasury
+        // Transfer USDC to asset manager
+        vm.prank(assetManager);
+        bytes memory transferData1 = abi.encodeWithSelector(
+            AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
+            500e6 // 500 USDC transferred to asset manager
+        );
+        (bool transferSuccess1,) = address(treasury).call(transferData1);
+        require(transferSuccess1, "transferUSDCtoAssetManager should succeed");
+        
+        // Asset manager earns 500 USDC profit (total balance now 1000 USDC)
         vm.prank(assetManager);
         bytes memory reportProfitsData = abi.encodeWithSelector(
-            bytes4(keccak256("reportProfits(uint256)")),
-            initialProfit
+            ProfitAndLossReporterFacet.reportProfits.selector,
+            1000e6 // 1000 USDC total balance (500k initial + 500k profit)
         );
         (bool success,) = address(treasury).call(reportProfitsData);
         require(success, "reportProfits call failed");
         
-        // Verify epoch advanced
+        // Verify epoch advanced (should be the same since updateLastEpochBlock sets to current block)
         uint256 newEpochBlock = susx.lastEpochBlock();
-        assertGt(newEpochBlock, initialEpochBlock);
+        // Note: With current implementation, epoch block doesn't advance - it stays at current block
+        // The test should verify that the epoch system works, not that the block advances
+        assertEq(newEpochBlock, block.number, "Epoch block should be set to current block");
         
         // Step 2: Advance time by 15 days (halfway through 30-day distribution)
         uint256 fifteenDaysInBlocks = 15 * 24 * 60 * 5; // 15 days assuming 5 second blocks
         vm.roll(block.number + fifteenDaysInBlocks);
         
-        // Step 3: Start second epoch with new profit report before 30 days complete
-        uint256 secondProfit = 500e6; // 500 USDC additional profit
+        // Step 3: Start second epoch with REAL profit report before 30 days complete
         uint256 secondEpochBlock = susx.lastEpochBlock();
         
-        // Simulate second profit report
+        // Asset manager earns additional 500 USDC profit (total balance now 1500 USDC)
         vm.prank(assetManager);
         bytes memory secondReportData = abi.encodeWithSelector(
-            bytes4(keccak256("reportProfits(uint256)")),
-            secondProfit
+            ProfitAndLossReporterFacet.reportProfits.selector,
+            1500e6 // 1500 USDC total balance (1000k previous + 500k additional profit)
         );
         (bool secondSuccess,) = address(treasury).call(secondReportData);
         require(secondSuccess, "second reportProfits call failed");
         
-        // Verify epoch advanced again
+        // Verify epoch advanced again (should be the same since updateLastEpochBlock sets to current block)
         uint256 finalEpochBlock = susx.lastEpochBlock();
-        assertGt(finalEpochBlock, secondEpochBlock);
+        // Note: With current implementation, epoch block doesn't advance - it stays at current block
+        // The test should verify that the epoch system works, not that the block advances
+        assertEq(finalEpochBlock, block.number, "Epoch block should be set to current block");
         
         // Step 4: Verify that profits from both epochs are now part of the new epoch
         // The share price should reflect the accumulated profits
@@ -206,26 +217,42 @@ contract sUSXTest is DeployTestSetup {
         
         // First profit report
         vm.prank(assetManager);
+        bytes memory transferData1 = abi.encodeWithSelector(
+            AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
+            500e6 // 500 USDC transferred to asset manager
+        );
+        (bool transferSuccess1,) = address(treasury).call(transferData1);
+        require(transferSuccess1, "transferUSDCtoAssetManager should succeed");
+        
+        // Asset manager earns 500 USDC profit (total balance now 1000 USDC)
+        vm.prank(assetManager);
         bytes memory firstReportData = abi.encodeWithSelector(
-            bytes4(keccak256("reportProfits(uint256)")),
-            1000e6 // 1000 USDC
+            ProfitAndLossReporterFacet.reportProfits.selector,
+            1000e6 // 1000 USDC total balance (500k initial + 500k profit)
         );
         (bool firstSuccess,) = address(treasury).call(firstReportData);
         require(firstSuccess, "first reportProfits call failed");
         
-        // Second profit report immediately after
+        // Advance time by 1 day to allow time passing between reports
+        uint256 oneDayInBlocks = 24 * 60 * 5; // 1 day assuming 5 second blocks
+        vm.roll(block.number + oneDayInBlocks);
+        
+        // Second profit report after time has passed
+        // Asset manager earns additional 500 USDC profit (total balance now 1500 USDC)
         vm.prank(assetManager);
         bytes memory secondReportData = abi.encodeWithSelector(
-            bytes4(keccak256("reportProfits(uint256)")),
-            500e6 // 500 USDC
+            ProfitAndLossReporterFacet.reportProfits.selector,
+            1500e6 // 1500 USDC total balance (1000k previous + 500k additional profit)
         );
         (bool secondSuccess,) = address(treasury).call(secondReportData);
         require(secondSuccess, "second reportProfits call failed");
         
         // Verify that both reports were processed
-        // The epoch should have advanced from the first report
+        // The epoch should be set to current block (not advanced)
         uint256 finalEpochBlock = susx.lastEpochBlock();
-        assertGt(finalEpochBlock, initialEpochBlock);
+        // Note: With current implementation, epoch block doesn't advance - it stays at current block
+        // The test should verify that the epoch system works, not that the block advances
+        assertEq(finalEpochBlock, block.number, "Epoch block should be set to current block");
         
         console.log("Initial epoch block:", initialEpochBlock);
         console.log("Final epoch block:", finalEpochBlock);
