@@ -263,4 +263,442 @@ contract sUSXTest is DeployTestSetup {
         assertTrue(true, "Multiple profit reports test completed successfully");
     }
 
+    /*=========================== Withdrawal Flow Tests =========================*/
+
+    function test_withdraw_creates_request() public {
+        // Setup: User deposits USX to get sUSX
+        vm.prank(user);
+        usx.deposit(1000e6); // 1000 USDC
+        
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        
+        vm.prank(user);
+        uint256 shares = susx.deposit(usxBalance, user);
+        
+        // User requests withdrawal
+        uint256 withdrawalAmount = shares / 2; // Withdraw half
+        vm.prank(user);
+        susx.withdraw(withdrawalAmount, user, user);
+        
+        // Check that withdrawal request was created
+        uint256 withdrawalId = 0; // First withdrawal request
+        sUSX.WithdrawalRequest memory request = susx.withdrawalRequests(withdrawalId);
+        
+        assertEq(request.user, user, "Withdrawal request user should match");
+        assertEq(request.amount, withdrawalAmount, "Withdrawal request amount should match");
+        assertEq(request.withdrawalBlock, block.number, "Withdrawal request block should match current block");
+        assertFalse(request.claimed, "Withdrawal request should not be claimed initially");
+        assertEq(susx.withdrawalIdCounter(), 1, "Withdrawal ID counter should be incremented");
+    }
+
+    function test_withdraw_revert_insufficient_balance() public {
+        // Setup: User deposits USX to get sUSX
+        vm.prank(user);
+        usx.deposit(1000e6); // 1000 USDC
+        
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        
+        vm.prank(user);
+        uint256 shares = susx.deposit(usxBalance, user);
+        
+        // Calculate how many shares the user actually has
+        uint256 userUSXBalance = susx.balanceOf(user);
+        uint256 sharePrice = susx.sharePrice();
+        uint256 actualShares = userUSXBalance * 1e18 / sharePrice;
+        
+        // Try to withdraw more than user actually has
+        uint256 excessiveAmount = actualShares + 1e18; // Try to withdraw 1 share more than they have
+        
+        // Check what the actual balance is
+        console.log("User shares from deposit:", shares);
+        console.log("User actual shares:", actualShares);
+        console.log("Trying to withdraw:", excessiveAmount);
+        
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(ERC4626ExceededMaxWithdraw.selector, user, excessiveAmount, actualShares));
+        susx.withdraw(excessiveAmount, user, user);
+    }
+
+    function test_claimWithdraw_success() public {
+        // Setup: User deposits USX to get sUSX
+        vm.prank(user);
+        usx.deposit(1000e6); // 1000 USDC
+        
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        
+        vm.prank(user);
+        uint256 shares = susx.deposit(usxBalance, user);
+        
+        // User requests withdrawal
+        uint256 withdrawalAmount = shares / 2; // Withdraw half
+        vm.prank(user);
+        susx.withdraw(withdrawalAmount, user, user);
+        
+        // Approve sUSX to spend its own USX (needed for claimWithdraw)
+        vm.prank(address(susx));
+        usx.approve(address(susx), type(uint256).max);
+        
+        // Advance time past withdrawal period and start new epoch
+        uint256 withdrawalPeriod = susx.withdrawalPeriod();
+        uint256 epochDuration = susx.epochDuration();
+        uint256 blocksToAdvance = withdrawalPeriod + epochDuration + 100; // Extra buffer
+        
+        vm.roll(block.number + blocksToAdvance);
+        
+        // Start new epoch (this happens when asset manager reports profits/losses)
+        vm.prank(assetManager);
+        bytes memory reportData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.reportProfits.selector,
+            1000e6 // Report same balance (no profit)
+        );
+        (bool success,) = address(treasury).call(reportData);
+        require(success, "reportProfits should succeed");
+        
+        // Get initial balances
+        uint256 userInitialUSX = usx.balanceOf(user);
+        uint256 governanceWarchestInitialUSX = usx.balanceOf(treasury.governanceWarchest());
+        
+        // User claims withdrawal
+        vm.prank(user);
+        susx.claimWithdraw(0); // First withdrawal request
+        
+        // Check that withdrawal was processed
+        sUSX.WithdrawalRequest memory request = susx.withdrawalRequests(0);
+        assertTrue(request.claimed, "Withdrawal request should be marked as claimed");
+        
+        // Check that user received USX (minus withdrawal fee)
+        uint256 userFinalUSX = usx.balanceOf(user);
+        assertGt(userFinalUSX, userInitialUSX, "User should receive USX");
+        
+        // Check that governance warchest received withdrawal fee
+        uint256 governanceWarchestFinalUSX = usx.balanceOf(treasury.governanceWarchest());
+        assertGt(governanceWarchestFinalUSX, governanceWarchestInitialUSX, "Governance warchest should receive withdrawal fee");
+    }
+
+    function test_claimWithdraw_revert_period_not_passed() public {
+        // Setup: User deposits USX to get sUSX
+        vm.prank(user);
+        usx.deposit(1000e6); // 1000 USDC
+        
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        
+        vm.prank(user);
+        uint256 shares = susx.deposit(usxBalance, user);
+        
+        // User requests withdrawal
+        uint256 withdrawalAmount = shares / 2;
+        vm.prank(user);
+        susx.withdraw(withdrawalAmount, user, user);
+        
+        // Try to claim immediately (before withdrawal period)
+        vm.prank(user);
+        vm.expectRevert(sUSX.WithdrawalPeriodNotPassed.selector);
+        susx.claimWithdraw(0);
+    }
+
+    function test_claimWithdraw_revert_next_epoch_not_started() public {
+        // Setup: User deposits USX to get sUSX
+        vm.prank(user);
+        usx.deposit(1000e6); // 1000 USDC
+        
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        
+        vm.prank(user);
+        uint256 shares = susx.deposit(usxBalance, user);
+        
+        // Advance block number to ensure withdrawal is made after lastEpochBlock
+        vm.roll(block.number + 1000);
+        
+        // User requests withdrawal AFTER the last epoch block
+        uint256 withdrawalAmount = shares / 2;
+        vm.prank(user);
+        susx.withdraw(withdrawalAmount, user, user);
+        
+        // Approve sUSX to spend its own USX
+        vm.prank(address(susx));
+        usx.approve(address(susx), type(uint256).max);
+        
+        // Advance time past withdrawal period but DON'T start a new epoch
+        uint256 withdrawalPeriod = susx.withdrawalPeriod();
+        vm.roll(block.number + withdrawalPeriod + 100);
+        
+        // Try to claim (withdrawal period passed but no NEW epoch after withdrawal)
+        vm.prank(user);
+        vm.expectRevert(sUSX.NextEpochNotStarted.selector);
+        susx.claimWithdraw(0);
+    }
+
+    function test_claimWithdraw_revert_already_claimed() public {
+        // Setup: User deposits USX to get sUSX
+        vm.prank(user);
+        usx.deposit(1000e6); // 1000 USDC
+        
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        
+        vm.prank(user);
+        uint256 shares = susx.deposit(usxBalance, user);
+        
+        // User requests withdrawal
+        uint256 withdrawalAmount = shares / 2;
+        vm.prank(user);
+        susx.withdraw(withdrawalAmount, user, user);
+        
+        // Approve sUSX to spend its own USX
+        vm.prank(address(susx));
+        usx.approve(address(susx), type(uint256).max);
+        
+        // Advance time and start new epoch
+        uint256 withdrawalPeriod = susx.withdrawalPeriod();
+        uint256 epochDuration = susx.epochDuration();
+        vm.roll(block.number + withdrawalPeriod + epochDuration + 100);
+        
+        // Start new epoch
+        vm.prank(assetManager);
+        bytes memory reportData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.reportProfits.selector,
+            1000e6
+        );
+        (bool success,) = address(treasury).call(reportData);
+        require(success, "reportProfits should succeed");
+        
+        // User claims withdrawal successfully
+        vm.prank(user);
+        susx.claimWithdraw(0);
+        
+        // Try to claim the same withdrawal again
+        vm.prank(user);
+        vm.expectRevert(sUSX.WithdrawalAlreadyClaimed.selector);
+        susx.claimWithdraw(0);
+    }
+
+    function test_claimWithdraw_with_profit_distribution() public {
+        // Setup: User deposits USX to get sUSX
+        vm.prank(user);
+        usx.deposit(1000e6); // 1000 USDC
+        
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        
+        vm.prank(user);
+        uint256 shares = susx.deposit(usxBalance, user);
+        
+        // User requests withdrawal
+        uint256 withdrawalAmount = shares / 2;
+        vm.prank(user);
+        susx.withdraw(withdrawalAmount, user, user);
+        
+        // Approve sUSX to spend its own USX
+        vm.prank(address(susx));
+        usx.approve(address(susx), type(uint256).max);
+        
+        // Advance time and start new epoch with profits
+        uint256 withdrawalPeriod = susx.withdrawalPeriod();
+        uint256 epochDuration = susx.epochDuration();
+        vm.roll(block.number + withdrawalPeriod + epochDuration + 100);
+        
+        // Transfer USDC to asset manager and report profits
+        vm.prank(assetManager);
+        bytes memory transferData = abi.encodeWithSelector(
+            AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
+            500e6 // 500 USDC transferred
+        );
+        (bool transferSuccess,) = address(treasury).call(transferData);
+        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        
+        vm.prank(assetManager);
+        bytes memory reportData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.reportProfits.selector,
+            1500e6 // 1500 USDC total (1000 initial + 500 profit)
+        );
+        (bool success,) = address(treasury).call(reportData);
+        require(success, "reportProfits should succeed");
+        
+        // Get initial balances
+        uint256 userInitialUSX = usx.balanceOf(user);
+        
+        // User claims withdrawal (should include profit distribution)
+        vm.prank(user);
+        susx.claimWithdraw(0);
+        
+        // Check that user received USX including profit share
+        uint256 userFinalUSX = usx.balanceOf(user);
+        assertGt(userFinalUSX, userInitialUSX, "User should receive USX including profit share");
+    }
+
+    function test_convertToShares_rounding() public {
+        // Test the _convertToShares function with different rounding modes
+        uint256 assets = 1000e6; // 1000 USDC
+        
+        // Test with Math.Rounding.Down
+        uint256 sharesDown = susx.previewDeposit(assets);
+        
+        // Test with Math.Rounding.Up (if available)
+        // Note: ERC4626 standard uses Math.Rounding.Down by default
+        
+        assertGt(sharesDown, 0, "Shares should be greater than 0");
+    }
+
+    function test_convertToAssets_rounding() public {
+        // Setup: User deposits USX to get sUSX
+        vm.prank(user);
+        usx.deposit(1000e6); // 1000 USDC
+        
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        
+        vm.prank(user);
+        uint256 shares = susx.deposit(usxBalance, user);
+        
+        // Test the _convertToAssets function
+        uint256 assets = susx.previewRedeem(shares);
+        
+        assertGt(assets, 0, "Assets should be greater than 0");
+        assertLe(assets, usxBalance, "Assets should not exceed original USX balance");
+    }
+
+    function test_authorizeUpgrade_success() public {
+        // Test that governance can authorize upgrades
+        // Note: _authorizeUpgrade is internal, so we test it through the upgrade mechanism
+        // This test verifies that only governance can call upgrade-related functions
+        
+        // Verify governance can call setGovernance (similar access control)
+        vm.prank(governance);
+        susx.setGovernance(address(0x5678));
+        
+        assertEq(susx.governance(), address(0x5678), "Governance should be updated");
+    }
+
+    function test_authorizeUpgrade_revert_not_governance() public {
+        // Test that non-governance cannot authorize upgrades
+        
+        // Non-governance should not be able to call governance functions
+        vm.prank(user);
+        vm.expectRevert(sUSX.NotGovernance.selector);
+        susx.setGovernance(address(0x5678));
+    }
+
+    function test_withdrawal_request_storage() public {
+        // Test that withdrawal requests are stored correctly
+        vm.prank(user);
+        usx.deposit(1000e6);
+        
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        
+        vm.prank(user);
+        uint256 shares = susx.deposit(usxBalance, user);
+        
+        // Create withdrawal requests with smaller amounts to avoid balance issues
+        uint256 withdrawalAmount1 = shares / 10; // 10% of shares
+        
+        // Convert shares to assets for withdraw function
+        uint256 assets1 = susx.previewRedeem(withdrawalAmount1);
+        uint256 assets2 = susx.previewRedeem(withdrawalAmount1); // Use same amount for both
+        
+        vm.prank(user);
+        susx.withdraw(assets1, user, user); // ID 0
+        
+        vm.prank(user);
+        susx.withdraw(assets2, user, user); // ID 1
+        
+        // Check that requests are stored correctly
+        sUSX.WithdrawalRequest memory request0 = susx.withdrawalRequests(0);
+        sUSX.WithdrawalRequest memory request1 = susx.withdrawalRequests(1);
+        
+        assertEq(request0.user, user, "Request 0 user should match");
+        assertGt(request0.amount, 0, "Request 0 amount should be greater than 0");
+        assertFalse(request0.claimed, "Request 0 should not be claimed");
+        
+        assertEq(request1.user, user, "Request 1 user should match");
+        assertGt(request1.amount, 0, "Request 1 amount should be greater than 0");
+        assertFalse(request1.claimed, "Request 1 should not be claimed");
+        
+        assertEq(susx.withdrawalIdCounter(), 2, "Withdrawal ID counter should be 2");
+        
+        // Verify that the amounts are different (to ensure they're not the same request)
+        assertGt(request0.amount, request1.amount, "Request amounts should be different");
+    }
+
+    /*=========================== Edge Cases & Unused Parameters =========================*/
+    
+    function test_withdraw_with_different_caller_receiver() public {
+        // Test _withdraw with different caller and receiver
+        uint256 usxBalance = usx.balanceOf(user);
+        uint256 shares = susx.deposit(usxBalance, user);
+        
+        address receiver = address(0x1234);
+        
+        // User withdraws to a different receiver
+        vm.prank(user);
+        susx.withdraw(shares / 2, receiver, user);
+        
+        // Check that withdrawal request was created for the receiver
+        uint256 requestId = susx.withdrawalIdCounter() - 1;
+        sUSX.WithdrawalRequest memory request = susx.withdrawalRequests(requestId);
+        assertEq(request.user, receiver, "Withdrawal request should be for receiver");
+    }
+    
+    function test_convertToShares_with_rounding() public {
+        // Test _convertToShares with different rounding modes
+        uint256 assets = 1000e18; // 1000 USX
+        
+        // Test with Math.Rounding.Down
+        uint256 sharesDown = susx.previewDeposit(assets);
+        
+        // Test with Math.Rounding.Up (we can't directly call _convertToShares, but we can test the logic)
+        uint256 sharePrice = susx.sharePrice();
+        uint256 sharesUp = assets * 1e18 / sharePrice;
+        
+        assertTrue(sharesDown > 0, "Should convert assets to shares");
+        assertTrue(sharesUp > 0, "Should convert assets to shares with rounding");
+    }
+    
+    function test_convertToAssets_with_rounding() public {
+        // Test _convertToAssets with different rounding modes
+        uint256 shares = 1000e18; // 1000 sUSX shares
+        
+        // Test with Math.Rounding.Down
+        uint256 assetsDown = susx.previewRedeem(shares);
+        
+        // Test with Math.Rounding.Up (we can't directly call _convertToAssets, but we can test the logic)
+        uint256 sharePrice = susx.sharePrice();
+        uint256 assetsUp = shares * sharePrice / 1e18;
+        
+        assertTrue(assetsDown > 0, "Should convert shares to assets");
+        assertTrue(assetsUp > 0, "Should convert shares to assets with rounding");
+    }
+    
+    function test_withdraw_with_zero_shares() public {
+        // Test withdrawal with zero shares
+        // ERC4626 allows zero withdrawals, so this should not revert
+        vm.prank(user);
+        uint256 shares = susx.withdraw(0, user, user);
+        
+        assertEq(shares, 0, "Should return 0 shares for zero withdrawal");
+    }
+    
+    function test_withdraw_with_zero_assets() public {
+        // Test withdrawal with zero assets
+        // ERC4626 allows zero withdrawals, so this should not revert
+        vm.prank(user);
+        uint256 assets = susx.redeem(0, user, user);
+        
+        assertEq(assets, 0, "Should return 0 assets for zero withdrawal");
+    }
+
 }

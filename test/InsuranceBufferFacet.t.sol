@@ -528,4 +528,88 @@ contract InsuranceBufferFacetTest is DeployTestSetup {
         console.log("  bufferRenewalFraction:", bufferRenewalFraction);
         console.log("  Vault USX balance:", usx.balanceOf(address(susx)));
     }
+
+    /*=========================== Missing Coverage Tests =========================*/
+
+    function test_slashBuffer_insufficient_buffer() public {
+        // Setup: Create a scenario where the loss exceeds the buffer size
+        uint256 largeLoss = 10000e6; // 10,000 USDC loss
+        
+        // Mock the buffer to have some USX but not enough
+        uint256 bufferUSX = 5000e18; // 5,000 USX in buffer
+        deal(address(usx), address(treasury), bufferUSX);
+        
+        // Calculate how much USX the loss represents
+        uint256 lossInUSX = largeLoss * DECIMAL_SCALE_FACTOR; // 10,000 USDC * 10^12 = 10^16 USX
+        
+        // The loss in USX (10^16) is greater than buffer USX (5*10^21), so this should trigger the else branch
+        vm.prank(address(treasury));
+        bytes memory slashBufferData = abi.encodeWithSelector(
+            InsuranceBufferFacet.slashBuffer.selector,
+            largeLoss
+        );
+        (bool slashBufferSuccess, bytes memory slashBufferResult) = address(treasury).call(slashBufferData);
+        require(slashBufferSuccess, "slashBuffer call failed");
+        uint256 remainingLosses = abi.decode(slashBufferResult, (uint256));
+        
+        // Verify the buffer was completely burned
+        assertEq(usx.balanceOf(address(treasury)), 0, "Buffer should be completely burned");
+        
+        // Verify remaining losses are calculated correctly
+        uint256 expectedRemainingLosses = (lossInUSX - bufferUSX) / DECIMAL_SCALE_FACTOR;
+        assertEq(remainingLosses, expectedRemainingLosses, "Remaining losses should be calculated correctly");
+    }
+
+    function test_topUpBuffer_buffer_at_target() public {
+        // Setup: Ensure buffer is already at or above target
+        bytes memory bufferTargetData = abi.encodeWithSelector(InsuranceBufferFacet.bufferTarget.selector);
+        (bool bufferTargetSuccess, bytes memory bufferTargetResult) = address(treasury).call(bufferTargetData);
+        require(bufferTargetSuccess, "bufferTarget call failed");
+        uint256 bufferTarget = abi.decode(bufferTargetResult, (uint256));
+        
+        // Give the treasury enough USX to meet the target
+        deal(address(usx), address(treasury), bufferTarget);
+        
+        // Try to top up buffer with profits
+        uint256 profits = 1000e6; // 1,000 USDC profits
+        vm.prank(address(treasury));
+        bytes memory topUpBufferData = abi.encodeWithSelector(
+            InsuranceBufferFacet.topUpBuffer.selector,
+            profits
+        );
+        (bool topUpBufferSuccess, bytes memory topUpBufferResult) = address(treasury).call(topUpBufferData);
+        require(topUpBufferSuccess, "topUpBuffer call failed");
+        uint256 insuranceBufferAccrual = abi.decode(topUpBufferResult, (uint256));
+        
+        // Should return 0 since buffer is already at target
+        assertEq(insuranceBufferAccrual, 0, "Should return 0 when buffer is at target");
+        
+        // Buffer size should remain unchanged
+        assertEq(usx.balanceOf(address(treasury)), bufferTarget, "Buffer size should remain unchanged");
+    }
+
+    function test_slashBuffer_exact_buffer_size() public {
+        // Setup: Create a scenario where the loss exactly equals the buffer size
+        uint256 bufferUSX = 1000e18; // 1,000 USX in buffer
+        uint256 lossInUSDC = 1000e6; // 1,000 USDC
+        uint256 lossInUSX = lossInUSDC * DECIMAL_SCALE_FACTOR; // 1,000 USDC * 10^12 = 10^15 USX
+        
+        // Set buffer to exactly match the loss
+        deal(address(usx), address(treasury), lossInUSX);
+        
+        vm.prank(address(treasury));
+        bytes memory slashBufferData = abi.encodeWithSelector(
+            InsuranceBufferFacet.slashBuffer.selector,
+            lossInUSDC
+        );
+        (bool slashBufferSuccess, bytes memory slashBufferResult) = address(treasury).call(slashBufferData);
+        require(slashBufferSuccess, "slashBuffer call failed");
+        uint256 remainingLosses = abi.decode(slashBufferResult, (uint256));
+        
+        // Should return 0 since buffer exactly covers the loss
+        assertEq(remainingLosses, 0, "Should return 0 when buffer exactly covers loss");
+        
+        // Buffer should be completely burned
+        assertEq(usx.balanceOf(address(treasury)), 0, "Buffer should be completely burned");
+    }
 }

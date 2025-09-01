@@ -10,6 +10,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 // TODO: Test profit/loss report with 0 value
 
 contract ProfitAndLossReporterFacetTest is DeployTestSetup {
+    // Constants for testing
+    uint256 public constant DECIMAL_SCALE_FACTOR = 10**12; // Decimal scaling: 10^12. USDC is 6 decimals, USX is 18 decimals (18 - 6 = 12)
     uint256 public constant INITIAL_BLOCKS = 1000000;
     uint256 public constant INITIAL_BALANCE = 1000e6; // 1000 USDC
     
@@ -506,5 +508,142 @@ contract ProfitAndLossReporterFacetTest is DeployTestSetup {
         // Should now be 10% of profit
         uint256 expectedFee = (100e6 * exactFraction) / 100000;
         assertEq(successFeeAmount, expectedFee);
+    }
+
+    /*=========================== Missing Coverage Tests =========================*/
+
+    function test_reportLosses_small_loss_fully_covered_by_buffer() public {
+        // Setup: Create a small loss that can be fully covered by the insurance buffer
+        uint256 smallLoss = 100e6; // 100 USDC loss
+        
+        // Give the treasury enough USX to cover the loss
+        uint256 bufferUSX = 1000e18; // 1,000 USX in buffer (more than enough)
+        deal(address(usx), address(treasury), bufferUSX);
+        
+        // First, transfer USDC to asset manager to establish a baseline
+        vm.prank(assetManager);
+        bytes memory transferData = abi.encodeWithSelector(
+            AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
+            1000e6 // 1,000 USDC transferred to asset manager
+        );
+        (bool transferSuccess,) = address(treasury).call(transferData);
+        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        
+        // Asset manager reports a loss (900 USDC, which is 100 USDC less than the 1000 USDC baseline)
+        vm.prank(assetManager);
+        bytes memory reportLossesData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.reportLosses.selector,
+            900e6 // 900 USDC (100 USDC less than previous 1000 USDC)
+        );
+        (bool reportLossesSuccess,) = address(treasury).call(reportLossesData);
+        
+        // Should succeed
+        assertTrue(reportLossesSuccess, "reportLosses should succeed");
+        
+        // Buffer should be reduced by the loss amount
+        uint256 expectedBufferReduction = smallLoss * DECIMAL_SCALE_FACTOR;
+        uint256 expectedRemainingBuffer = bufferUSX - expectedBufferReduction;
+        assertEq(usx.balanceOf(address(treasury)), expectedRemainingBuffer, "Buffer should be reduced by loss amount");
+        
+        // No losses should remain after buffer
+        // The _distributeLosses function should not be called since remainingLossesAfterInsuranceBuffer = 0
+    }
+
+    function test_reportLosses_profits_detected_revert() public {
+        // Setup: Asset manager reports a balance higher than current assetManagerUSDC
+        uint256 currentBalance = 1000e6; // Current balance
+        uint256 reportedBalance = 1500e6; // Higher reported balance (profit)
+        
+        // Asset manager reports profits instead of losses
+        vm.prank(assetManager);
+        bytes memory reportLossesData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.reportLosses.selector,
+            reportedBalance
+        );
+        (bool reportLossesSuccess,) = address(treasury).call(reportLossesData);
+        
+        // Should fail because profits were detected
+        assertFalse(reportLossesSuccess, "reportLosses should fail when profits are detected");
+    }
+
+    function test_distributeLosses_sufficient_vault_balance() public {
+        // Setup: Create a loss that can be fully covered by the sUSX vault
+        uint256 loss = 1000e6; // 1,000 USDC loss
+        
+        // Give the sUSX vault enough USX to cover the loss
+        uint256 vaultUSX = 2000e18; // 2,000 USX in vault (more than enough)
+        deal(address(usx), address(susx), vaultUSX);
+        
+        // Mock the insurance buffer to be depleted (return remaining losses)
+        uint256 bufferUSX = 100e18; // Small buffer
+        deal(address(usx), address(treasury), bufferUSX);
+        
+        // First, transfer USDC to asset manager to establish a baseline
+        vm.prank(assetManager);
+        bytes memory transferData = abi.encodeWithSelector(
+            AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
+            2000e6 // 2,000 USDC transferred to asset manager
+        );
+        (bool transferSuccess,) = address(treasury).call(transferData);
+        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        
+        // Asset manager reports a loss (1000 USDC, which is 1000 USDC less than the 2000 USDC baseline)
+        vm.prank(assetManager);
+        bytes memory reportLossesData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.reportLosses.selector,
+            1000e6 // 1000 USDC (1000 USDC less than previous 2000 USDC)
+        );
+        (bool reportLossesSuccess,) = address(treasury).call(reportLossesData);
+        
+        // Should succeed
+        assertTrue(reportLossesSuccess, "reportLosses should succeed");
+        
+        // Vault should be reduced by the remaining loss amount after buffer
+        uint256 lossInUSX = loss * DECIMAL_SCALE_FACTOR;
+        uint256 remainingLossAfterBuffer = lossInUSX - bufferUSX;
+        uint256 expectedRemainingVault = vaultUSX - remainingLossAfterBuffer;
+        assertEq(usx.balanceOf(address(susx)), expectedRemainingVault, "Vault should be reduced by remaining loss");
+        
+        // No losses should remain after vault (remainingLossesAfterVault = 0)
+        // The _updatePeg and freezeWithdrawals should not be called
+    }
+
+    function test_recoverPeg_partial_recovery() public {
+        // Setup: Create a broken peg scenario with limited profits
+        vm.prank(user);
+        usx.deposit(1000000e6); // 1,000,000 USDC deposit to get USX
+        
+        // Break the peg by calling updatePeg with a value less than 1e18
+        uint256 brokenPegPrice = 8e17; // 0.8 USDC per USX (20% devaluation)
+        vm.prank(address(treasury));
+        usx.updatePeg(brokenPegPrice);
+        
+        // Verify peg is broken
+        uint256 usxPrice = usx.usxPrice();
+        assertLt(usxPrice, 1e18, "Peg should be broken");
+        
+        // Transfer USDC to asset manager
+        vm.prank(assetManager);
+        bytes memory transferData = abi.encodeWithSelector(
+            AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
+            50000e6 // 50,000 USDC (insufficient for full peg recovery)
+        );
+        (bool transferSuccess,) = address(treasury).call(transferData);
+        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        
+        // Asset manager reports profits (insufficient for full peg recovery)
+        vm.prank(assetManager);
+        bytes memory reportProfitsData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.reportProfits.selector,
+            60000e6 // 60,000 USDC total (10k profit, insufficient for full recovery)
+        );
+        (bool reportProfitsSuccess,) = address(treasury).call(reportProfitsData);
+        
+        // Should succeed with partial peg recovery
+        assertTrue(reportProfitsSuccess, "reportProfits should succeed with partial recovery");
+        
+        // Check that some USX was minted for partial peg recovery
+        uint256 finalUSXSupply = usx.totalSupply();
+        assertGt(finalUSXSupply, 1000000e18, "USX should be minted for partial peg recovery");
     }
 }
