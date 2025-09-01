@@ -9,6 +9,10 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+/// @title sUSX
+/// @notice The main contract for the sUSX token, allowing USX holders to stake to share in protocols profits
+/// @dev ERC4626 vault
+
 contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     /*=========================== Errors =========================*/
@@ -82,6 +86,10 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     /*=========================== Initialization =========================*/
 
+    /// @notice Initialize the sUSX contract
+    /// @param _usx Address of the USX token
+    /// @param _treasury Address of the Treasury contract
+    /// @param _governance Address of the governance
     function initialize(
         address _usx,
         address _treasury,
@@ -108,10 +116,8 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         $.lastEpochBlock = block.number;  // Set to current block number
     }
 
-    /**
-     * @dev Set the initial Treasury address - can only be called once when treasury is address(0)
-     * @param _treasury Address of the Treasury contract
-     */
+    /// @notice Set the initial Treasury address - can only be called once when treasury is address(0)
+    /// @param _treasury Address of the Treasury contract
     function setInitialTreasury(address _treasury) external onlyGovernance {
         if (_treasury == address(0)) revert ZeroAddress();
         SUSXStorage storage $ = _getStorage();
@@ -123,8 +129,10 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     /*=========================== Public Functions =========================*/
 
-    // after withdrawalPeriod AND epoch the user made withdrawal on is finished, after Gross Profits has been counted
-    // portion is sent to the Governance Warchest (withdrawalFee applied here)
+    /// @notice Finishes a withdrawal, claiming a specified withdrawal claim
+    /// @dev Allowed after withdrawalPeriod AND epoch the user made withdrawal on is finished, after Gross Profits has been counted
+    ///     Portion is sent to the Governance Warchest (withdrawalFee applied here)
+    /// @param withdrawalId The id of the withdrawal to claim
     function claimWithdraw(uint256 withdrawalId) public {
         SUSXStorage storage $ = _getStorage();
         
@@ -154,7 +162,9 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         $.withdrawalRequests[withdrawalId].claimed = true;
     }
 
-    // calculated using on chain USX balance and linear profit accrual (USX.balanceOf(this) + linear scaled profits from last epoch)
+    /// @notice Returns the current share price of sUSX
+    /// @dev Calculated using on chain USX balance and linear profit accrual (USX.balanceOf(this) + linear scaled profits from last epoch)
+    /// @return The current share price of sUSX
     function sharePrice() public view returns (uint256) {
         uint256 supply = totalSupply();
         
@@ -171,7 +181,10 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         return totalUSX * 1e18 / supply;
     }
 
-    // withdrawal fee taken on all withdrawals that goes to the Governance Warchest
+    /// @notice Returns the withdrawal fee for a specified withdrawal amount
+    /// @dev Withdrawal fee taken on all withdrawals that goes to the Governance Warchest
+    /// @param withdrawalAmount The amount of sUSX to withdraw
+    /// @return The withdrawal fee for the specified withdrawal amount
     function withdrawalFee(uint256 withdrawalAmount) public view returns (uint256) {
         SUSXStorage storage $ = _getStorage();
         return withdrawalAmount * $.withdrawalFeeFraction / 100000;
@@ -179,30 +192,31 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     /*=========================== Governance Functions =========================*/
 
-    // sets withdrawal period in blocks
+    /// @notice Sets withdrawal period in blocks
+    /// @param _minWithdrawalPeriod The new withdrawal period in blocks
     function setMinWithdrawalPeriod(uint256 _minWithdrawalPeriod) public onlyGovernance {
         if (_minWithdrawalPeriod < 108000) revert InvalidMinWithdrawalPeriod();
         SUSXStorage storage $ = _getStorage();
         $.minWithdrawalPeriod = _minWithdrawalPeriod;
     }
 
-    // sets withdrawal fee with precision to 0.001 percent
+    /// @notice Sets withdrawal fee with precision to 0.001 percent
+    /// @param _withdrawalFeeFraction The new withdrawal fee fraction
     function setWithdrawalFeeFraction(uint256 _withdrawalFeeFraction) public onlyGovernance {
         if (_withdrawalFeeFraction > 20000) revert InvalidWithdrawalFeeFraction();
         SUSXStorage storage $ = _getStorage();
         $.withdrawalFeeFraction = _withdrawalFeeFraction;
     }
 
-    // duration of epoch in blocks
+    /// @notice Sets duration of epoch in blocks
+    /// @param _epochDurationBlocks The new epoch duration in blocks
     function setEpochDuration(uint256 _epochDurationBlocks) public onlyGovernance {
         SUSXStorage storage $ = _getStorage();
         $.epochDuration = _epochDurationBlocks;
     }
 
-    /**
-     * @dev Set new governance address
-     * @param newGovernance Address of new governance
-     */
+    /// @notice Set new governance address
+    /// @param newGovernance Address of new governance
     function setGovernance(address newGovernance) external onlyGovernance {
         if (newGovernance == address(0)) revert ZeroAddress();
         
@@ -215,7 +229,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     /*=========================== Treasury Functions =========================*/
 
-    // updates lastEpochBlock to the current block number
+    /// @notice Updates lastEpochBlock to the current block number
     function updateLastEpochBlock() external onlyTreasury {
         SUSXStorage storage $ = _getStorage();
         
@@ -226,14 +240,13 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     /*=========================== Internal Functions =========================*/
 
-    // user must wait for withdrawalPeriod to pass before unstaking (withdrawalPeriod)
-    // "requestWithdraw" function
-    // override default ERC4626 for the 2 step withdrawal process in protocol
+    /// @dev User must wait for withdrawalPeriod to pass before unstaking (withdrawalPeriod)
+    /// @dev Override default ERC4626 for the 2 step withdrawal process in protocol
     function _withdraw(
-        address caller,
+        address ,
         address receiver,
         address owner,
-        uint256 assets,
+        uint256 ,
         uint256 shares
     ) internal override {        
         // Note: ERC4626 withdraw() already checks balance via maxWithdraw()
@@ -256,22 +269,20 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         $.withdrawalIdCounter++;
     }
 
-    // override default ERC4626 to use sharePrice
+    /// @dev Override default ERC4626 to use sharePrice
     function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns (uint256 shares) {
         return assets * 1e18 / sharePrice();
     }
 
-    // override default ERC4626 to use sharePrice
+    /// @dev Override default ERC4626 to use sharePrice
     function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256 assets) {
         return shares * sharePrice() / 1e18;
     }
 
     /*=========================== UUPS Functions =========================*/
 
-    /**
-     * @dev Authorize upgrade to new implementation
-     * @param newImplementation Address of new implementation
-     */
+    /// @dev Authorize upgrade to new implementation
+    /// @param newImplementation Address of new implementation
     function _authorizeUpgrade(address newImplementation) internal override onlyGovernance {}
 
     /*=========================== View Functions =========================*/
