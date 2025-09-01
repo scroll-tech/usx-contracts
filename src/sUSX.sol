@@ -216,14 +216,13 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     /*=========================== Treasury Functions =========================*/
 
-    // updates lastEpochBlock to the current epoch start block
+    // updates lastEpochBlock to the current block number
     function updateLastEpochBlock() external onlyTreasury {
         SUSXStorage storage $ = _getStorage();
-        uint256 currentEpochStart = (block.number / $.epochDuration) * $.epochDuration;
         
         uint256 oldEpochBlock = $.lastEpochBlock;
-        $.lastEpochBlock = currentEpochStart;
-        emit EpochAdvanced(oldEpochBlock, currentEpochStart);
+        $.lastEpochBlock = block.number;
+        emit EpochAdvanced(oldEpochBlock, block.number);
     }
 
     /*=========================== Internal Functions =========================*/
