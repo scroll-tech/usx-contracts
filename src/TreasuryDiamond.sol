@@ -10,6 +10,10 @@ import {IUSX} from "./interfaces/IUSX.sol";
 import {IsUSX} from "./interfaces/IsUSX.sol";
 import {IAssetManager} from "./interfaces/IAssetManager.sol";
 
+/// @title TreasuryDiamond
+/// @notice The main contract for the USX Protocol Treasury
+/// @dev The TreasuryDiamond contract is a proxy contract that delegates calls to the various facets of the Treasury
+
 contract TreasuryDiamond is TreasuryStorage, UUPSUpgradeable, Initializable {
     
     /*=========================== Events =========================*/
@@ -37,15 +41,14 @@ contract TreasuryDiamond is TreasuryStorage, UUPSUpgradeable, Initializable {
         _disableInitializers();
     }
     
-    /**
-     * @dev Initialize the Treasury Diamond
-     * @param _USDC Address of USDC token
-     * @param _USX Address of USX token
-     * @param _sUSX Address of sUSX vault
-     * @param _governance Address of governance
-     * @param _governanceWarchest Address of governance warchest
-     * @param _assetManager Address of asset manager
-     */
+    /// @notice Initialize the Treasury Diamond
+    /// @dev Initialize the Treasury Diamond
+    /// @param _USDC Address of USDC token
+    /// @param _USX Address of USX token
+    /// @param _sUSX Address of sUSX vault
+    /// @param _governance Address of governance
+    /// @param _governanceWarchest Address of governance warchest
+    /// @param _assetManager Address of asset manager
     function initialize(
         address _USDC,
         address _USX,
@@ -78,11 +81,9 @@ contract TreasuryDiamond is TreasuryStorage, UUPSUpgradeable, Initializable {
     
     /*=========================== Diamond Functions =========================*/
     
-    /**
-     * @dev Add a new facet to the diamond
-     * @param _facet Address of the facet to add
-     * @param _selectors Array of function selectors to add
-     */
+    /// @notice Add a new facet to the diamond
+    /// @param _facet Address of the facet to add
+    /// @param _selectors Array of function selectors to add
     function addFacet(address _facet, bytes4[] calldata _selectors) external onlyGovernance {
         if (_facet == address(0)) revert ZeroAddress();
         
@@ -110,10 +111,8 @@ contract TreasuryDiamond is TreasuryStorage, UUPSUpgradeable, Initializable {
         emit FacetAdded(_selectors[0], _facet);
     }
     
-    /**
-     * @dev Remove a facet from the diamond
-     * @param _facet Address of the facet to remove
-     */
+    /// @notice Remove a facet from the diamond
+    /// @param _facet Address of the facet to remove
     function removeFacet(address _facet) external onlyGovernance {
         bytes4[] memory selectors = facetFunctionSelectors[_facet];
         
@@ -135,11 +134,9 @@ contract TreasuryDiamond is TreasuryStorage, UUPSUpgradeable, Initializable {
         emit FacetRemoved(selectors[0]);
     }
     
-    /**
-     * @dev Replace a facet with a new one
-     * @param _oldFacet Address of the old facet
-     * @param _newFacet Address of the new facet
-     */
+    /// @notice Replace a facet with a new one
+    /// @param _oldFacet Address of the old facet
+    /// @param _newFacet Address of the new facet
     function replaceFacet(address _oldFacet, address _newFacet) external onlyGovernance {
         if (_newFacet == address(0)) revert ZeroAddress();
         
@@ -165,10 +162,8 @@ contract TreasuryDiamond is TreasuryStorage, UUPSUpgradeable, Initializable {
         emit FacetReplaced(selectors[0], _oldFacet, _newFacet);
     }
     
-    /**
-     * @dev Set new governance address
-     * @param newGovernance Address of new governance
-     */
+    /// @notice Set new governance address
+    /// @param newGovernance Address of new governance
     function setGovernance(address newGovernance) external onlyGovernance {
         if (newGovernance == address(0)) revert ZeroAddress();
         
@@ -181,9 +176,7 @@ contract TreasuryDiamond is TreasuryStorage, UUPSUpgradeable, Initializable {
     
     /*=========================== Fallback =========================*/
     
-    /**
-     * @dev Fallback function that delegates calls to facets
-     */
+    /// @dev Fallback function that delegates calls to facets
     fallback() external payable {
         address facet = facets[msg.sig];
         if (facet == address(0)) revert SelectorNotFound();
@@ -199,22 +192,16 @@ contract TreasuryDiamond is TreasuryStorage, UUPSUpgradeable, Initializable {
         }
     }
     
-    /**
-     * @dev Receive function for ETH
-     */
+    /// @dev Receive function for ETH
     receive() external payable {}
     
     /*=========================== UUPS Functions =========================*/
     
-    /**
-     * @dev Authorize upgrade to new implementation
-     * @param newImplementation Address of new implementation
-     */
+    /// @notice Authorize upgrade to new implementation
+    /// @param newImplementation Address of new implementation
     function _authorizeUpgrade(address newImplementation) internal override onlyGovernance {}
     
-    /**
-     * @dev Get current implementation version
-     */
+    /// @notice Get current implementation version
     function getImplementation() external view returns (address) {
         return ERC1967Utils.getImplementation();
     }

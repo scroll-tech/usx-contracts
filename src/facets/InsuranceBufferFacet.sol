@@ -5,11 +5,16 @@ import {TreasuryStorage} from "../TreasuryStorage.sol";
 import {IUSX} from "../interfaces/IUSX.sol";
 import {AssetManagerAllocatorFacet} from "./AssetManagerAllocatorFacet.sol";
 
+/// @title InsuranceBufferFacet
+/// @notice Handles the Insurance Buffer logic, managing how it is renewed and depleted
+/// @dev Facet for USX Protocol Treasury Diamond contract
+
 contract InsuranceBufferFacet is TreasuryStorage {
     
     /*=========================== Public Functions =========================*/
     
-    // returns current buffer target based on bufferTargetFraction and USX total supply
+    /// @notice Returns current buffer target based on bufferTargetFraction and USX total supply
+    /// @return The current buffer target
     function bufferTarget() public view returns (uint256) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         return $.USX.totalSupply() * $.bufferTargetFraction / 100000;
@@ -17,14 +22,16 @@ contract InsuranceBufferFacet is TreasuryStorage {
 
     /*=========================== Governance Functions =========================*/
     
-    // sets renewal fraction with precision to 0.001 percent (Minimal value & default is 10% fee == 100000)
+    /// @notice Sets renewal fraction with precision to 0.001 percent (Minimal value & default is 10% fee == 100000)
+    /// @param _bufferRenewalRate The new renewal fraction
     function setBufferRenewalRate(uint256 _bufferRenewalRate) external onlyGovernance {
         if (_bufferRenewalRate < 100000) revert InvalidBufferRenewalRate();
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         $.bufferRenewalFraction = _bufferRenewalRate;
     }
 
-    // sets buffer target with precision to 0.001 percent (Minimum value & default is 5% == 50000)
+    /// @notice Sets buffer target with precision to 0.001 percent (Minimum value & default is 5% == 50000)
+    /// @param _bufferTargetFraction The new buffer target fraction
     function setBufferTargetFraction(uint256 _bufferTargetFraction) external onlyGovernance {
         if (_bufferTargetFraction < 50000) revert InvalidBufferTargetFraction();
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
@@ -33,9 +40,9 @@ contract InsuranceBufferFacet is TreasuryStorage {
 
     /*=========================== Treasury Functions =========================*/
 
-    // tops up insurance buffer
-    /// @param _totalProfit - total profit from the latest epoch in USDC
-    // it is triggered within every reportProfitAndLoss() call reports positive rewards while insurance buffer is less then bufferTarget(). Tries to replenish buffer up to amount from first netDeposits from the latest epoch, then netEpochProfits
+    /// @notice Tops up insurance buffer if below the target buffer amount.
+    /// @param _totalProfit Total profit from the latest epoch in USDC
+    /// @return insuranceBufferAccrual The amount of USX to mint to the buffer
     function topUpBuffer(uint256 _totalProfit) public onlyTreasury returns (uint256 insuranceBufferAccrual) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         
@@ -56,8 +63,9 @@ contract InsuranceBufferFacet is TreasuryStorage {
         }
     }
 
-    // deplete insurance buffer
-    // it is triggered within every reportProfitAndLoss() call reports a loss. Tries to drain buffer up to amount. If amount <= bufferSize, then it drains the buffer, if amount > bufferSize than the USX:USDC peg is broken to reflect the loss.
+    /// @notice Depletes Insurance Buffer to cover losses to the protocol
+    /// @param _amount The amount of USX to burn
+    /// @return remainingLosses The amount of USDC remaining after the buffer is depleted
     function slashBuffer(uint256 _amount) public onlyTreasury returns (uint256 remainingLosses) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         uint256 bufferSize = $.USX.balanceOf(address(this));

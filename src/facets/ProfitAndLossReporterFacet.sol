@@ -8,24 +8,32 @@ import {IsUSX} from "../interfaces/IsUSX.sol";
 import {InsuranceBufferFacet} from "./InsuranceBufferFacet.sol";
 import {AssetManagerAllocatorFacet} from "./AssetManagerAllocatorFacet.sol";
 
+/// @title ProfitAndLossReporterFacet
+/// @notice Handles the reporting of profits and losses to the protocol by the Asset Manager
+/// @dev Facet for USX Protocol Treasury Diamond contract
+
 contract ProfitAndLossReporterFacet is TreasuryStorage {
     
     /*=========================== Public Functions =========================*/
     
-    // calculates the success fee for the Goverance Warchest based on successFeeFraction
+    /// @notice Calculates the success fee for the Goverance Warchest based on successFeeFraction
+    /// @param profitAmount The amount of profits to calculate the success fee for
+    /// @return The success fee for the Goverance Warchest
     function successFee(uint256 profitAmount) public view returns (uint256) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         return profitAmount * $.successFeeFraction / 100000;
     }
 
-    // calculates cumulative profit for previous epoch
+    /// @notice Calculates cumulative profit for previous epoch
+    /// @return profit The cumulative profit for the previous epoch
     function profitLatestEpoch() public view returns (uint256 profit) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         uint256 blocks = block.number - $.sUSX.lastEpochBlock();
         return profitPerBlock() * blocks;
     }
 
-    // calculates the profit per block for the current epoch, to be added to USX balance over time in sharePrice() function
+    /// @notice Calculates the profit per block for the current epoch, to be added to USX balance over time in sharePrice() function
+    /// @return The profit per block for the current epoch
     function profitPerBlock() public view returns (uint256) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         uint256 blocksRemainingInEpoch = $.sUSX.lastEpochBlock() + $.sUSX.epochDuration() - block.number;
@@ -34,7 +42,8 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
 
     /*=========================== Asset Manager Functions =========================*/
     
-    // Asset Manager reports total balance of USDC they hold, profits calculated from that
+    /// @notice Asset Manager reports total balance of USDC they hold, profits calculated from this value
+    /// @param totalBalance The total balance of USDC held by the Asset Manager
     function reportProfits(uint256 totalBalance) public onlyAssetManager {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         // Next epoch is started
@@ -69,6 +78,8 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         }
     }
 
+    /// @notice Asset Manager reports total balance of USDC they hold, losses calculated from this value
+    /// @param totalBalance The total balance of USDC held by the Asset Manager
     function reportLosses(uint256 totalBalance) public onlyAssetManager {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         // Next epoch is started
@@ -97,7 +108,8 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
     
     /*=========================== Governance Functions =========================*/
     
-    // fraction of success fee determining the success fee, (default 5% == 50000) with precision to 0.001 percent
+    /// @notice Sets the success fee fraction determining the success fee, (default 5% == 50000) with precision to 0.001 percent
+    /// @param _successFeeFraction The new success fee fraction
     function setSuccessFeeFraction(uint256 _successFeeFraction) external onlyGovernance {
         if (_successFeeFraction > 100000) revert InvalidSuccessFeeFraction();
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
@@ -106,9 +118,9 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
     
     /*=========================== Internal Functions =========================*/
     
-    // updates peg, by taking all outstanding USDC in the system (treasury & asset manager holdings) and dividing them by total supply of USX. 
-    // USDCoutstanding / USXtotalSupply
-    // Note: USDC has 6 decimals, USX has 18 decimals, so we need to scale USDC up by 10^12
+    /// @notice Updates peg, by taking all outstanding USDC in the system (treasury & asset manager holdings) and dividing them by total supply of USX. 
+    /// @return The updated peg
+    /// @dev USDC has 6 decimals, USX has 18 decimals, so we need to scale USDC up by 10^12
     function _updatePeg() internal returns (uint256) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         uint256 totalUSDCoutstanding = AssetManagerAllocatorFacet(address(this)).netDeposits();
@@ -118,6 +130,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         return updatedPeg;
     }
 
+    /// @notice Distributes profits to the Insurance Buffer and Governance Warchest, and sUSX contract (USX stakers)
     /// @param profits The total amount of profits to distribute in USDC
     function _distributeProfits(uint256 profits) internal {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
@@ -139,6 +152,9 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         $.netEpochProfits = stakerProfits;
     }
 
+    /// @notice Distributes losses to the sUSX contract (USX stakers)
+    /// @param losses The total amount of losses to distribute in USDC
+    /// @return remainingLosses The amount of USDC remaining after the losses are distributed
     function _distributeLosses(uint256 losses) internal returns (uint256 remainingLosses) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         address vaultAddress = address($.sUSX);
@@ -157,9 +173,9 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         }
     }
 
-    // Recovers the broken peg by minting USX to restore 1:1 backing ratio
-    // @param availableProfits The USDC profits available for peg recovery
-    // @return profitsRemainingAfterPegRecovery The USDC profits remaining after peg recovery
+    /// @notice Recovers the broken peg by minting USX to restore 1:1 backing ratio
+    /// @param availableProfits The USDC profits available for peg recovery
+    /// @return profitsRemainingAfterPegRecovery The USDC profits remaining after peg recovery
     function _recoverPeg(uint256 availableProfits) internal returns (uint256 profitsRemainingAfterPegRecovery) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         

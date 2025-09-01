@@ -5,6 +5,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IUSX} from "./interfaces/IUSX.sol";
 import {IsUSX} from "./interfaces/IsUSX.sol";
 
+/// @title TreasuryStorage
+/// @notice Contains state for the USX Protocols Treasury contracts
 contract TreasuryStorage {
     
     /*=========================== Errors =========================*/

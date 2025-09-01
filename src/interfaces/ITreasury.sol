@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+/// @title ITreasury
+/// @notice Interface for the USX Protocol Treasury contract
 interface ITreasury {
     // Core functions
     function governanceWarchest() external view returns (address);

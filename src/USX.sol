@@ -100,10 +100,8 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         $.usxPrice = 1e18;
     }
 
-    /**
-     * @dev Set the initial Treasury address - can only be called once when treasury is address(0)
-     * @param _treasury Address of the Treasury contract
-     */
+    /// @dev Set the initial Treasury address - can only be called once when treasury is address(0)
+    /// @param _treasury Address of the Treasury contract
     function setInitialTreasury(address _treasury) external onlyGovernance {
         if (_treasury == address(0)) revert ZeroAddress();
         USXStorage storage $ = _getStorage();
@@ -190,15 +188,14 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
 
     /*=========================== Governance Functions =========================*/
 
+    /// @notice Unfreeze withdrawals, allowing users to withdraw again
     function unfreezeWithdrawals() public onlyGovernance {
         USXStorage storage $ = _getStorage();
         $.withdrawalsFrozen = false;
     }
 
-    /**
-     * @dev Set new governance address
-     * @param newGovernance Address of new governance
-     */
+    /// @notice Set new governance address
+    /// @param newGovernance Address of new governance
     function setGovernance(address newGovernance) external onlyGovernance {
         if (newGovernance == address(0)) revert ZeroAddress();
         
@@ -222,19 +219,32 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
 
     /*=========================== Treasury Functions =========================*/
 
+    /// @notice Mint USX to an address
+    /// @param _to The address to mint USX to
+    /// @param _amount The amount of USX to mint
+    /// @dev Used by Treasury to mint profits from profitable Asset Manager reports
     function mintUSX(address _to, uint256 _amount) public onlyTreasury {
         _mint(_to, _amount);
     }
 
+    /// @notice Burn USX from an address
+    /// @param _from The address to burn USX from
+    /// @param _amount The amount of USX to burn
+    /// @dev Used by Treasury to burn USX when losses are reported by Asset Manager
     function burnUSX(address _from, uint256 _amount) public onlyTreasury {
         _burn(_from, _amount);
     }
 
+    /// @notice Update the USX:USDC price
+    /// @param newPeg The new USX:USDC price
+    /// @dev Used by Treasury to update the USX:USDC price
     function updatePeg(uint256 newPeg) public onlyTreasury {
         USXStorage storage $ = _getStorage();
         $.usxPrice = newPeg;
     }
 
+    /// @notice Freeze withdrawals, preventing users from redeeming USX
+    /// @dev Used by Treasury to freeze withdrawals when peg is broken
     function freezeWithdrawals() public onlyTreasury {
         USXStorage storage $ = _getStorage();
         $.withdrawalsFrozen = true;
@@ -242,10 +252,8 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
 
     /*=========================== UUPS Functions =========================*/
 
-    /**
-     * @dev Authorize upgrade to new implementation
-     * @param newImplementation Address of new implementation
-     */
+    /// @notice Authorize upgrade to new implementation
+    /// @param newImplementation Address of new implementation
     function _authorizeUpgrade(address newImplementation) internal override onlyGovernance {}
 
     /*=========================== View Functions =========================*/

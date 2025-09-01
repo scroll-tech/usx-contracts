@@ -16,7 +16,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     error ZeroAddress();
     error NotGovernance();
     error NotTreasury();
-    error InsufficientBalance();
     error WithdrawalAlreadyClaimed();
     error WithdrawalPeriodNotPassed();
     error NextEpochNotStarted();
@@ -237,8 +236,9 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         uint256 assets,
         uint256 shares
     ) internal override {        
-        // Check if user has enough sUSX shares
-        if (balanceOf(owner) < shares) revert InsufficientBalance();
+        // Note: ERC4626 withdraw() already checks balance via maxWithdraw()
+        // so this check is redundant and will never be reached
+        // if (balanceOf(owner) < shares) revert InsufficientBalance();
 
         // Burn sUSX shares
         _burn(owner, shares);

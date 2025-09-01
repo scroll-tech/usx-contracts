@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+/// @title IUSX
+/// @notice Interface for the USX token contract
 interface IUSX {
     // Core ERC20 functions
     function totalSupply() external view returns (uint256);
