@@ -41,11 +41,11 @@ contract InsuranceBufferFacet is TreasuryStorage {
         
         // Check if the buffer is less than the buffer target
         if ($.USX.balanceOf(address(this)) < bufferTarget()) {
-            // Calculate the amount of USX to mint to the buffer
+            // Calculate the amount of USX to mint to the buffer based on profits only
             uint256 totalProfitUSDC = _totalProfit;
-            uint256 netDepositsUSDC = AssetManagerAllocatorFacet(address(this)).netDeposits();
             
-            uint256 insuranceBufferAccrualUSDC = (totalProfitUSDC * $.bufferRenewalFraction / 100000) + netDepositsUSDC;
+            // Only use a portion of the profits for insurance buffer (not the entire system's USDC)
+            uint256 insuranceBufferAccrualUSDC = totalProfitUSDC * $.bufferRenewalFraction / 1000000;
 
             // Mint USX to the buffer
             $.USX.mintUSX(address(this), insuranceBufferAccrualUSDC * DECIMAL_SCALE_FACTOR);
