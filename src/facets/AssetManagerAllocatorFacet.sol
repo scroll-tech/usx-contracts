@@ -14,20 +14,19 @@ interface IAssetManager {
 /// @dev Facet for TreasuryDiamond contract
 
 contract AssetManagerAllocatorFacet is TreasuryStorage {
-    
     /*=========================== Public Functions =========================*/
-    
+
     /// @notice Returns the maximum USDC allocation allowed based on current leverage settings
     /// @return The maximum USDC allocation allowed
     function maxLeverage() public view returns (uint256) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         uint256 vaultValue = $.USX.balanceOf(address($.sUSX));
-        
+
         // maxLeverageFraction is in basis points (e.g., 100000 = 10%)
         // So maxAllocation = maxLeverageFraction * vaultValue / 100000
         return ($.maxLeverageFraction * vaultValue) / 100000;
     }
-    
+
     /// @notice Checks if a deposit on the sUSX contract would exceed the max protocol leverage.
     ///          e.g. maxLeverage of 10 means treasury will allocate to Asset Manager no more USDC than x10 USX held by vault
     /// @param depositAmount The amount of USDC to deposit
@@ -50,7 +49,7 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
     }
 
     /*=========================== Governance Functions =========================*/
-    
+
     /// @notice Sets the current Asset Manager for the protocol
     /// @param _assetManager The address of the new Asset Manager
     function setAssetManager(address _assetManager) external onlyGovernance {
@@ -66,9 +65,9 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         $.maxLeverageFraction = _maxLeverageFraction;
     }
-    
+
     /*=========================== Asset Manager Functions =========================*/
-    
+
     /// @notice Transfers USDC from the treasury to the Asset Manager
     /// @param _amount The amount of USDC to transfer
     function transferUSDCtoAssetManager(uint256 _amount) external {

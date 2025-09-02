@@ -8,9 +8,8 @@ import {TreasuryStorage} from "../TreasuryStorage.sol";
 /// @dev Facet for USX Protocol Treasury Diamond contract
 
 contract InsuranceBufferFacet is TreasuryStorage {
-    
     /*=========================== Public Functions =========================*/
-    
+
     /// @notice Returns current buffer target based on bufferTargetFraction and USX total supply
     /// @return The current buffer target
     function bufferTarget() public view returns (uint256) {
@@ -19,7 +18,7 @@ contract InsuranceBufferFacet is TreasuryStorage {
     }
 
     /*=========================== Governance Functions =========================*/
-    
+
     /// @notice Sets renewal fraction with precision to 0.001 percent (Minimal value & default is 10% fee == 100000)
     /// @param _bufferRenewalRate The new renewal fraction
     function setBufferRenewalRate(uint256 _bufferRenewalRate) external onlyGovernance {
@@ -43,18 +42,18 @@ contract InsuranceBufferFacet is TreasuryStorage {
     /// @return insuranceBufferAccrual The amount of USX to mint to the buffer
     function topUpBuffer(uint256 _totalProfit) public onlyTreasury returns (uint256 insuranceBufferAccrual) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        
+
         // Check if the buffer is less than the buffer target
         if ($.USX.balanceOf(address(this)) < bufferTarget()) {
             // Calculate the amount of USX to mint to the buffer based on profits only
             uint256 totalProfitUSDC = _totalProfit;
-            
+
             // Only use a portion of the profits for insurance buffer (not the entire system's USDC)
             uint256 insuranceBufferAccrualUSDC = totalProfitUSDC * $.bufferRenewalFraction / 1000000;
 
             // Mint USX to the buffer
             $.USX.mintUSX(address(this), insuranceBufferAccrualUSDC * DECIMAL_SCALE_FACTOR);
-            
+
             insuranceBufferAccrual = insuranceBufferAccrualUSDC;
         } else {
             insuranceBufferAccrual = 0;
@@ -69,12 +68,12 @@ contract InsuranceBufferFacet is TreasuryStorage {
         uint256 bufferSize = $.USX.balanceOf(address(this));
         // Convert USDC amount to USX: _amount (6 decimals) * DECIMAL_SCALE_FACTOR (10^12) = USX (18 decimals)
         uint256 amountUSX = _amount * DECIMAL_SCALE_FACTOR;
-        
+
         // Insurance Buffer can absorb the loss
         if (amountUSX <= bufferSize) {
             $.USX.burnUSX(address(this), amountUSX);
             remainingLosses = 0;
-        // Insurance Buffer is not sufficient to absorb the loss
+            // Insurance Buffer is not sufficient to absorb the loss
         } else {
             // If the amount is greater than the buffer size, burn the buffer and return the remaining losses
             $.USX.burnUSX(address(this), bufferSize);

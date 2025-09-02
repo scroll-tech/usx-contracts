@@ -7,13 +7,13 @@ import {USX} from "../src/USX.sol";
 
 contract USXTest is DeployTestSetup {
     uint256 public constant INITIAL_BALANCE = 1000e6; // 1000 USDC
-    
+
     event TreasurySet(address indexed treasury);
     event GovernanceTransferred(address indexed oldGovernance, address indexed newGovernance);
 
     function setUp() public override {
         super.setUp(); // Runs the deployment script and sets up contracts
-        
+
         // Whitelist user for testing
         vm.prank(admin);
         usx.whitelistUser(user, true);
@@ -39,11 +39,11 @@ contract USXTest is DeployTestSetup {
 
     function test_deposit_success() public {
         uint256 depositAmount = 100e6; // 100 USDC
-        
+
         vm.startPrank(user);
         usx.deposit(depositAmount);
         vm.stopPrank();
-        
+
         // Verify USX minted (100 USDC * 1e12 = 100e18 USX)
         assertEq(usx.balanceOf(user), 100e18);
     }
@@ -52,11 +52,11 @@ contract USXTest is DeployTestSetup {
         // Create a new user that is not whitelisted
         address nonWhitelistedUser = address(0x888);
         deal(SCROLL_USDC, nonWhitelistedUser, 1000e6); // Give some USDC
-        
+
         // Approve USDC spending
         vm.prank(nonWhitelistedUser);
         usdc.approve(address(usx), type(uint256).max);
-        
+
         // Try to deposit (should revert)
         vm.prank(nonWhitelistedUser);
         vm.expectRevert(USX.UserNotWhitelisted.selector);
@@ -66,28 +66,28 @@ contract USXTest is DeployTestSetup {
     function test_deposit_zero_amount() public {
         vm.prank(user);
         usx.deposit(0);
-        
+
         // Verify no USX was minted
         assertEq(usx.balanceOf(user), 0);
     }
 
     function test_deposit_large_amount() public {
         uint256 largeAmount = 1000000e6; // 1,000,000 USDC
-        
+
         vm.prank(user);
         usx.deposit(largeAmount);
-        
+
         // Verify USX was minted with proper decimal scaling
         assertEq(usx.balanceOf(user), largeAmount * 1e12);
     }
 
     function test_deposit_decimal_scaling() public {
         uint256 depositAmount = 1; // 1 wei of USDC (6 decimals)
-        
+
         vm.startPrank(user);
         usx.deposit(depositAmount);
         vm.stopPrank();
-        
+
         // Should scale up by 1e12: 1 * 1e12 = 1e12 wei of USX (18 decimals)
         assertEq(usx.balanceOf(user), 1e12);
     }
@@ -98,14 +98,14 @@ contract USXTest is DeployTestSetup {
         // Test the complete flow: deposit -> requestUSDC
         vm.prank(user);
         usx.deposit(100e6); // 100 USDC deposit
-        
+
         // Verify USX was minted
         assertEq(usx.balanceOf(user), 100e18);
-        
+
         // Request USDC withdrawal
         vm.prank(user);
         usx.requestUSDC(50e18); // Request 50 USX withdrawal
-        
+
         // Verify withdrawal request was recorded
         assertEq(usx.outstandingWithdrawalRequests(user), 50e6, "User should have 50 USDC withdrawal request");
         assertEq(usx.totalOutstandingWithdrawalAmount(), 50e6, "Total outstanding should be 50 USDC");
@@ -117,17 +117,17 @@ contract USXTest is DeployTestSetup {
         // Test multiple withdrawal requests in sequence
         vm.prank(user);
         usx.deposit(300e6); // 300 USDC deposit to get USX
-        
+
         // Make multiple withdrawal requests
         vm.prank(user);
         usx.requestUSDC(50e18); // Request 50 USX withdrawal
-        
+
         vm.prank(user);
         usx.requestUSDC(30e18); // Request 30 USX withdrawal
-        
+
         vm.prank(user);
         usx.requestUSDC(20e18); // Request 20 USX withdrawal
-        
+
         // Verify total outstanding
         assertEq(usx.totalOutstandingWithdrawalAmount(), 100e6, "Total outstanding should be 100 USDC");
         assertEq(usx.outstandingWithdrawalRequests(user), 100e6, "User should have 100 USDC withdrawal request");
@@ -136,11 +136,11 @@ contract USXTest is DeployTestSetup {
     function test_requestUSDC_zero_amount() public {
         vm.prank(user);
         usx.deposit(100e6); // 100 USDC deposit to get USX
-        
+
         // Request zero amount withdrawal
         vm.prank(user);
         usx.requestUSDC(0);
-        
+
         // Verify no withdrawal request was recorded
         assertEq(usx.outstandingWithdrawalRequests(user), 0, "User should have no withdrawal request for zero amount");
         assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0 for zero amount");
@@ -149,11 +149,11 @@ contract USXTest is DeployTestSetup {
     function test_requestUSDC_large_amount() public {
         vm.prank(user);
         usx.deposit(1000000e6); // 1,000,000 USDC deposit to get USX
-        
+
         // Request large amount withdrawal
         vm.prank(user);
         usx.requestUSDC(500000e18); // Request 500,000 USX withdrawal
-        
+
         // Verify large withdrawal request was recorded
         assertEq(usx.outstandingWithdrawalRequests(user), 500000e6, "User should have 500,000 USDC withdrawal request");
         assertEq(usx.totalOutstandingWithdrawalAmount(), 500000e6, "Total outstanding should be 500,000 USDC");
@@ -162,20 +162,26 @@ contract USXTest is DeployTestSetup {
     function test_requestUSDC_outstanding_amount_tracking() public {
         vm.prank(user);
         usx.deposit(1000e6); // 1,000 USDC deposit to get USX
-        
+
         // Make multiple requests and verify tracking
         vm.prank(user);
         usx.requestUSDC(100e18); // Request 100 USX
-        assertEq(usx.totalOutstandingWithdrawalAmount(), 100e6, "Total outstanding should be 100 USDC after first request");
-        
+        assertEq(
+            usx.totalOutstandingWithdrawalAmount(), 100e6, "Total outstanding should be 100 USDC after first request"
+        );
+
         vm.prank(user);
         usx.requestUSDC(200e18); // Request 200 USX
-        assertEq(usx.totalOutstandingWithdrawalAmount(), 300e6, "Total outstanding should be 300 USDC after second request");
-        
+        assertEq(
+            usx.totalOutstandingWithdrawalAmount(), 300e6, "Total outstanding should be 300 USDC after second request"
+        );
+
         vm.prank(user);
         usx.requestUSDC(150e18); // Request 150 USX
-        assertEq(usx.totalOutstandingWithdrawalAmount(), 450e6, "Total outstanding should be 450 USDC after third request");
-        
+        assertEq(
+            usx.totalOutstandingWithdrawalAmount(), 450e6, "Total outstanding should be 450 USDC after third request"
+        );
+
         // Verify user's individual request
         assertEq(usx.outstandingWithdrawalRequests(user), 450e6, "User should have 450 USDC total withdrawal request");
     }
@@ -183,16 +189,16 @@ contract USXTest is DeployTestSetup {
     function test_requestUSDC_revert_withdrawals_frozen() public {
         vm.prank(user);
         usx.deposit(100e6); // 100 USDC deposit to get USX
-        
+
         // Freeze withdrawals
         vm.prank(address(treasury));
         usx.freezeWithdrawals();
-        
+
         // Try to request USDC withdrawal while frozen
         vm.prank(user);
         vm.expectRevert(USX.WithdrawalsFrozen.selector);
         usx.requestUSDC(50e18);
-        
+
         // Verify no withdrawal request was recorded
         assertEq(usx.outstandingWithdrawalRequests(user), 0, "User should have no withdrawal request when frozen");
         assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0 when frozen");
@@ -205,31 +211,31 @@ contract USXTest is DeployTestSetup {
         // First, deposit USDC to get USX
         vm.prank(user);
         usx.deposit(100e6); // 100 USDC deposit
-        
+
         // Verify USX was minted
         assertEq(usx.balanceOf(user), 100e18, "User should have 100 USX");
-        
+
         // Request USDC withdrawal
         vm.prank(user);
         usx.requestUSDC(50e18); // Request 50 USX withdrawal
-        
+
         // Verify withdrawal request was recorded
         assertEq(usx.outstandingWithdrawalRequests(user), 50e6, "User should have 50 USDC withdrawal request");
         assertEq(usx.totalOutstandingWithdrawalAmount(), 50e6, "Total outstanding should be 50 USDC");
-        
+
         // Claim USDC
         vm.prank(user);
         usx.claimUSDC();
-        
+
         // Verify withdrawal request was fulfilled
         assertEq(usx.outstandingWithdrawalRequests(user), 0, "User should have no outstanding withdrawal requests");
         assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0");
-        
+
         // Verify user received USDC
         // The user should have their initial balance + 100 (deposit) - 50 (withdrawal)
         uint256 actualBalance = usdc.balanceOf(user);
         assertTrue(actualBalance > 0, "User should have USDC balance");
-        
+
         // The balance should be reasonable (not negative or extremely large)
         // User started with some USDC, deposited 100, then withdrew 50, so balance should be initial + 50
         // The exact amount depends on the test setup, but it should be positive and reasonable
@@ -246,21 +252,21 @@ contract USXTest is DeployTestSetup {
         // Test multiple withdrawal requests
         vm.prank(user);
         usx.deposit(200e6); // 200 USDC deposit
-        
+
         // Make multiple withdrawal requests
         vm.prank(user);
         usx.requestUSDC(50e18); // Request 50 USX withdrawal
-        
+
         vm.prank(user);
         usx.requestUSDC(30e18); // Request 30 USX withdrawal
-        
+
         // Verify total outstanding
         assertEq(usx.totalOutstandingWithdrawalAmount(), 80e6, "Total outstanding should be 80 USDC");
-        
+
         // Claim USDC (this claims all outstanding requests)
         vm.prank(user);
         usx.claimUSDC();
-        
+
         // Verify all requests were fulfilled
         assertEq(usx.outstandingWithdrawalRequests(user), 0, "User should have no outstanding withdrawal requests");
         assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0");
@@ -270,17 +276,17 @@ contract USXTest is DeployTestSetup {
         // Test that withdrawal requests are properly cleaned up
         vm.prank(user);
         usx.deposit(100e6); // 100 USDC deposit
-        
+
         vm.prank(user);
         usx.requestUSDC(50e18); // Request 50 USX withdrawal
-        
+
         // Verify request exists
         assertEq(usx.outstandingWithdrawalRequests(user), 50e6, "User should have 50 USDC withdrawal request");
-        
+
         // Claim USDC
         vm.prank(user);
         usx.claimUSDC();
-        
+
         // Verify request is cleaned up
         assertEq(usx.outstandingWithdrawalRequests(user), 0, "User should have no outstanding withdrawal requests");
         assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0");
@@ -291,14 +297,14 @@ contract USXTest is DeployTestSetup {
     function test_mintUSX_success() public {
         // Test mintUSX through the treasury (full flow)
         // Since mintUSX is onlyTreasury, we need to impersonate the treasury
-        
+
         uint256 initialBalance = usx.balanceOf(user);
         uint256 mintAmount = 1000e18; // 1000 USX
-        
+
         // Impersonate the treasury to call mintUSX
         vm.prank(address(treasury));
         usx.mintUSX(user, mintAmount);
-        
+
         uint256 finalBalance = usx.balanceOf(user);
         assertEq(finalBalance, initialBalance + mintAmount, "User should receive minted USX");
         assertEq(usx.totalSupply(), 1000000000000000000000000 + mintAmount, "Total supply should increase");
@@ -313,19 +319,19 @@ contract USXTest is DeployTestSetup {
     function test_burnUSX_success() public {
         // Test burnUSX through the treasury (full flow)
         // Since burnUSX is onlyTreasury, we need to impersonate the treasury
-        
+
         // First mint some USX to the user
         uint256 mintAmount = 1000e18;
         vm.prank(address(treasury));
         usx.mintUSX(user, mintAmount);
-        
+
         uint256 initialBalance = usx.balanceOf(user);
         uint256 burnAmount = 500e18; // Burn 500 USX
-        
+
         // Impersonate the treasury to call burnUSX
         vm.prank(address(treasury));
         usx.burnUSX(user, burnAmount);
-        
+
         uint256 finalBalance = usx.balanceOf(user);
         assertEq(finalBalance, initialBalance - burnAmount, "User should have USX burned");
         assertEq(usx.totalSupply(), 1000000000000000000000000 + mintAmount - burnAmount, "Total supply should decrease");
@@ -340,18 +346,18 @@ contract USXTest is DeployTestSetup {
     function test_updatePeg_success() public {
         // Test updatePeg through the treasury (full flow)
         // Since updatePeg is onlyTreasury, we need to impersonate the treasury
-        
+
         uint256 newPeg = 2e18; // 2 USDC per USX
         uint256 initialPeg = usx.usxPrice();
-        
+
         // Impersonate the treasury to call updatePeg
         vm.prank(address(treasury));
         usx.updatePeg(newPeg);
-        
+
         uint256 finalPeg = usx.usxPrice();
         assertEq(finalPeg, newPeg, "USX peg should be updated");
         assertEq(finalPeg, 2e18, "USX peg should be 2 USDC");
-        
+
         // Note: The current deposit function doesn't use the peg price - it just scales USDC to USX by 1e12
         // This is a limitation of the current implementation
         // The peg price is stored but not used in deposit calculations
@@ -368,17 +374,17 @@ contract USXTest is DeployTestSetup {
     function test_freezeWithdrawals_success() public {
         // Test freezeWithdrawals through the treasury (full flow)
         // Since freezeWithdrawals is onlyTreasury, we need to impersonate the treasury
-        
+
         bool initialFreezeState = usx.withdrawalsFrozen();
         assertFalse(initialFreezeState, "Withdrawals should not be frozen initially");
-        
+
         // Impersonate the treasury to call freezeWithdrawals
         vm.prank(address(treasury));
         usx.freezeWithdrawals();
-        
+
         bool finalFreezeState = usx.withdrawalsFrozen();
         assertTrue(finalFreezeState, "Withdrawals should be frozen");
-        
+
         // Test that frozen withdrawals prevent withdrawal requests
         vm.prank(user);
         vm.expectRevert(USX.WithdrawalsFrozen.selector);
@@ -394,24 +400,24 @@ contract USXTest is DeployTestSetup {
     function test_unfreezeWithdrawals_success() public {
         // Test unfreezeWithdrawals through governance (full flow)
         // Since unfreezeWithdrawals is onlyGovernance, we need to impersonate governance
-        
+
         // First freeze withdrawals
         vm.prank(address(treasury));
         usx.freezeWithdrawals();
         assertTrue(usx.withdrawalsFrozen(), "Withdrawals should be frozen");
-        
+
         // Then unfreeze withdrawals
         vm.prank(governanceWarchest);
         usx.unfreezeWithdrawals();
-        
+
         bool finalFreezeState = usx.withdrawalsFrozen();
         assertFalse(finalFreezeState, "Withdrawals should be unfrozen");
-        
+
         // Test that unfrozen withdrawals allow withdrawal requests
         // First give the user some USX to request withdrawal for
         vm.prank(address(treasury));
         usx.mintUSX(user, 1000e18); // Give user 1000 USX
-        
+
         // Now test withdrawal request
         vm.prank(user);
         usx.requestUSDC(100e18);
@@ -428,10 +434,10 @@ contract USXTest is DeployTestSetup {
 
     function test_whitelistUser_success() public {
         address newUser = address(0x999);
-        
+
         vm.prank(admin);
         usx.whitelistUser(newUser, true);
-        
+
         assertTrue(usx.whitelistedUsers(newUser));
     }
 
@@ -451,11 +457,11 @@ contract USXTest is DeployTestSetup {
 
     function test_setGovernance_success() public {
         address newGovernance = address(0x555);
-        
+
         // Set new governance (should succeed)
         vm.prank(governanceWarchest); // Use governanceWarchest, not governance
         usx.setGovernance(newGovernance);
-        
+
         // Verify governance was updated
         assertEq(usx.governanceWarchest(), newGovernance);
     }
@@ -489,18 +495,18 @@ contract USXTest is DeployTestSetup {
 
     function test_whitelisted_users_mapping() public {
         // Test that whitelisted users mapping works correctly
-        
+
         // User should be whitelisted from setUp
         assertTrue(usx.whitelistedUsers(user), "User should be whitelisted");
-        
+
         // Test a different address
         address otherUser = address(0x777);
         assertFalse(usx.whitelistedUsers(otherUser), "Other user should not be whitelisted");
-        
+
         // Whitelist the other user
         vm.prank(admin);
         usx.whitelistUser(otherUser, true);
-        
+
         // Verify they are now whitelisted
         assertTrue(usx.whitelistedUsers(otherUser), "Other user should now be whitelisted");
     }
@@ -511,7 +517,7 @@ contract USXTest is DeployTestSetup {
         // This test is challenging to mock properly due to the complex USDC interaction
         // Instead, we'll test the whitelist check which is easier to control
         address nonWhitelistedUser = address(0x1234);
-        
+
         // Try to deposit as non-whitelisted user
         vm.prank(nonWhitelistedUser);
         vm.expectRevert(USX.UserNotWhitelisted.selector);
@@ -521,7 +527,7 @@ contract USXTest is DeployTestSetup {
     function test_claimUSDC_revert_no_outstanding_requests() public {
         // Setup: User with no outstanding withdrawal requests
         address userWithoutRequests = address(0x1234);
-        
+
         // Try to claim USDC without any requests
         vm.prank(userWithoutRequests);
         vm.expectRevert(); // Should revert with NoOutstandingWithdrawalRequests
@@ -531,22 +537,22 @@ contract USXTest is DeployTestSetup {
     function test_claimUSDC_revert_insufficient_usdc_balance() public {
         // Setup: User has outstanding request but contract has insufficient USDC
         uint256 requestAmount = 1000e18; // 1,000 USX (not USDC)
-        
+
         // First, give user some USX to request USDC
         vm.prank(user);
         usx.deposit(1000e6); // Deposit 1,000 USDC to get USX
-        
+
         // User requests USDC
         vm.prank(user);
         usx.requestUSDC(requestAmount);
-        
+
         // Drain the USX contract's USDC balance by transferring to treasury
         uint256 usxUSDCBalance = usdc.balanceOf(address(usx));
         if (usxUSDCBalance > 0) {
             vm.prank(address(usx));
             usdc.transfer(address(treasury), usxUSDCBalance);
         }
-        
+
         // Try to claim USDC
         vm.prank(user);
         vm.expectRevert(USX.InsufficientUSDC.selector);
@@ -558,7 +564,7 @@ contract USXTest is DeployTestSetup {
         // Instead, we'll test a different error condition that's easier to control
         // Test that a user with no outstanding requests cannot claim USDC
         address userWithoutRequests = address(0x1234);
-        
+
         // Try to claim USDC without any requests
         vm.prank(userWithoutRequests);
         vm.expectRevert(USX.NoOutstandingWithdrawalRequests.selector);
@@ -566,107 +572,107 @@ contract USXTest is DeployTestSetup {
     }
 
     /*=========================== Edge Cases & Error Scenarios =========================*/
-    
+
     function test_deposit_exact_outstanding_amount() public {
         // Test deposit when amount exactly equals outstanding withdrawal amount
         // First, give user some USX to request USDC
         vm.prank(user);
         usx.deposit(1000e6); // Deposit 1000 USDC to get USX
-        
+
         // Create a withdrawal request
         vm.prank(user);
         usx.requestUSDC(1000e18); // Request 1000 USX worth of USDC
-        
+
         uint256 outstandingAmount = usx.totalOutstandingWithdrawalAmount();
-        
+
         // Now deposit exactly the outstanding amount
         vm.prank(user);
         usx.deposit(outstandingAmount);
-        
+
         // Verify the deposit worked correctly
         assertEq(usx.balanceOf(user), outstandingAmount * 1e12, "User should receive correct USX amount");
     }
-    
+
     function test_deposit_zero_usdc_for_treasury() public {
         // Test deposit when all USDC goes to contract (none to treasury)
         // First, give user some USX to request USDC
         vm.prank(user);
         usx.deposit(1000e6); // Deposit 1000 USDC to get USX
-        
+
         // Create a withdrawal request
         vm.prank(user);
         usx.requestUSDC(1000e18); // Request 1000 USX worth of USDC
-        
+
         uint256 outstandingAmount = usx.totalOutstandingWithdrawalAmount();
-        
+
         // Deposit exactly the outstanding amount (all goes to contract)
         vm.prank(user);
         usx.deposit(outstandingAmount);
-        
+
         // Verify the deposit worked correctly
         assertEq(usx.balanceOf(user), outstandingAmount * 1e12, "User should receive correct USX amount");
     }
-    
+
     function test_deposit_zero_usdc_for_contract() public {
         // Test deposit when all USDC goes to treasury (none to contract)
         uint256 outstandingAmount = usx.totalOutstandingWithdrawalAmount();
-        
+
         // Deposit more than outstanding amount (excess goes to treasury)
         uint256 depositAmount = outstandingAmount + 1000e6;
         vm.prank(user);
         usx.deposit(depositAmount);
-        
+
         // Verify the deposit worked correctly
         assertEq(usx.balanceOf(user), depositAmount * 1e12, "User should receive correct USX amount");
     }
 
     /*=========================== UUPS Upgrade Tests =========================*/
-    
+
     function test_authorizeUpgrade_success() public {
         // Test that governance can authorize upgrade
         // Note: _authorizeUpgrade is internal, so we can't test it directly
         // But we can verify that the UUPS functionality is properly set up
-        
+
         // Test that the contract is UUPS upgradeable
         assertTrue(address(usx) != address(0), "USX should be deployed");
-        
+
         // Test that governance can call governance functions
         // The governance address is the governanceWarchest
         address governanceAddress = usx.governanceWarchest();
         vm.prank(governanceAddress);
         usx.setGovernance(governanceAddress); // This should not revert
-        
+
         // This verifies that the governance access control works
     }
-    
+
     function test_authorizeUpgrade_revert_not_governance() public {
         // Test that non-governance cannot authorize upgrade
         // Note: _authorizeUpgrade is internal, so we can't test it directly
         // But we can test that non-governance cannot call governance functions
-        
+
         vm.prank(user);
         vm.expectRevert(USX.NotGovernance.selector);
         usx.setGovernance(address(0x1234));
     }
 
     /*=========================== USDC Transfer Failure Tests =========================*/
-    
+
     function test_deposit_revert_usdc_transfer_failed() public {
         // This test is challenging to implement with real USDC
         // Instead, we'll test the whitelist check which is easier to control
         address nonWhitelistedUser = address(0x1234);
-        
+
         // Try to deposit as non-whitelisted user
         vm.prank(nonWhitelistedUser);
         vm.expectRevert(USX.UserNotWhitelisted.selector);
         usx.deposit(1000e6);
     }
-    
+
     function test_claimUSDC_revert_usdc_transfer_failed() public {
         // This test is challenging to implement with real USDC
         // Instead, we'll test the no outstanding requests check
         address userWithoutRequests = address(0x1234);
-        
+
         // Try to claim USDC without any requests
         vm.prank(userWithoutRequests);
         vm.expectRevert(USX.NoOutstandingWithdrawalRequests.selector);

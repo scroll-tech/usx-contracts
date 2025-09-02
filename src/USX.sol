@@ -8,7 +8,6 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 contract USX is ERC20Upgradeable, UUPSUpgradeable {
-
     /*=========================== Errors =========================*/
 
     error ZeroAddress();
@@ -60,16 +59,13 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     }
 
     // keccak256(abi.encode(uint256(keccak256("usx.main")) - 1)) & ~bytes32(uint256(0xff));
-    bytes32 private constant USX_STORAGE_LOCATION =
-        0x0c53c51c00000000000000000000000000000000000000000000000000000000;
+    bytes32 private constant USX_STORAGE_LOCATION = 0x0c53c51c00000000000000000000000000000000000000000000000000000000;
 
     function _getStorage() private pure returns (USXStorage storage $) {
         assembly {
             $.slot := USX_STORAGE_LOCATION
         }
     }
-
-
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -78,20 +74,15 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
 
     /*=========================== Initialization =========================*/
 
-    function initialize(
-        address _USDC,
-        address _treasury,
-        address _governanceWarchest,
-        address _admin
-    ) public initializer {
-        if (_USDC == address(0) ||
-            _governanceWarchest == address(0) ||
-            _admin == address(0)
-        ) revert ZeroAddress();
-        
+    function initialize(address _USDC, address _treasury, address _governanceWarchest, address _admin)
+        public
+        initializer
+    {
+        if (_USDC == address(0) || _governanceWarchest == address(0) || _admin == address(0)) revert ZeroAddress();
+
         // Initialize ERC20
         __ERC20_init("USX Token", "USX");
-        
+
         USXStorage storage $ = _getStorage();
         $.USDC = IERC20(_USDC);
         $.treasury = ITreasury(_treasury);
@@ -106,7 +97,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         if (_treasury == address(0)) revert ZeroAddress();
         USXStorage storage $ = _getStorage();
         if ($.treasury != ITreasury(address(0))) revert TreasuryAlreadySet();
-        
+
         $.treasury = ITreasury(_treasury);
         emit TreasurySet(_treasury);
     }
@@ -117,20 +108,21 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     /// @param _amount The amount of USDC to deposit
     function deposit(uint256 _amount) public {
         USXStorage storage $ = _getStorage();
-        
+
         // Check if user is whitelisted
         if (!$.whitelistedUsers[msg.sender]) revert UserNotWhitelisted();
-    
+
         // Calculate USDC distribution: keep what's needed for withdrawal requests, send excess to treasury
-        uint256 usdcForContract = _amount <= $.totalOutstandingWithdrawalAmount ? _amount : $.totalOutstandingWithdrawalAmount;
+        uint256 usdcForContract =
+            _amount <= $.totalOutstandingWithdrawalAmount ? _amount : $.totalOutstandingWithdrawalAmount;
         uint256 usdcForTreasury = _amount - usdcForContract;
-        
+
         // Transfer USDC to contract (if needed for withdrawal requests)
         if (usdcForContract > 0) {
             bool success = $.USDC.transferFrom(msg.sender, address(this), usdcForContract);
             if (!success) revert USDCTransferFailed();
         }
-        
+
         // Transfer excess USDC to treasury
         if (usdcForTreasury > 0) {
             bool success = $.USDC.transferFrom(msg.sender, address($.treasury), usdcForTreasury);
@@ -145,7 +137,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     /// @param _USXredeemed The amount of USX to redeem
     function requestUSDC(uint256 _USXredeemed) public {
         USXStorage storage $ = _getStorage();
-        
+
         // Check if withdrawals are frozen
         if ($.withdrawalsFrozen) revert WithdrawalsFrozen();
 
@@ -163,14 +155,13 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         $.outstandingWithdrawalRequests[msg.sender] += usdcAmount;
 
         // TODO: Consider automatically sending USDC to user if available
-
     }
 
     // TODO: Consider allowing partial claims as well
     /// @notice Claim USDC (fulfill withdrawal request)
     function claimUSDC() public {
         USXStorage storage $ = _getStorage();
-        
+
         // Check if user has outstanding withdrawal requests
         if ($.outstandingWithdrawalRequests[msg.sender] == 0) revert NoOutstandingWithdrawalRequests();
 
@@ -181,7 +172,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         uint256 usdcAmount = $.outstandingWithdrawalRequests[msg.sender];
         $.outstandingWithdrawalRequests[msg.sender] = 0;
         $.totalOutstandingWithdrawalAmount -= usdcAmount;
-        
+
         // Send the USDC to the user
         $.USDC.transfer(msg.sender, usdcAmount);
     }
@@ -198,11 +189,11 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     /// @param newGovernance Address of new governance
     function setGovernance(address newGovernance) external onlyGovernance {
         if (newGovernance == address(0)) revert ZeroAddress();
-        
+
         USXStorage storage $ = _getStorage();
         address oldGovernance = $.governanceWarchest;
         $.governanceWarchest = newGovernance;
-        
+
         emit GovernanceTransferred(oldGovernance, newGovernance);
     }
 

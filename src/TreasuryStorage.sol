@@ -8,9 +8,8 @@ import {IsUSX} from "./interfaces/IsUSX.sol";
 /// @title TreasuryStorage
 /// @notice Contains state for the USX Protocols Treasury contracts
 contract TreasuryStorage {
-    
     /*=========================== Errors =========================*/
-    
+
     // Core Diamond errors
     error FacetAlreadyExists();
     error FacetNotFound();
@@ -19,38 +18,38 @@ contract TreasuryStorage {
 
     // Core contract errors
     error ZeroAddress();
-    
+
     // Asset Manager errors
     error InvalidMaxLeverageFraction();
     error MaxLeverageExceeded();
-    
+
     // Insurance Buffer errors
     error InvalidBufferRenewalRate();
     error InvalidBufferTargetFraction();
-    
+
     // Profit/Loss Reporter errors
     error ZeroValueChange();
     error InvalidSuccessFeeFraction();
     error ProfitsDetectedUseReportProfitsFunction();
     error LossesDetectedUseReportLossesFunction();
-    
+
     // Access control errors
     error NotGovernance();
     error NotAssetManager();
     error NotTreasury();
-    
+
     /*=========================== Events =========================*/
-    
+
     event GovernanceTransferred(address indexed oldGovernance, address indexed newGovernance);
 
     /*=========================== Modifiers =========================*/
-    
+
     // Modifier to restrict access to governance functions
     modifier onlyGovernance() {
         if (msg.sender != _getStorage().governance) revert NotGovernance();
         _;
     }
-    
+
     // Modifier to restrict access to asset manager functions
     modifier onlyAssetManager() {
         if (msg.sender != _getStorage().assetManager) revert NotAssetManager();
@@ -67,21 +66,21 @@ contract TreasuryStorage {
 
     /// @custom:storage-location erc7201:treasury.main
     struct TreasuryStorageStruct {
-        IUSX USX;                           // USX token contract
-        IsUSX sUSX;                         // sUSX vault contract
-        IERC20 USDC;                        // USDC token contract
-        address governance;                  // Governance address
-        address assetManager;                // The current Asset Manager for the protocol
-        address governanceWarchest;          // Governance warchest address
-        uint256 successFeeFraction;          // Success fee fraction (default 5% == 50000)
-        uint256 maxLeverageFraction;         // Max leverage fraction (default 10% == 100000)
-        uint256 bufferRenewalFraction;       // Buffer renewal fraction (default 10% == 100000)
-        uint256 bufferTargetFraction;        // Buffer target fraction (default 5% == 50000)    
-        uint256 assetManagerUSDC;            // USDC allocated to Asset Manager
-        uint256 netEpochProfits;             // profits reported for previous epoch, after deducting Insurance Buffer and Governance Warchest fees
+        IUSX USX; // USX token contract
+        IsUSX sUSX; // sUSX vault contract
+        IERC20 USDC; // USDC token contract
+        address governance; // Governance address
+        address assetManager; // The current Asset Manager for the protocol
+        address governanceWarchest; // Governance warchest address
+        uint256 successFeeFraction; // Success fee fraction (default 5% == 50000)
+        uint256 maxLeverageFraction; // Max leverage fraction (default 10% == 100000)
+        uint256 bufferRenewalFraction; // Buffer renewal fraction (default 10% == 100000)
+        uint256 bufferTargetFraction; // Buffer target fraction (default 5% == 50000)
+        uint256 assetManagerUSDC; // USDC allocated to Asset Manager
+        uint256 netEpochProfits; // profits reported for previous epoch, after deducting Insurance Buffer and Governance Warchest fees
     }
 
-    uint256 public constant DECIMAL_SCALE_FACTOR = 10**12; // Decimal scaling: 10^12. USDC is 6 decimals, USX is 18 decimals (18 - 6 = 12)
+    uint256 public constant DECIMAL_SCALE_FACTOR = 10 ** 12; // Decimal scaling: 10^12. USDC is 6 decimals, USX is 18 decimals (18 - 6 = 12)
 
     // keccak256(abi.encode(uint256(keccak256("treasury.main")) - 1)) & ~bytes32(uint256(0xff));
     bytes32 private constant TREASURY_STORAGE_LOCATION =

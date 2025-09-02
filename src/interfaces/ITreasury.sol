@@ -6,7 +6,7 @@ pragma solidity 0.8.30;
 interface ITreasury {
     // Core functions
     function governanceWarchest() external view returns (address);
-    
+
     // Asset Manager functions
     function maxLeverage() external view returns (uint256);
     function checkMaxLeverage(uint256 depositAmount) external view returns (bool);
@@ -16,7 +16,7 @@ interface ITreasury {
 
     // Insurance Buffer functions
     function bufferTarget() external view returns (uint256);
-    
+
     // Profit/Loss functions
     function successFee(uint256 profitAmount) external view returns (uint256);
     function profitLatestEpoch() external view returns (uint256);

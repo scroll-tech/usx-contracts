@@ -11,16 +11,16 @@ interface IsUSX {
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
     function approve(address spender, uint256 amount) external returns (bool);
     function allowance(address owner, address spender) external view returns (uint256);
-    
+
     // Vault functionsw
     function sharePrice() external view returns (uint256);
-    
+
     // State getters
     function USX() external view returns (address);
     function treasury() external view returns (address);
     function lastEpochBlock() external view returns (uint256);
     function epochDuration() external view returns (uint256);
-    
+
     // Epoch management
     function updateLastEpochBlock() external;
 }

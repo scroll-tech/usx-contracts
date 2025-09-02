@@ -14,7 +14,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 /// @dev ERC4626 vault
 
 contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
-
     /*=========================== Errors =========================*/
 
     error ZeroAddress();
@@ -51,27 +50,26 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     /// @custom:storage-location erc7201:susx.main
     struct SUSXStorage {
         IERC20 USX; // USX token reference (the underlying asset)
-        ITreasury treasury;     // treasury contract
-        address governance;    // address that controls governance of the contract
-        uint256 withdrawalPeriod;    // withdrawal period in blocks, (default == 108000 (15 days))
-        uint256 withdrawalFeeFraction;    // fraction of withdrawals determining the withdrawal fee, (default 0.5% == 500) with precision to 0.001 percent
-        uint256 minWithdrawalPeriod;     // withdrawal period in blocks, (default == 108000 (15 days))
-        uint256 lastEpochBlock;     // block number of the last epoch
-        uint256 withdrawalIdCounter; 
-        uint256 epochDuration;     //  duration of epoch in blocks, (default == 216000 (30days))
+        ITreasury treasury; // treasury contract
+        address governance; // address that controls governance of the contract
+        uint256 withdrawalPeriod; // withdrawal period in blocks, (default == 108000 (15 days))
+        uint256 withdrawalFeeFraction; // fraction of withdrawals determining the withdrawal fee, (default 0.5% == 500) with precision to 0.001 percent
+        uint256 minWithdrawalPeriod; // withdrawal period in blocks, (default == 108000 (15 days))
+        uint256 lastEpochBlock; // block number of the last epoch
+        uint256 withdrawalIdCounter;
+        uint256 epochDuration; //  duration of epoch in blocks, (default == 216000 (30days))
         mapping(uint256 => WithdrawalRequest) withdrawalRequests;
     }
 
     struct WithdrawalRequest {
-        address user;                   // Address of withdrawer
-        uint256 amount;                 // sUSX amount redeemed
-        uint256 withdrawalBlock;        // Block number of the withdrawal request
-        bool claimed;                   // True = withdrawal request has been claimed
+        address user; // Address of withdrawer
+        uint256 amount; // sUSX amount redeemed
+        uint256 withdrawalBlock; // Block number of the withdrawal request
+        bool claimed; // True = withdrawal request has been claimed
     }
 
     // keccak256(abi.encode(uint256(keccak256("susx.main")) - 1)) & ~bytes32(uint256(0xff));
-    bytes32 private constant SUSX_STORAGE_LOCATION =
-        0x0c53c51c00000000000000000000000000000000000000000000000000000000;
+    bytes32 private constant SUSX_STORAGE_LOCATION = 0x0c53c51c00000000000000000000000000000000000000000000000000000000;
 
     function _getStorage() private pure returns (SUSXStorage storage $) {
         assembly {
@@ -90,30 +88,24 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     /// @param _usx Address of the USX token
     /// @param _treasury Address of the Treasury contract
     /// @param _governance Address of the governance
-    function initialize(
-        address _usx,
-        address _treasury,
-        address _governance
-    ) public initializer {
-        if (_usx == address(0) ||
-            _governance == address(0)
-        ) revert ZeroAddress();
-        
+    function initialize(address _usx, address _treasury, address _governance) public initializer {
+        if (_usx == address(0) || _governance == address(0)) revert ZeroAddress();
+
         // Initialize ERC4626 and ERC20
         __ERC4626_init(IERC20(_usx));
         __ERC20_init("sUSX Token", "sUSX");
-        
+
         SUSXStorage storage $ = _getStorage();
         $.USX = IERC20(_usx);
         $.treasury = ITreasury(_treasury);
         $.governance = _governance;
-        
+
         // Set default values
-        $.withdrawalPeriod = 108000;      // 15 days (assuming 12 second block time)
-        $.withdrawalFeeFraction = 500;    // 0.5%
-        $.minWithdrawalPeriod = 108000;   // 15 days
-        $.epochDuration = 216000;         // 30 days
-        $.lastEpochBlock = block.number;  // Set to current block number
+        $.withdrawalPeriod = 108000; // 15 days (assuming 12 second block time)
+        $.withdrawalFeeFraction = 500; // 0.5%
+        $.minWithdrawalPeriod = 108000; // 15 days
+        $.epochDuration = 216000; // 30 days
+        $.lastEpochBlock = block.number; // Set to current block number
     }
 
     /// @notice Set the initial Treasury address - can only be called once when treasury is address(0)
@@ -122,7 +114,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         if (_treasury == address(0)) revert ZeroAddress();
         SUSXStorage storage $ = _getStorage();
         if ($.treasury != ITreasury(address(0))) revert TreasuryAlreadySet();
-        
+
         $.treasury = ITreasury(_treasury);
         emit TreasurySet(_treasury);
     }
@@ -135,12 +127,14 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     /// @param withdrawalId The id of the withdrawal to claim
     function claimWithdraw(uint256 withdrawalId) public {
         SUSXStorage storage $ = _getStorage();
-        
+
         // Check if the withdrawal request is unclaimed
         if ($.withdrawalRequests[withdrawalId].claimed) revert WithdrawalAlreadyClaimed();
 
         // Check if the withdrawal period has passed
-        if ($.withdrawalRequests[withdrawalId].withdrawalBlock + $.withdrawalPeriod > block.number) revert WithdrawalPeriodNotPassed();
+        if ($.withdrawalRequests[withdrawalId].withdrawalBlock + $.withdrawalPeriod > block.number) {
+            revert WithdrawalPeriodNotPassed();
+        }
 
         // Check if the next epoch has started since the withdrawal request was made
         if ($.withdrawalRequests[withdrawalId].withdrawalBlock > $.lastEpochBlock) revert NextEpochNotStarted();
@@ -167,17 +161,17 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     /// @return The current share price of sUSX
     function sharePrice() public view returns (uint256) {
         uint256 supply = totalSupply();
-        
+
         // Handle the first deposit case
         if (supply == 0) {
             return 1e18; // 1:1 ratio for first deposit
         }
-        
+
         SUSXStorage storage $ = _getStorage();
         uint256 base = $.USX.balanceOf(address(this));
         uint256 rewards = $.treasury.profitLatestEpoch();
         uint256 totalUSX = base + rewards;
-        
+
         return totalUSX * 1e18 / supply;
     }
 
@@ -219,11 +213,11 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     /// @param newGovernance Address of new governance
     function setGovernance(address newGovernance) external onlyGovernance {
         if (newGovernance == address(0)) revert ZeroAddress();
-        
+
         SUSXStorage storage $ = _getStorage();
         address oldGovernance = $.governance;
         $.governance = newGovernance;
-        
+
         emit GovernanceTransferred(oldGovernance, newGovernance);
     }
 
@@ -232,7 +226,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     /// @notice Updates lastEpochBlock to the current block number
     function updateLastEpochBlock() external onlyTreasury {
         SUSXStorage storage $ = _getStorage();
-        
+
         uint256 oldEpochBlock = $.lastEpochBlock;
         $.lastEpochBlock = block.number;
         emit EpochAdvanced(oldEpochBlock, block.number);
@@ -242,13 +236,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     /// @dev User must wait for withdrawalPeriod to pass before unstaking (withdrawalPeriod)
     /// @dev Override default ERC4626 for the 2 step withdrawal process in protocol
-    function _withdraw(
-        address ,
-        address receiver,
-        address owner,
-        uint256 ,
-        uint256 shares
-    ) internal override {        
+    function _withdraw(address, address receiver, address owner, uint256, uint256 shares) internal override {
         // Note: ERC4626 withdraw() already checks balance via maxWithdraw()
         // so this check is redundant and will never be reached
         // if (balanceOf(owner) < shares) revert InsufficientBalance();
@@ -258,12 +246,8 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
         // Record withdrawal request
         SUSXStorage storage $ = _getStorage();
-        $.withdrawalRequests[$.withdrawalIdCounter] = WithdrawalRequest({
-            user: receiver,
-            amount: shares,
-            withdrawalBlock: block.number,
-            claimed: false
-        });
+        $.withdrawalRequests[$.withdrawalIdCounter] =
+            WithdrawalRequest({user: receiver, amount: shares, withdrawalBlock: block.number, claimed: false});
 
         // Increment withdrawalIdCounter
         $.withdrawalIdCounter++;
