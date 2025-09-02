@@ -22,3 +22,9 @@ scroll = "${SCROLL_MAINNET_RPC}"
 scroll_sepolia = "${SCROLL_SEPOLIA_RPC}"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+# Invariant testing configuration
+[invariant]
+runs = 1000
+depth = 15
+fail_on_revert = false
