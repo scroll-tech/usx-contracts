@@ -70,9 +70,8 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
 
     /// @notice Transfers USDC from the treasury to the Asset Manager
     /// @param _amount The amount of USDC to transfer
-    function transferUSDCtoAssetManager(uint256 _amount) external {
+    function transferUSDCtoAssetManager(uint256 _amount) external onlyAssetManager {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        if (msg.sender != $.assetManager) revert NotAssetManager();
 
         // Check if the transfer would exceed the max leverage
         if (!checkMaxLeverage(_amount)) revert MaxLeverageExceeded();
@@ -83,9 +82,8 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
 
     /// @notice Transfers USDC from the Asset Manager to the treasury
     /// @param _amount The amount of USDC to transfer
-    function transferUSDCFromAssetManager(uint256 _amount) external {
+    function transferUSDCFromAssetManager(uint256 _amount) external onlyAssetManager {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        if (msg.sender != $.assetManager) revert NotAssetManager();
         $.assetManagerUSDC -= _amount;
         IAssetManager($.assetManager).withdraw(_amount);
     }
