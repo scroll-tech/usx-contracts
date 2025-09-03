@@ -2,24 +2,22 @@
 pragma solidity 0.8.30;
 
 import {Test, console} from "forge-std/Test.sol";
-import {DeployTestSetup} from "../script/DeployTestSetup.sol";
+import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
 import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // TODO: Test profit/loss report with 0 value
 
-contract ProfitAndLossReporterFacetTest is DeployTestSetup {
+contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
     // Constants for testing
-    uint256 public constant DECIMAL_SCALE_FACTOR = 10 ** 12; // Decimal scaling: 10^12. USDC is 6 decimals, USX is 18 decimals (18 - 6 = 12)
-    uint256 public constant INITIAL_BLOCKS = 1000000;
     uint256 public constant INITIAL_BALANCE = 1000e6; // 1000 USDC
 
     function setUp() public override {
-        super.setUp(); // Runs the deployment script and sets up contracts
+        super.setUp(); // Runs the local deployment setup
 
         // Give treasury some USDC to work with
-        deal(SCROLL_USDC, address(treasury), 10000e6); // 10,000 USDC
+        deal(address(usdc), address(treasury), 10000e6); // 10,000 USDC
     }
 
     /*=========================== successFee Function Tests =========================*/
@@ -581,5 +579,34 @@ contract ProfitAndLossReporterFacetTest is DeployTestSetup {
         // Check that some USX was minted for partial peg recovery
         uint256 finalUSXSupply = usx.totalSupply();
         assertGt(finalUSXSupply, 1000000e18, "USX should be minted for partial peg recovery");
+    }
+
+    function test_debug_peg_and_value() public {
+        console.log("=== DEBUG PEG AND VALUE CONSERVATION ===");
+        
+        // Check peg calculation
+        uint256 totalUSDCoutstanding = usdc.balanceOf(address(treasury)) + 
+                                       treasury.assetManagerUSDC() + 
+                                       usdc.balanceOf(address(usx));
+        uint256 scaledUSDC = totalUSDCoutstanding * 1e18;
+        uint256 expectedPeg = scaledUSDC / usx.totalSupply();
+        uint256 actualPeg = usx.usxPrice();
+        
+        console.log("Total USDC Outstanding:", totalUSDCoutstanding);
+        console.log("USX Total Supply:", usx.totalSupply());
+        console.log("Scaled USDC:", scaledUSDC);
+        console.log("Expected Peg:", expectedPeg);
+        console.log("Actual Peg:", actualPeg);
+        console.log("Peg Difference:", actualPeg > expectedPeg ? actualPeg - expectedPeg : expectedPeg - actualPeg);
+        
+        // Check value conservation
+        uint256 totalUSXValue = usx.totalSupply() * usx.usxPrice() / 1e18;
+        uint256 totalUSDCBacking = (usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx))) * 1e18;
+        
+        console.log("Total USX Value (wei):", totalUSXValue);
+        console.log("Total USDC Backing (scaled):", totalUSDCBacking);
+        console.log("Value Conservation Difference:", totalUSDCBacking > totalUSXValue ? totalUSDCBacking - totalUSXValue : totalUSXValue - totalUSDCBacking);
+        
+        console.log("=== END DEBUG ===");
     }
 }

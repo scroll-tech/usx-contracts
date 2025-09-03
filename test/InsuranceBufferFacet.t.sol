@@ -2,14 +2,12 @@
 pragma solidity 0.8.30;
 
 import {Test, console} from "forge-std/Test.sol";
-import {DeployTestSetup} from "../script/DeployTestSetup.sol";
+import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
 import {InsuranceBufferFacet} from "../src/facets/InsuranceBufferFacet.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
 import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
 
-contract InsuranceBufferFacetTest is DeployTestSetup {
-    // Constants for testing
-    uint256 public constant DECIMAL_SCALE_FACTOR = 10 ** 12; // Decimal scaling: 10^12. USDC is 6 decimals, USX is 18 decimals (18 - 6 = 12)
+contract InsuranceBufferFacetTest is LocalDeployTestSetup {
 
     function setUp() public override {
         super.setUp(); // Runs the deployment script and sets up contracts
@@ -97,7 +95,7 @@ contract InsuranceBufferFacetTest is DeployTestSetup {
         usx.whitelistUser(user2, true);
 
         // Give user2 USDC
-        deal(SCROLL_USDC, user2, 2000000e6);
+        deal(address(usdc), user2, 2000000e6);
 
         // Approve USDC spending
         vm.prank(user2);

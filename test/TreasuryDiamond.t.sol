@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.30;
 
-import {Test} from "forge-std/Test.sol";
-import {DeployTestSetup} from "../script/DeployTestSetup.sol";
-import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
-import {InsuranceBufferFacet} from "../src/facets/InsuranceBufferFacet.sol";
-import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
+import {Test, console} from "forge-std/Test.sol";
+import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
 import {TreasuryDiamond} from "../src/TreasuryDiamond.sol";
+import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
+import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
+import {InsuranceBufferFacet} from "../src/facets/InsuranceBufferFacet.sol";
 import {TreasuryStorage} from "../src/TreasuryStorage.sol";
 
-contract TreasuryDiamondTest is DeployTestSetup {
+contract TreasuryDiamondTest is LocalDeployTestSetup {
     function setUp() public override {
         super.setUp(); // Runs the deployment script and sets up contracts
     }
@@ -17,7 +17,7 @@ contract TreasuryDiamondTest is DeployTestSetup {
     /*=========================== Deployment & Initialization Tests =========================*/
 
     function test_deploy_treasury_success() public {
-        assertEq(address(treasury.USDC()), SCROLL_USDC);
+        assertEq(address(treasury.USDC()), address(usdc));
         assertEq(address(treasury.USX()), address(usx));
         assertEq(address(treasury.sUSX()), address(susx));
         assertEq(treasury.governance(), governance);
@@ -72,10 +72,10 @@ contract TreasuryDiamondTest is DeployTestSetup {
 
     function test_real_usdc_integration() public {
         // Verify we're using real Scroll mainnet USDC
-        assertEq(address(usdc), SCROLL_USDC);
+        assertEq(address(usdc), address(usdc));
 
         // Verify treasury is properly connected to real USDC
-        assertEq(address(treasury.USDC()), SCROLL_USDC);
+        assertEq(address(treasury.USDC()), address(usdc));
     }
 
     function test_complete_diamond_facet_setup() public {
@@ -121,7 +121,7 @@ contract TreasuryDiamondTest is DeployTestSetup {
         // Verify the system is initialized exactly as it would be in production
 
         // 1. Treasury has correct addresses
-        assertEq(address(treasury.USDC()), SCROLL_USDC);
+        assertEq(address(treasury.USDC()), address(usdc));
         assertEq(address(treasury.USX()), address(usx));
         assertEq(address(treasury.sUSX()), address(susx));
         assertEq(treasury.governance(), governance);

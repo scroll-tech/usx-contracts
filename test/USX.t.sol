@@ -2,10 +2,10 @@
 pragma solidity 0.8.30;
 
 import {Test, console} from "forge-std/Test.sol";
-import {DeployTestSetup} from "../script/DeployTestSetup.sol";
+import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
 import {USX} from "../src/USX.sol";
 
-contract USXTest is DeployTestSetup {
+contract USXTest is LocalDeployTestSetup {
     uint256 public constant INITIAL_BALANCE = 1000e6; // 1000 USDC
 
     event TreasurySet(address indexed treasury);
@@ -51,7 +51,7 @@ contract USXTest is DeployTestSetup {
     function test_deposit_revert_not_whitelisted() public {
         // Create a new user that is not whitelisted
         address nonWhitelistedUser = address(0x888);
-        deal(SCROLL_USDC, nonWhitelistedUser, 1000e6); // Give some USDC
+        deal(address(usdc), nonWhitelistedUser, 1000e6); // Give some USDC
 
         // Approve USDC spending
         vm.prank(nonWhitelistedUser);
@@ -483,7 +483,7 @@ contract USXTest is DeployTestSetup {
     /*=========================== View Function Tests =========================*/
 
     function test_view_functions_return_correct_values() public {
-        assertEq(address(usx.USDC()), SCROLL_USDC);
+        assertEq(address(usx.USDC()), address(usdc));
         assertEq(address(usx.treasury()), address(treasury));
         assertEq(usx.governanceWarchest(), governanceWarchest);
         assertEq(usx.admin(), admin);

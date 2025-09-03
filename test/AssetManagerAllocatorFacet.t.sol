@@ -2,16 +2,16 @@
 pragma solidity 0.8.30;
 
 import {Test, console} from "forge-std/Test.sol";
-import {DeployTestSetup} from "../script/DeployTestSetup.sol";
+import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract AssetManagerAllocatorFacetTest is DeployTestSetup {
+contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
     function setUp() public override {
-        super.setUp(); // Runs the deployment script and sets up contracts
+        super.setUp(); // Runs the local deployment setup
 
         // Give treasury some USDC to work with
-        deal(SCROLL_USDC, address(treasury), 10000e6); // 10,000 USDC
+        deal(address(usdc), address(treasury), 10000e6); // 10,000 USDC
 
         // Give asset manager USDC approval to receive transfers from treasury
         vm.prank(address(treasury));
@@ -70,8 +70,8 @@ contract AssetManagerAllocatorFacetTest is DeployTestSetup {
         address user3 = address(0x777);
 
         // Give additional users USDC
-        deal(SCROLL_USDC, user2, 1000000e6);
-        deal(SCROLL_USDC, user3, 1000000e6);
+        deal(address(usdc), user2, 1000000e6);
+        deal(address(usdc), user3, 1000000e6);
 
         // Whitelist additional users
         vm.prank(admin);
@@ -227,7 +227,7 @@ contract AssetManagerAllocatorFacetTest is DeployTestSetup {
 
     function test_netDeposits_empty_treasury() public {
         // Ensure treasury has no USDC by transferring it all out
-        uint256 treasuryBalance = IERC20(SCROLL_USDC).balanceOf(address(treasury));
+        uint256 treasuryBalance = usdc.balanceOf(address(treasury));
         if (treasuryBalance > 0) {
             vm.prank(governance);
             // Transfer all USDC out (this would need a function in treasury to do this)
@@ -242,13 +242,13 @@ contract AssetManagerAllocatorFacetTest is DeployTestSetup {
         uint256 netDeposits = abi.decode(result, (uint256));
 
         // Should return current treasury USDC balance
-        uint256 currentBalance = IERC20(SCROLL_USDC).balanceOf(address(treasury));
+        uint256 currentBalance = usdc.balanceOf(address(treasury));
         assertEq(netDeposits, currentBalance);
     }
 
     function test_netDeposits_with_treasury_usdc() public {
         // Get real treasury USDC balance
-        uint256 treasuryUSDC = IERC20(SCROLL_USDC).balanceOf(address(treasury));
+        uint256 treasuryUSDC = usdc.balanceOf(address(treasury));
 
         // Call through Treasury
         bytes memory data = abi.encodeWithSelector(AssetManagerAllocatorFacet.netDeposits.selector);
@@ -263,7 +263,7 @@ contract AssetManagerAllocatorFacetTest is DeployTestSetup {
 
     function test_netDeposits_with_asset_manager_usdc() public {
         // Get real treasury USDC balance
-        uint256 treasuryUSDC = IERC20(SCROLL_USDC).balanceOf(address(treasury));
+        uint256 treasuryUSDC = usdc.balanceOf(address(treasury));
 
         // Call through Treasury
         bytes memory data = abi.encodeWithSelector(AssetManagerAllocatorFacet.netDeposits.selector);
@@ -279,7 +279,7 @@ contract AssetManagerAllocatorFacetTest is DeployTestSetup {
 
     function test_netDeposits_combined_balances() public {
         // Get real treasury USDC balance
-        uint256 treasuryUSDC = IERC20(SCROLL_USDC).balanceOf(address(treasury));
+        uint256 treasuryUSDC = usdc.balanceOf(address(treasury));
 
         // Call through Treasury
         bytes memory data = abi.encodeWithSelector(AssetManagerAllocatorFacet.netDeposits.selector);
@@ -407,7 +407,7 @@ contract AssetManagerAllocatorFacetTest is DeployTestSetup {
         uint256 transferAmount = 100e6; // 100 USDC
 
         // Ensure treasury has enough USDC
-        uint256 treasuryBalance = IERC20(SCROLL_USDC).balanceOf(address(treasury));
+        uint256 treasuryBalance = usdc.balanceOf(address(treasury));
         require(treasuryBalance >= transferAmount, "Treasury needs more USDC");
 
         // Call through Treasury

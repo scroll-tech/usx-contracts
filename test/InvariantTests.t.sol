@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import {Test, console} from "forge-std/Test.sol";
+import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
 import {USX} from "../src/USX.sol";
 import {TreasuryDiamond} from "../src/TreasuryDiamond.sol";
 import {sUSX} from "../src/sUSX.sol";
@@ -15,30 +16,17 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title InvariantTests
 /// @notice These are Foundry invariant tests that run with fuzzing, without forking
-contract InvariantTests is Test {
-    uint256 public constant DECIMAL_SCALE_FACTOR = 10 ** 12;
-
-    // Test addresses
-    address public governance = 0x1000000000000000000000000000000000000001;
-    address public governanceWarchest = 0x2000000000000000000000000000000000000002;
-    address public admin = 0x4000000000000000000000000000000000000004;
-
-    // Deployed contracts
-    USX public usx;
-    sUSX public susx;
-    TreasuryDiamond public treasury;
-    MockAssetManager public mockAssetManager;
-    MockUSDC public usdc;
-
+contract InvariantTests is LocalDeployTestSetup {
+    
     // Track state for invariant testing
     uint256 public previousTotalSupply;
     uint256 public previousPegPrice;
     bool public previousWithdrawalsFrozen;
-
+    
     // Multiple test users for more realistic testing
     address[] private testUsers;
     uint256 public constant NUM_TEST_USERS = 3;
-
+    
     // Modifier for random time advancement
     modifier advanceTimeRandomly() {
         // Advance time randomly (including 0 for same-block transactions)
@@ -49,7 +37,7 @@ contract InvariantTests is Test {
         }
         _;
     }
-
+    
     /// @notice Get a random test user
     /// @dev Returns a random user from the test users array
     function getRandomUser() internal view returns (address) {
@@ -57,110 +45,29 @@ contract InvariantTests is Test {
         uint256 userIndex = (block.timestamp % testUsers.length);
         return testUsers[userIndex];
     }
-
-    function setUp() public {
-        // Deploy contracts directly without forking
-        _deployContracts();
+    
+    function setUp() public override {
+        // Call parent setup first
+        super.setUp();
+        
+        // Set up additional test users
         _setupTestUsers();
-
+        
         // Initialize state tracking
         previousTotalSupply = usx.totalSupply();
         previousPegPrice = usx.usxPrice();
         previousWithdrawalsFrozen = usx.withdrawalsFrozen();
     }
-
-    function _deployContracts() internal {
-        console.log("Deploying contracts...");
-
-        // Deploy mock USDC first
-        usdc = new MockUSDC();
-        console.log("Mock USDC deployed at:", address(usdc));
-
-        // Deploy MockAssetManager
-        mockAssetManager = new MockAssetManager(address(usdc));
-        console.log("MockAssetManager deployed at:", address(mockAssetManager));
-
-        // Deploy USX implementation and proxy
-        USX usxImpl = new USX();
-        console.log("USX implementation deployed at:", address(usxImpl));
-
-        bytes memory usxData =
-            abi.encodeWithSelector(USX.initialize.selector, address(usdc), address(0), governanceWarchest, admin);
-        ERC1967Proxy usxProxy = new ERC1967Proxy(address(usxImpl), usxData);
-        usx = USX(address(usxProxy));
-        console.log("USX proxy deployed at:", address(usx));
-
-        // Deploy sUSX implementation and proxy
-        sUSX susxImpl = new sUSX();
-        console.log("sUSX implementation deployed at:", address(susxImpl));
-
-        bytes memory susxData = abi.encodeWithSelector(sUSX.initialize.selector, address(usx), address(0), governance);
-        ERC1967Proxy susxProxy = new ERC1967Proxy(address(susxImpl), susxData);
-        susx = sUSX(address(susxProxy));
-        console.log("sUSX proxy deployed at:", address(susx));
-
-        // Deploy Treasury Diamond
-        TreasuryDiamond treasuryImpl = new TreasuryDiamond();
-        console.log("Treasury implementation deployed at:", address(treasuryImpl));
-
-        try new ERC1967Proxy(
-            address(treasuryImpl),
-            abi.encodeWithSelector(
-                TreasuryDiamond.initialize.selector,
-                address(usdc),
-                address(usx),
-                address(susx),
-                governance,
-                governanceWarchest,
-                address(mockAssetManager)
-            )
-        ) returns (ERC1967Proxy treasuryProxy) {
-            treasury = TreasuryDiamond(payable(treasuryProxy));
-            console.log("Treasury proxy deployed at:", address(treasury));
-        } catch Error(string memory reason) {
-            console.log("Treasury deployment failed with reason:", reason);
-            revert();
-        } catch (bytes memory lowLevelData) {
-            console.log("Treasury deployment failed with low level error");
-            revert();
-        }
-
-        // Link contracts properly
-        console.log("Attempting to link USX to Treasury...");
-        console.log("Governance Warchest:", governanceWarchest);
-        console.log("Treasury:", address(treasury));
-
-        // Check if treasury is already set
-        vm.prank(governanceWarchest);
-        try usx.setInitialTreasury(address(treasury)) {
-            console.log("USX treasury set successfully");
-        } catch {
-            console.log("USX treasury already set or failed");
-        }
-
-        console.log("Attempting to link sUSX to Treasury...");
-        console.log("Governance:", governance);
-
-        // Check if treasury is already set
-        vm.prank(governance);
-        try susx.setInitialTreasury(address(treasury)) {
-            console.log("sUSX treasury set successfully");
-        } catch {
-            console.log("sUSX treasury already set or failed");
-        }
-
-        console.log("Contracts linked successfully");
-    }
-
+    
     function _setupTestUsers() internal {
         for (uint256 i = 0; i < NUM_TEST_USERS; i++) {
             address testUser = address(uint160(1000 + i));
             testUsers.push(testUser);
-
+            
             // Whitelist the user
             vm.prank(admin);
             usx.whitelistUser(testUser, true);
-
+            
             // Give each user some initial USDC
             deal(address(usdc), testUser, 1000000e6);
 
@@ -170,29 +77,29 @@ contract InvariantTests is Test {
             usx.approve(address(susx), type(uint256).max); // For sUSX deposits
         }
     }
-
+    
     /*=========================== Invariants =========================*/
 
     /// @notice Invariant: Value conservation must always hold
     function invariant_value_conservation() public view {
         if (usx.totalSupply() == 0) return; // Skip initial state
-
-        uint256 totalUSXValue = usx.totalSupply() * usx.usxPrice() / 1e18 / 1e12; // Convert to USDC scale (6 decimals)
-        uint256 totalUSDCBacking =
-            usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx));
-
-        // STRICT: No tolerance for value conservation - must be exact
-        assertEq(totalUSXValue, totalUSDCBacking, "Value conservation violated - must be exact");
+        
+        uint256 totalUSXValue = usx.totalSupply() * usx.usxPrice() / 1e18; // USX value in wei (18 decimals)
+        uint256 totalUSDCBacking = (usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx))) * 1e18; // USDC backing scaled to 18 decimals
+        
+        // Allow small tolerance for rounding errors (1 wei)
+        uint256 difference = totalUSDCBacking > totalUSXValue ? totalUSDCBacking - totalUSXValue : totalUSXValue - totalUSDCBacking;
+        assertLe(difference, 1, "Value conservation violated - difference too large");
     }
 
     /// @notice Invariant: Protocol must never lose value to rounding (PROTOCOL-FAVORED)
     function invariant_protocol_favored_rounding() public view {
         if (usx.totalSupply() == 0) return; // Skip initial state
-
+        
         uint256 totalUSXValue = usx.totalSupply() * usx.usxPrice() / 1e18 / 1e12; // Convert to USDC scale (6 decimals)
         uint256 totalUSDCBacking =
             usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx));
-
+        
         // Protocol should NEVER lose value to rounding
         // If there's any difference, it should favor the protocol (USDC backing >= USX value)
         assertGe(totalUSDCBacking, totalUSXValue, "Protocol lost value to rounding");
@@ -201,10 +108,10 @@ contract InvariantTests is Test {
     /// @notice Invariant: sUSX rounding must favor the protocol
     function invariant_susx_protocol_favored_rounding() public view {
         if (susx.totalSupply() == 0) return; // Skip if no shares exist
-
+        
         uint256 expectedSharePrice = (susx.totalAssets() * 1e18) / susx.totalSupply();
         uint256 actualSharePrice = susx.sharePrice();
-
+        
         // Share price should never be higher than expected (protocol should not lose)
         assertLe(actualSharePrice, expectedSharePrice, "sUSX share price favors users over protocol");
     }
@@ -212,7 +119,7 @@ contract InvariantTests is Test {
     /// @notice Invariant: Share prices must be valid and consistent with underlying assets
     function invariant_valid_share_price() public view {
         if (susx.totalSupply() == 0) return; // Skip if no shares exist
-
+        
         uint256 sharePrice = susx.sharePrice();
         uint256 totalAssets = susx.totalAssets();
         uint256 totalSupply = susx.totalSupply();
@@ -255,12 +162,12 @@ contract InvariantTests is Test {
         // Check that total supply equals sum of individual balances
         uint256 totalSupply = usx.totalSupply();
         uint256 sumOfBalances = usx.balanceOf(address(treasury)) + usx.balanceOf(address(susx));
-
+        
         // Add balances of test users
         for (uint256 i = 0; i < NUM_TEST_USERS; i++) {
             sumOfBalances += usx.balanceOf(testUsers[i]);
         }
-
+        
         assertEq(totalSupply, sumOfBalances, "USX accounting inconsistency");
     }
 
@@ -283,7 +190,7 @@ contract InvariantTests is Test {
     function invariant_withdrawal_requests_valid() public view {
         uint256 totalWithdrawalRequests = 0;
         uint256 totalClaimed = 0;
-
+        
         // Check all withdrawal requests
         for (uint256 i = 0; i < susx.withdrawalIdCounter(); i++) {
             sUSX.WithdrawalRequest memory request = susx.withdrawalRequests(i);
@@ -294,9 +201,77 @@ contract InvariantTests is Test {
                 }
             }
         }
-
+        
         // Total claimed should not exceed total requested
         assertLe(totalClaimed, totalWithdrawalRequests, "More shares claimed than requested");
+    }
+
+    /// @notice Invariant: Measure and track rounding errors down to wei precision
+    /// @dev This invariant helps identify exact precision loss in every calculation
+    function invariant_rounding_error_tracking() public view {
+        if (usx.totalSupply() == 0) return; // Skip initial state
+        
+        // 1. USX Share Price Calculation (Peg) - Should be very close
+        uint256 totalUSDCoutstanding = usdc.balanceOf(address(treasury)) + 
+                                       treasury.assetManagerUSDC() + 
+                                       usdc.balanceOf(address(usx));
+        uint256 scaledUSDC = totalUSDCoutstanding * 1e18;
+        uint256 expectedPeg = scaledUSDC / usx.totalSupply();
+        uint256 actualPeg = usx.usxPrice();
+        uint256 pegRoundingError = actualPeg > expectedPeg ? 
+            actualPeg - expectedPeg : expectedPeg - actualPeg;
+        
+        // 2. sUSX Share Price Calculation - Should be very close
+        if (susx.totalSupply() > 0) {
+            uint256 expectedSharePrice = (susx.totalAssets() * 1e18) / susx.totalSupply();
+            uint256 actualSharePrice = susx.sharePrice();
+            uint256 sharePriceRoundingError = actualSharePrice > expectedSharePrice ? 
+                actualSharePrice - expectedSharePrice : expectedSharePrice - actualSharePrice;
+            
+            assertLe(sharePriceRoundingError, 1, "Share price rounding error should be <= 1 wei");
+        }
+        
+        // 3. Fee Calculations - Should be exact
+        uint256 testAmount = 1000e18; // 1000 USX
+        uint256 expectedFee = testAmount * susx.withdrawalFeeFraction() / 100000;
+        uint256 actualFee = susx.withdrawalFee(testAmount);
+        uint256 feeRoundingError = actualFee > expectedFee ? 
+            actualFee - expectedFee : expectedFee - actualFee;
+        
+        // Assert that rounding errors are minimal
+        // Peg should be very close to expected (max 1 wei error)
+        assertLe(pegRoundingError, 1, "Peg calculation error too large");
+        assertEq(feeRoundingError, 0, "Fee calculation should be exact - no rounding allowed");
+    }
+
+    /// @notice Debug function to see actual values causing invariant failures
+    function test_debug_invariant_values() public {
+        console.log("=== DEBUG INVARIANT VALUES ===");
+        
+        // Check peg calculation
+        uint256 totalUSDCoutstanding = usdc.balanceOf(address(treasury)) + 
+                                       treasury.assetManagerUSDC() + 
+                                       usdc.balanceOf(address(usx));
+        uint256 scaledUSDC = totalUSDCoutstanding * 1e18;
+        uint256 expectedPeg = scaledUSDC / usx.totalSupply();
+        uint256 actualPeg = usx.usxPrice();
+        
+        console.log("Total USDC Outstanding:", totalUSDCoutstanding);
+        console.log("USX Total Supply:", usx.totalSupply());
+        console.log("Scaled USDC:", scaledUSDC);
+        console.log("Expected Peg:", expectedPeg);
+        console.log("Actual Peg:", actualPeg);
+        console.log("Peg Difference:", actualPeg > expectedPeg ? actualPeg - expectedPeg : expectedPeg - actualPeg);
+        
+        // Check value conservation
+        uint256 totalUSXValue = usx.totalSupply() * usx.usxPrice() / 1e18;
+        uint256 totalUSDCBacking = (usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx))) * 1e18;
+        
+        console.log("Total USX Value (wei):", totalUSXValue);
+        console.log("Total USDC Backing (scaled):", totalUSDCBacking);
+        console.log("Value Conservation Difference:", totalUSDCBacking > totalUSXValue ? totalUSDCBacking - totalUSXValue : totalUSXValue - totalUSDCBacking);
+        
+        console.log("=== END DEBUG ===");
     }
 
     /*=========================== Fuzzing Functions =========================*/
@@ -306,7 +281,7 @@ contract InvariantTests is Test {
     function fuzz_advance_time(uint256 timeAdvance) public {
         // Bound the time advancement to reasonable values (1 hour to 40 days)
         timeAdvance = bound(timeAdvance, 3600, 40 days);
-
+        
         // Advance both timestamp and block number
         vm.warp(block.timestamp + timeAdvance);
         vm.roll(block.number + (timeAdvance / 12)); // Assuming 12-second block time
@@ -316,10 +291,10 @@ contract InvariantTests is Test {
     function fuzz_usx_deposit(uint256 amount) public advanceTimeRandomly {
         // Bound the amount to reasonable values
         amount = bound(amount, 1e6, 1000000e6); // 1 USDC to 1M USDC
-
+        
         // Get a random user
         address randomUser = getRandomUser();
-
+        
         // Only proceed if user has enough USDC and is whitelisted
         if (usdc.balanceOf(randomUser) >= amount && usx.whitelistedUsers(randomUser)) {
             vm.prank(randomUser);
@@ -331,10 +306,10 @@ contract InvariantTests is Test {
     function fuzz_usx_request_withdrawal(uint256 amount) public advanceTimeRandomly {
         // Bound the amount to reasonable values
         amount = bound(amount, 1e18, 1000000e18); // 1 USX to 1M USX
-
+        
         // Get a random user
         address randomUser = getRandomUser();
-
+        
         // Only proceed if user has enough USX and withdrawals aren't frozen
         if (usx.balanceOf(randomUser) >= amount && !usx.withdrawalsFrozen()) {
             vm.prank(randomUser);
@@ -346,7 +321,7 @@ contract InvariantTests is Test {
     function fuzz_usx_claim_withdrawal() public advanceTimeRandomly {
         // Get a random user
         address randomUser = getRandomUser();
-
+        
         // Only proceed if user has outstanding withdrawal requests
         if (usx.outstandingWithdrawalRequests(randomUser) > 0) {
             vm.prank(randomUser);
@@ -358,10 +333,10 @@ contract InvariantTests is Test {
     function fuzz_susx_deposit(uint256 amount) public advanceTimeRandomly {
         // Bound the amount to reasonable values
         amount = bound(amount, 1e18, 1000000e18); // 1 USX to 1M USX
-
+        
         // Get a random user
         address randomUser = getRandomUser();
-
+        
         // Only proceed if user has enough USX
         if (usx.balanceOf(randomUser) >= amount) {
             vm.prank(randomUser);
@@ -373,10 +348,10 @@ contract InvariantTests is Test {
     function fuzz_susx_withdraw(uint256 shares) public advanceTimeRandomly {
         // Bound the amount to reasonable values
         shares = bound(shares, 1e18, 1000000e18); // 1 share to 1M shares
-
+        
         // Get a random user
         address randomUser = getRandomUser();
-
+        
         // Only proceed if user has enough shares
         if (susx.balanceOf(randomUser) >= shares) {
             vm.prank(randomUser);
@@ -388,7 +363,7 @@ contract InvariantTests is Test {
     function fuzz_susx_claim_withdrawal(uint256 withdrawalId) public advanceTimeRandomly {
         // Bound the withdrawal ID to reasonable values
         withdrawalId = bound(withdrawalId, 0, susx.withdrawalIdCounter());
-
+        
         // Only proceed if withdrawal exists and is unclaimed
         if (withdrawalId < susx.withdrawalIdCounter()) {
             sUSX.WithdrawalRequest memory request = susx.withdrawalRequests(withdrawalId);
@@ -401,7 +376,7 @@ contract InvariantTests is Test {
                         break;
                     }
                 }
-
+                
                 if (isTestUser) {
                     vm.prank(request.user);
                     susx.claimWithdraw(withdrawalId);
@@ -415,33 +390,27 @@ contract InvariantTests is Test {
         // Bound the amount to reasonable values
         totalBalance = bound(totalBalance, 1000e6, 10000000e6); // 1K to 10M USDC
 
-        // Only proceed if asset manager has enough balance
-        if (usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() >= totalBalance) {
-            vm.prank(address(mockAssetManager));
-            bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, totalBalance);
-            address(treasury).call(data);
-        }
+        vm.prank(address(mockAssetManager));
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, totalBalance);
+        address(treasury).call(data);
     }
 
     /// @notice Random loss report function for fuzzing
     /// @dev Foundry will call this with random parameters
     function fuzz_report_losses(uint256 totalBalance) public advanceTimeRandomly {
         // Bound the amount to reasonable values
-        totalBalance = bound(totalBalance, 1000e6, 10000000e6); // 1K to 10M USDC
+        totalBalance = bound(totalBalance, 0, 10000000e6); // 0 to 10M USDC
 
-        // Only proceed if asset manager has enough balance
-        if (usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() >= totalBalance) {
-            vm.prank(address(mockAssetManager));
-            bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, totalBalance);
-            address(treasury).call(data);
-        }
+        vm.prank(address(mockAssetManager));
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, totalBalance);
+        address(treasury).call(data);
     }
 
     /// @notice Random asset manager transfer to function for fuzzing
     function fuzz_transfer_usdc_to_asset_manager(uint256 amount) public advanceTimeRandomly {
         // Bound the amount to reasonable values
         amount = bound(amount, 1000e6, 10000000e6); // 1K to 10M USDC
-
+        
         // Only proceed if treasury has enough USDC
         if (usdc.balanceOf(address(treasury)) >= amount) {
             vm.prank(address(mockAssetManager));
@@ -455,7 +424,7 @@ contract InvariantTests is Test {
     function fuzz_transfer_usdc_from_asset_manager(uint256 amount) public advanceTimeRandomly {
         // Bound the amount to reasonable values
         amount = bound(amount, 1000e6, 10000000e6); // 1K to 10M USDC
-
+        
         // Only proceed if asset manager has enough USDC
         if (treasury.assetManagerUSDC() >= amount) {
             vm.prank(address(mockAssetManager));
@@ -470,9 +439,9 @@ contract InvariantTests is Test {
         // Bound the parameter type and value
         paramType = bound(paramType, 0, 1); // 0: buffer renewal rate, 1: buffer target fraction
         newValue = bound(newValue, 100, 20000); // Reasonable ranges for each parameter
-
+        
         vm.prank(governance);
-
+        
         if (paramType == 0) {
             // Update buffer renewal rate
             bytes memory data = abi.encodeWithSelector(InsuranceBufferFacet.setBufferRenewalRate.selector, newValue);
@@ -496,7 +465,7 @@ contract InvariantTests is Test {
         // Call maxLeverage through the diamond proxy
         bytes memory data = abi.encodeWithSelector(AssetManagerAllocatorFacet.maxLeverage.selector);
         (bool success, bytes memory result) = address(treasury).call(data);
-
+        
         if (success) {
             return abi.decode(result, (uint256));
         } else {
