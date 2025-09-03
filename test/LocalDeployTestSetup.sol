@@ -57,30 +57,30 @@ contract LocalDeployTestSetup is Test {
         // Deploy USX implementation and proxy
         USX usxImpl = new USX();
         console.log("USX implementation deployed at:", address(usxImpl));
-        
+
         bytes memory usxData =
             abi.encodeWithSelector(USX.initialize.selector, address(usdc), address(0), governanceWarchest, admin);
         ERC1967Proxy usxProxyContract = new ERC1967Proxy(address(usxImpl), usxData);
         usx = USX(address(usxProxyContract));
         usxProxy = address(usxProxyContract);
         console.log("USX proxy deployed at:", address(usx));
-        
+
         // Deploy sUSX implementation and proxy
         sUSX susxImpl = new sUSX();
         console.log("sUSX implementation deployed at:", address(susxImpl));
-        
+
         bytes memory susxData = abi.encodeWithSelector(sUSX.initialize.selector, address(usx), address(0), governance);
         ERC1967Proxy susxProxyContract = new ERC1967Proxy(address(susxImpl), susxData);
         susx = sUSX(address(susxProxyContract));
         susxProxy = address(susxProxyContract);
         console.log("sUSX proxy deployed at:", address(susx));
-        
+
         // Deploy Treasury Diamond
         TreasuryDiamond treasuryImpl = new TreasuryDiamond();
         console.log("Treasury implementation deployed at:", address(treasuryImpl));
-        
+
         try new ERC1967Proxy(
-            address(treasuryImpl), 
+            address(treasuryImpl),
             abi.encodeWithSelector(
                 TreasuryDiamond.initialize.selector,
                 address(usdc),
@@ -101,43 +101,43 @@ contract LocalDeployTestSetup is Test {
             console.log("Treasury deployment failed with low level error");
             revert();
         }
-        
+
         // Link contracts properly
         console.log("Linking contracts...");
-        
+
         vm.prank(governanceWarchest);
         try usx.setInitialTreasury(address(treasury)) {
             console.log("USX treasury set successfully");
         } catch {
             console.log("USX treasury already set or failed");
         }
-        
+
         vm.prank(governance);
         try susx.setInitialTreasury(address(treasury)) {
             console.log("sUSX treasury set successfully");
         } catch {
             console.log("sUSX treasury already set or failed");
         }
-        
+
         console.log("Contracts linked successfully");
-        
+
         // Add facets to the diamond
         _addFacetsToDiamond();
-        
+
         // Set up test environment
         _setupTestEnvironment();
-        
+
         console.log("=== LOCAL DEPLOYMENT SETUP COMPLETE ===");
     }
-    
+
     function _addFacetsToDiamond() internal {
         console.log("Adding facets to diamond...");
-        
+
         // Deploy facets
         AssetManagerAllocatorFacet assetManagerFacet = new AssetManagerAllocatorFacet();
         InsuranceBufferFacet insuranceBufferFacet = new InsuranceBufferFacet();
         ProfitAndLossReporterFacet profitLossFacet = new ProfitAndLossReporterFacet();
-        
+
         // Define selectors for each facet (matching deployment script)
         bytes4[] memory assetManagerSelectors = new bytes4[](7);
         assetManagerSelectors[0] = AssetManagerAllocatorFacet.maxLeverage.selector;
@@ -147,14 +147,14 @@ contract LocalDeployTestSetup is Test {
         assetManagerSelectors[4] = AssetManagerAllocatorFacet.setMaxLeverageFraction.selector;
         assetManagerSelectors[5] = AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector;
         assetManagerSelectors[6] = AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector;
-        
+
         bytes4[] memory insuranceBufferSelectors = new bytes4[](5);
         insuranceBufferSelectors[0] = InsuranceBufferFacet.bufferTarget.selector;
         insuranceBufferSelectors[1] = InsuranceBufferFacet.topUpBuffer.selector;
         insuranceBufferSelectors[2] = InsuranceBufferFacet.slashBuffer.selector;
         insuranceBufferSelectors[3] = InsuranceBufferFacet.setBufferTargetFraction.selector;
         insuranceBufferSelectors[4] = InsuranceBufferFacet.setBufferRenewalRate.selector;
-        
+
         bytes4[] memory profitLossSelectors = new bytes4[](6);
         profitLossSelectors[0] = ProfitAndLossReporterFacet.successFee.selector;
         profitLossSelectors[1] = ProfitAndLossReporterFacet.profitLatestEpoch.selector;
@@ -162,51 +162,44 @@ contract LocalDeployTestSetup is Test {
         profitLossSelectors[3] = ProfitAndLossReporterFacet.reportProfits.selector;
         profitLossSelectors[4] = ProfitAndLossReporterFacet.reportLosses.selector;
         profitLossSelectors[5] = ProfitAndLossReporterFacet.setSuccessFeeFraction.selector;
-        
+
         // Add facets to diamond
         vm.prank(governance);
         treasury.addFacet(address(assetManagerFacet), assetManagerSelectors);
-        
+
         vm.prank(governance);
         treasury.addFacet(address(insuranceBufferFacet), insuranceBufferSelectors);
-        
+
         vm.prank(governance);
         treasury.addFacet(address(profitLossFacet), profitLossSelectors);
-        
+
         console.log("Facets added successfully");
     }
 
     function _setupTestEnvironment() internal {
         console.log("Setting up test environment...");
-        
-        // Set up USDC balances
+
+        // Set up USDC balances - only give user USDC for deposits
         console.log("  Setting up USDC balances...");
-        deal(address(usdc), address(treasury), 1000000e6); // Give treasury 1,000,000 USDC (matching original)
-        deal(address(usdc), user, 10000000e6); // Give user 10,000,000 USDC (matching original)
-        deal(address(usdc), address(usx), 1000000e6); // Give USX contract 1,000,000 USDC (matching original)
+        deal(address(usdc), user, 10000000e6); // Give user 10,000,000 USDC for testing
         console.log("  USDC balances set");
-        
+
         // Set up USDC approvals
         console.log("  Setting up USDC approvals...");
         vm.prank(user);
         usdc.approve(address(usx), type(uint256).max);
-        
+
         // Approve MockAssetManager to spend USDC from treasury
         vm.prank(address(treasury));
         usdc.approve(address(mockAssetManager), type(uint256).max);
         console.log("  USDC approvals set");
-        
+
         // Whitelist test user
         console.log("  Whitelisting test user...");
         vm.prank(admin);
         usx.whitelistUser(user, true);
         console.log("  Test user whitelisted");
-        
-        // Seed vault with USX for testing (matching original behavior)
-        console.log("  Seeding vault with USX for testing...");
-        _seedVaultWithUSX();
-        console.log("  Vault seeded with USX");
-        
+
         // Advance block number for time-based functions
         console.log("  Advancing block number for time-based functions...");
         uint256 currentBlock = block.number;
@@ -217,30 +210,13 @@ contract LocalDeployTestSetup is Test {
             console.log("  Block advancement not needed - contract properly initialized");
         }
         console.log("  Block number advanced");
-        
+
         // Update lastEpochBlock to current block number after advancement
         console.log("  Updating lastEpochBlock to current block number...");
         vm.prank(address(treasury));
         susx.updateLastEpochBlock();
         console.log("  lastEpochBlock updated to:", susx.lastEpochBlock());
-    }
-    
-    /**
-     * @dev Seed the sUSX vault with USX for testing leverage functions
-     * This is needed because checkMaxLeverage() depends on vault having USX
-     */
-    function _seedVaultWithUSX() internal {
-        // First, deposit USDC to get USX
-        vm.prank(user);
-        usx.deposit(1000000e6); // Deposit 1,000,000 USDC to get USX
 
-        // Then deposit USX to sUSX vault to get sUSX shares
-        uint256 usxBalance = usx.balanceOf(user);
-        vm.prank(user);
-        usx.approve(address(susx), usxBalance);
-        vm.prank(user);
-        susx.deposit(usxBalance, user);
-
-        console.log("  Vault now has USX balance:", usx.balanceOf(address(susx)));
+        console.log("  Initial state: USX supply =", usx.totalSupply(), ", sUSX supply =", susx.totalSupply());
     }
 }

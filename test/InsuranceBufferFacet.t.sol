@@ -8,7 +8,6 @@ import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFac
 import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
 
 contract InsuranceBufferFacetTest is LocalDeployTestSetup {
-
     function setUp() public override {
         super.setUp(); // Runs the deployment script and sets up contracts
     }

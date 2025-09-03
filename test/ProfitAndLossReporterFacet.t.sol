@@ -583,30 +583,33 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
 
     function test_debug_peg_and_value() public {
         console.log("=== DEBUG PEG AND VALUE CONSERVATION ===");
-        
+
         // Check peg calculation
-        uint256 totalUSDCoutstanding = usdc.balanceOf(address(treasury)) + 
-                                       treasury.assetManagerUSDC() + 
-                                       usdc.balanceOf(address(usx));
+        uint256 totalUSDCoutstanding =
+            usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx));
         uint256 scaledUSDC = totalUSDCoutstanding * 1e18;
         uint256 expectedPeg = scaledUSDC / usx.totalSupply();
         uint256 actualPeg = usx.usxPrice();
-        
+
         console.log("Total USDC Outstanding:", totalUSDCoutstanding);
         console.log("USX Total Supply:", usx.totalSupply());
         console.log("Scaled USDC:", scaledUSDC);
         console.log("Expected Peg:", expectedPeg);
         console.log("Actual Peg:", actualPeg);
         console.log("Peg Difference:", actualPeg > expectedPeg ? actualPeg - expectedPeg : expectedPeg - actualPeg);
-        
+
         // Check value conservation
         uint256 totalUSXValue = usx.totalSupply() * usx.usxPrice() / 1e18;
-        uint256 totalUSDCBacking = (usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx))) * 1e18;
-        
+        uint256 totalUSDCBacking =
+            (usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx))) * 1e18;
+
         console.log("Total USX Value (wei):", totalUSXValue);
         console.log("Total USDC Backing (scaled):", totalUSDCBacking);
-        console.log("Value Conservation Difference:", totalUSDCBacking > totalUSXValue ? totalUSDCBacking - totalUSXValue : totalUSXValue - totalUSDCBacking);
-        
+        console.log(
+            "Value Conservation Difference:",
+            totalUSDCBacking > totalUSXValue ? totalUSDCBacking - totalUSXValue : totalUSXValue - totalUSDCBacking
+        );
+
         console.log("=== END DEBUG ===");
     }
 }
