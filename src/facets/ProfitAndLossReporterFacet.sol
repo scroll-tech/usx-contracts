@@ -4,6 +4,7 @@ pragma solidity 0.8.30;
 import {TreasuryStorage} from "../TreasuryStorage.sol";
 import {InsuranceBufferFacet} from "./InsuranceBufferFacet.sol";
 import {AssetManagerAllocatorFacet} from "./AssetManagerAllocatorFacet.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title ProfitAndLossReporterFacet
 /// @notice Handles the reporting of profits and losses to the protocol by the Asset Manager
@@ -17,7 +18,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
     /// @return The success fee for the Goverance Warchest
     function successFee(uint256 profitAmount) public view returns (uint256) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        return profitAmount * $.successFeeFraction / 100000;
+        return Math.mulDiv(profitAmount, $.successFeeFraction, 100000, Math.Rounding.Floor);
     }
 
     /// @notice Calculates cumulative profit for previous epoch
@@ -178,7 +179,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         // Calculate how much USX needs to be minted to restore 1:1 peg
         uint256 totalUSDC = AssetManagerAllocatorFacet(address(this)).netDeposits();
         uint256 totalUSX = $.USX.totalSupply();
-        uint256 usxNeededForPeg = totalUSX - (totalUSDC * DECIMAL_SCALE_FACTOR / 1e18);
+        uint256 usxNeededForPeg = totalUSX - Math.mulDiv(totalUSDC, DECIMAL_SCALE_FACTOR, 1e18, Math.Rounding.Floor);
 
         // Convert profits to USX (profits in USDC, need to scale to USX)
         uint256 profitsInUSX = availableProfits * DECIMAL_SCALE_FACTOR;

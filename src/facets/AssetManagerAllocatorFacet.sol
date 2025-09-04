@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import {TreasuryStorage} from "../TreasuryStorage.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 // Standaradized interface for Asset Manager's contract
 interface IAssetManager {
@@ -24,7 +25,7 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
 
         // maxLeverageFraction is in basis points (e.g., 100000 = 10%)
         // So maxAllocation = maxLeverageFraction * vaultValue / 100000
-        return ($.maxLeverageFraction * vaultValue) / 100000;
+        return Math.mulDiv($.maxLeverageFraction, vaultValue, 100000, Math.Rounding.Floor);
     }
 
     /// @notice Checks if a deposit on the sUSX contract would exceed the max protocol leverage.

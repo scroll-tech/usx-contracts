@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import {TreasuryStorage} from "../TreasuryStorage.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title InsuranceBufferFacet
 /// @notice Handles the Insurance Buffer logic, managing how it is renewed and depleted
@@ -14,7 +15,7 @@ contract InsuranceBufferFacet is TreasuryStorage {
     /// @return The current buffer target
     function bufferTarget() public view returns (uint256) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        return $.USX.totalSupply() * $.bufferTargetFraction / 100000;
+        return Math.mulDiv($.USX.totalSupply(), $.bufferTargetFraction, 100000, Math.Rounding.Floor);
     }
 
     /*=========================== Governance Functions =========================*/
@@ -49,7 +50,7 @@ contract InsuranceBufferFacet is TreasuryStorage {
             uint256 totalProfitUSDC = _totalProfit;
 
             // Only use a portion of the profits for insurance buffer (not the entire system's USDC)
-            uint256 insuranceBufferAccrualUSDC = totalProfitUSDC * $.bufferRenewalFraction / 1000000;
+            uint256 insuranceBufferAccrualUSDC = Math.mulDiv(totalProfitUSDC, $.bufferRenewalFraction, 1000000, Math.Rounding.Floor);
 
             // Mint USX to the buffer
             $.USX.mintUSX(address(this), insuranceBufferAccrualUSDC * DECIMAL_SCALE_FACTOR);

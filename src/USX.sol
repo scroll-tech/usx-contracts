@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ITreasury} from "./interfaces/ITreasury.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract USX is ERC20Upgradeable, UUPSUpgradeable {
     /*=========================== Errors =========================*/
@@ -130,7 +131,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         }
 
         // User receives USX
-        _mint(msg.sender, _amount * 1e12); // Scale USDC (6 decimals) to USX (18 decimals)
+        _mint(msg.sender, Math.mulDiv(_amount, 1e12, 1, Math.Rounding.Floor)); // Scale USDC (6 decimals) to USX (18 decimals)
     }
 
     /// @notice Redeem USX to get USDC (begin withdrawal request)

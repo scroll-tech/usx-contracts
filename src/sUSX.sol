@@ -140,7 +140,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         if ($.withdrawalRequests[withdrawalId].withdrawalBlock > $.lastEpochBlock) revert NextEpochNotStarted();
 
         // Get the total USX amount for the amount of sUSX being redeemed
-        uint256 USXAmount = $.withdrawalRequests[withdrawalId].amount * sharePrice() / 1e18;
+        uint256 USXAmount = Math.mulDiv($.withdrawalRequests[withdrawalId].amount, sharePrice(), 1e18, Math.Rounding.Floor);
 
         // Distribute portion of USX to the Governance Warchest
         uint256 governanceWarchestPortion = withdrawalFee(USXAmount);
@@ -172,7 +172,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         uint256 rewards = $.treasury.profitLatestEpoch();
         uint256 totalUSX = base + rewards;
 
-        return totalUSX * 1e18 / supply;
+        return Math.mulDiv(totalUSX, 1e18, supply, Math.Rounding.Floor);
     }
 
     /// @notice Returns the withdrawal fee for a specified withdrawal amount
@@ -181,7 +181,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     /// @return The withdrawal fee for the specified withdrawal amount
     function withdrawalFee(uint256 withdrawalAmount) public view returns (uint256) {
         SUSXStorage storage $ = _getStorage();
-        return withdrawalAmount * $.withdrawalFeeFraction / 100000;
+        return Math.mulDiv(withdrawalAmount, $.withdrawalFeeFraction, 100000, Math.Rounding.Floor);
     }
 
     /*=========================== Governance Functions =========================*/
@@ -255,12 +255,12 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     /// @dev Override default ERC4626 to use sharePrice
     function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns (uint256 shares) {
-        return assets * 1e18 / sharePrice();
+        return Math.mulDiv(assets, 1e18, sharePrice(), Math.Rounding.Floor);
     }
 
     /// @dev Override default ERC4626 to use sharePrice
     function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256 assets) {
-        return shares * sharePrice() / 1e18;
+        return Math.mulDiv(shares, sharePrice(), 1e18, Math.Rounding.Floor);
     }
 
     /*=========================== UUPS Functions =========================*/
