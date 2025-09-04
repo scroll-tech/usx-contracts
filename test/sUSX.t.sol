@@ -39,9 +39,16 @@ contract sUSXTest is LocalDeployTestSetup {
     /*=========================== Share Price Calculation Tests =========================*/
 
     function test_sharePrice_first_deposit() public {
-        // In deployment-based testing, the vault is pre-seeded with USX
-        // This represents the state after initial deposits
-        assertEq(susx.totalSupply(), 1000000000000000000000000);
+        // In local deployment, we need to seed the vault with USX first
+        vm.prank(user);
+        usx.deposit(1000000e6); // 1,000,000 USDC deposit to get USX
+
+        // Deposit USX to sUSX vault to create realistic vault balance
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        vm.prank(user);
+        susx.deposit(usxBalance, user);
 
         // Should return 1:1 ratio for initial deposits
         assertEq(susx.sharePrice(), 1e18);
@@ -145,6 +152,17 @@ contract sUSXTest is LocalDeployTestSetup {
         // This test verifies that profits roll over correctly when a new epoch starts
         // before the 30-day distribution window is complete
 
+        // First, seed the vault with USX so we have leverage to work with
+        vm.prank(user);
+        usx.deposit(500000e6); // 500,000 USDC deposit to get USX
+
+        // Deposit USX to sUSX vault to create realistic vault balance
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        vm.prank(user);
+        susx.deposit(usxBalance, user);
+
         // Step 1: Start first epoch with REAL profit report
         uint256 initialEpochBlock = susx.lastEpochBlock();
 
@@ -214,6 +232,17 @@ contract sUSXTest is LocalDeployTestSetup {
     function test_multiple_profit_reports_same_epoch() public {
         // This test verifies that multiple profit reports in quick succession
         // work correctly and don't interfere with each other
+
+        // First, seed the vault with USX so we have leverage to work with
+        vm.prank(user);
+        usx.deposit(500000e6); // 500,000 USDC deposit to get USX
+
+        // Deposit USX to sUSX vault to create realistic vault balance
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        vm.prank(user);
+        susx.deposit(usxBalance, user);
 
         uint256 initialEpochBlock = susx.lastEpochBlock();
 

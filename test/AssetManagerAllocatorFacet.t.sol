@@ -119,7 +119,7 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
 
         // Verify the vault has a large realistic USX balance
         assertTrue(
-            usx.balanceOf(address(susx)) > 1000000e18, "Vault should have large USX balance from multiple deposits"
+            usx.balanceOf(address(susx)) >= 1000000e18, "Vault should have large USX balance from multiple deposits"
         );
     }
 
@@ -149,6 +149,17 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
     /*=========================== checkMaxLeverage Function Tests =========================*/
 
     function test_checkMaxLeverage_within_limit() public {
+        // First, seed the vault with USX so we have leverage to work with
+        vm.prank(user);
+        usx.deposit(1000000e6); // 1,000,000 USDC deposit to get USX
+
+        // Deposit USX to sUSX vault to create realistic vault balance
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        vm.prank(user);
+        susx.deposit(usxBalance, user);
+
         uint256 depositAmount = 100e6; // 100 USDC
 
         // Call through Treasury
@@ -163,8 +174,19 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
     }
 
     function test_checkMaxLeverage_at_limit() public {
-        // Calculate the maximum allowed allocation
-        uint256 maxLeverage = (100000 * usx.totalSupply()) / 100000;
+        // First, seed the vault with USX so we have leverage to work with
+        vm.prank(user);
+        usx.deposit(1000000e6); // 1,000,000 USDC deposit to get USX
+
+        // Deposit USX to sUSX vault to create realistic vault balance
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        vm.prank(user);
+        susx.deposit(usxBalance, user);
+
+        // Calculate the maximum allowed allocation based on vault balance
+        uint256 maxLeverage = (100000 * usx.balanceOf(address(susx))) / 100000;
         uint256 depositAmount = maxLeverage; // Exactly at the limit
 
         // Call through Treasury
@@ -179,8 +201,19 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
     }
 
     function test_checkMaxLeverage_exceeds_limit() public {
-        // Calculate the maximum allowed allocation
-        uint256 maxLeverage = (100000 * usx.totalSupply()) / 100000;
+        // First, seed the vault with USX so we have leverage to work with
+        vm.prank(user);
+        usx.deposit(1000000e6); // 1,000,000 USDC deposit to get USX
+
+        // Deposit USX to sUSX vault to create realistic vault balance
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        vm.prank(user);
+        susx.deposit(usxBalance, user);
+
+        // Calculate the maximum allowed allocation based on vault balance
+        uint256 maxLeverage = (100000 * usx.balanceOf(address(susx))) / 100000;
         uint256 depositAmount = maxLeverage + 1; // Exceeds the limit
 
         // Call through Treasury
@@ -404,6 +437,17 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
     /*=========================== Asset Manager Function Tests =========================*/
 
     function test_transferUSDCtoAssetManager_success() public {
+        // First, seed the vault with USX so we have leverage to work with
+        vm.prank(user);
+        usx.deposit(1000000e6); // 1,000,000 USDC deposit to get USX
+
+        // Deposit USX to sUSX vault to create realistic vault balance
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        vm.prank(user);
+        susx.deposit(usxBalance, user);
+
         uint256 transferAmount = 100e6; // 100 USDC
 
         // Ensure treasury has enough USDC
@@ -454,6 +498,17 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
     }
 
     function test_transferUSDCFromAssetManager_success() public {
+        // First, seed the vault with USX so we have leverage to work with
+        vm.prank(user);
+        usx.deposit(1000000e6); // 1,000,000 USDC deposit to get USX
+
+        // Deposit USX to sUSX vault to create realistic vault balance
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        vm.prank(user);
+        susx.deposit(usxBalance, user);
+
         uint256 transferAmount = 100e6; // 100 USDC
 
         // First, give USDC to the asset manager so it has something to withdraw

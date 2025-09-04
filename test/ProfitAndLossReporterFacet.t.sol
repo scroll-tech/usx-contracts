@@ -176,6 +176,17 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
     }
 
     function test_reportProfits_revert_losses_detected() public {
+        // First, seed the vault with USX so we have leverage to work with
+        vm.prank(user);
+        usx.deposit(500000e6); // 500,000 USDC deposit to get USX
+
+        // Deposit USX to sUSX vault to create realistic vault balance
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        vm.prank(user);
+        susx.deposit(usxBalance, user);
+
         // First transfer USDC to asset manager to set up initial state
         vm.prank(assetManager);
         bytes memory transferData = abi.encodeWithSelector(
@@ -199,6 +210,17 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
     }
 
     function test_reportProfits_revert_zero_change() public {
+        // First, seed the vault with USX so we have leverage to work with
+        vm.prank(user);
+        usx.deposit(500000e6); // 500,000 USDC deposit to get USX
+
+        // Deposit USX to sUSX vault to create realistic vault balance
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        vm.prank(user);
+        susx.deposit(usxBalance, user);
+
         // First transfer USDC to asset manager to set up initial state
         vm.prank(assetManager);
         bytes memory transferData = abi.encodeWithSelector(
@@ -452,6 +474,17 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         // Setup: Create a small loss that can be fully covered by the insurance buffer
         uint256 smallLoss = 100e6; // 100 USDC loss
 
+        // First, seed the vault with USX so we have leverage to work with
+        vm.prank(user);
+        usx.deposit(500000e6); // 500,000 USDC deposit to get USX
+
+        // Deposit USX to sUSX vault to create realistic vault balance
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        vm.prank(user);
+        susx.deposit(usxBalance, user);
+
         // Give the treasury enough USX to cover the loss
         uint256 bufferUSX = 1000e18; // 1,000 USX in buffer (more than enough)
         deal(address(usx), address(treasury), bufferUSX);
@@ -547,6 +580,13 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         vm.prank(user);
         usx.deposit(1000000e6); // 1,000,000 USDC deposit to get USX
 
+        // Deposit USX to sUSX vault to create realistic vault balance
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        vm.prank(user);
+        susx.deposit(usxBalance, user);
+
         // Break the peg by calling updatePeg with a value less than 1e18
         uint256 brokenPegPrice = 8e17; // 0.8 USDC per USX (20% devaluation)
         vm.prank(address(treasury));
@@ -584,10 +624,17 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
     function test_debug_peg_and_value() public {
         console.log("=== DEBUG PEG AND VALUE CONSERVATION ===");
 
+        // Check if USX supply is 0 to avoid division by zero
+        if (usx.totalSupply() == 0) {
+            console.log("USX total supply is 0, skipping peg calculation");
+            console.log("=== END DEBUG ===");
+            return;
+        }
+
         // Check peg calculation
         uint256 totalUSDCoutstanding =
             usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx));
-        uint256 scaledUSDC = totalUSDCoutstanding * 1e18;
+        uint256 scaledUSDC = totalUSDCoutstanding * DECIMAL_SCALE_FACTOR;
         uint256 expectedPeg = scaledUSDC / usx.totalSupply();
         uint256 actualPeg = usx.usxPrice();
 
@@ -600,8 +647,9 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
 
         // Check value conservation
         uint256 totalUSXValue = usx.totalSupply() * usx.usxPrice() / 1e18;
-        uint256 totalUSDCBacking =
-            (usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx))) * 1e18;
+        uint256 totalUSDCBacking = (
+            usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx))
+        ) * DECIMAL_SCALE_FACTOR;
 
         console.log("Total USX Value (wei):", totalUSXValue);
         console.log("Total USDC Backing (scaled):", totalUSDCBacking);

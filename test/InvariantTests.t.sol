@@ -84,8 +84,9 @@ contract InvariantTests is LocalDeployTestSetup {
         if (usx.totalSupply() == 0) return; // Skip initial state
 
         uint256 totalUSXValue = usx.totalSupply() * usx.usxPrice() / 1e18; // USX value in wei (18 decimals)
-        uint256 totalUSDCBacking =
-            (usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx))) * 1e18; // USDC backing scaled to 18 decimals
+        uint256 totalUSDCBacking = (
+            usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx))
+        ) * DECIMAL_SCALE_FACTOR; // USDC backing scaled to 18 decimals
 
         // Allow small tolerance for rounding errors (1 wei)
         uint256 difference =
@@ -121,14 +122,24 @@ contract InvariantTests is LocalDeployTestSetup {
     function invariant_valid_share_price() public view {
         if (susx.totalSupply() == 0) return; // Skip if no shares exist
 
+        _checkSharePriceBasicValidity();
+        _checkSharePriceConsistencyWithAssets();
+        _checkSharePriceConsistencyWithUSX();
+        _checkSharePriceBounds();
+    }
+
+    /// @notice Check basic share price validity
+    function _checkSharePriceBasicValidity() internal view {
+        uint256 sharePrice = susx.sharePrice();
+        assertGt(sharePrice, 0, "Share price must be positive");
+    }
+
+    /// @notice Check share price consistency with total assets
+    function _checkSharePriceConsistencyWithAssets() internal view {
         uint256 sharePrice = susx.sharePrice();
         uint256 totalAssets = susx.totalAssets();
         uint256 totalSupply = susx.totalSupply();
 
-        // Basic validity checks
-        assertGt(sharePrice, 0, "Share price must be positive");
-
-        // Share price should be consistent with total assets and supply
         // If there are assets, share price should be very close to expected
         if (totalAssets > 0) {
             uint256 expectedPrice = (totalAssets * 1e18) / totalSupply;
@@ -140,10 +151,13 @@ contract InvariantTests is LocalDeployTestSetup {
             assertGe(sharePrice, minAllowedPrice, "Share price too low relative to assets");
             assertLe(sharePrice, maxAllowedPrice, "Share price too high relative to assets");
         }
+    }
 
-        // Share price should be consistent with USX price
-        // sUSX shares represent USX, so their price should be very close
+    /// @notice Check share price consistency with USX price
+    function _checkSharePriceConsistencyWithUSX() internal view {
+        uint256 sharePrice = susx.sharePrice();
         uint256 usxPrice = usx.usxPrice();
+
         if (usxPrice > 0) {
             // Allow only minimal tolerance for fees/rounding (0.5%)
             uint256 minAllowedPrice = usxPrice * 995 / 1000; // 99.5% (allowing for withdrawal fees)
@@ -152,7 +166,11 @@ contract InvariantTests is LocalDeployTestSetup {
             assertGe(sharePrice, minAllowedPrice, "Share price too low compared to USX price");
             assertLe(sharePrice, maxAllowedPrice, "Share price too high compared to USX price");
         }
+    }
 
+    /// @notice Check share price bounds
+    function _checkSharePriceBounds() internal view {
+        uint256 sharePrice = susx.sharePrice();
         // Share price should not exceed reasonable bounds
         // Maximum reasonable share price: 10 USDC equivalent (much more conservative)
         assertLe(sharePrice, 10e18, "Share price exceeds maximum reasonable value");
@@ -212,15 +230,26 @@ contract InvariantTests is LocalDeployTestSetup {
     function invariant_rounding_error_tracking() public view {
         if (usx.totalSupply() == 0) return; // Skip initial state
 
-        // 1. USX Share Price Calculation (Peg) - Should be very close
+        _checkPegRoundingError();
+        _checkSharePriceRoundingError();
+        _checkFeeRoundingError();
+    }
+
+    /// @notice Check peg calculation rounding error
+    function _checkPegRoundingError() internal view {
         uint256 totalUSDCoutstanding =
             usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx));
-        uint256 scaledUSDC = totalUSDCoutstanding * 1e18;
+        uint256 scaledUSDC = totalUSDCoutstanding * DECIMAL_SCALE_FACTOR;
         uint256 expectedPeg = scaledUSDC / usx.totalSupply();
         uint256 actualPeg = usx.usxPrice();
         uint256 pegRoundingError = actualPeg > expectedPeg ? actualPeg - expectedPeg : expectedPeg - actualPeg;
 
-        // 2. sUSX Share Price Calculation - Should be very close
+        // Peg should be very close to expected (max 1 wei error)
+        assertLe(pegRoundingError, 1, "Peg calculation error too large");
+    }
+
+    /// @notice Check share price calculation rounding error
+    function _checkSharePriceRoundingError() internal view {
         if (susx.totalSupply() > 0) {
             uint256 expectedSharePrice = (susx.totalAssets() * 1e18) / susx.totalSupply();
             uint256 actualSharePrice = susx.sharePrice();
@@ -230,16 +259,15 @@ contract InvariantTests is LocalDeployTestSetup {
 
             assertLe(sharePriceRoundingError, 1, "Share price rounding error should be <= 1 wei");
         }
+    }
 
-        // 3. Fee Calculations - Should be exact
+    /// @notice Check fee calculation rounding error
+    function _checkFeeRoundingError() internal view {
         uint256 testAmount = 1000e18; // 1000 USX
         uint256 expectedFee = testAmount * susx.withdrawalFeeFraction() / 100000;
         uint256 actualFee = susx.withdrawalFee(testAmount);
         uint256 feeRoundingError = actualFee > expectedFee ? actualFee - expectedFee : expectedFee - actualFee;
 
-        // Assert that rounding errors are minimal
-        // Peg should be very close to expected (max 1 wei error)
-        assertLe(pegRoundingError, 1, "Peg calculation error too large");
         assertEq(feeRoundingError, 0, "Fee calculation should be exact - no rounding allowed");
     }
 
@@ -262,7 +290,7 @@ contract InvariantTests is LocalDeployTestSetup {
         // Check peg calculation
         uint256 totalUSDCoutstanding =
             usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx));
-        uint256 scaledUSDC = totalUSDCoutstanding * 1e18;
+        uint256 scaledUSDC = totalUSDCoutstanding * DECIMAL_SCALE_FACTOR;
         uint256 expectedPeg = scaledUSDC / usx.totalSupply();
         uint256 actualPeg = usx.usxPrice();
 
@@ -275,8 +303,9 @@ contract InvariantTests is LocalDeployTestSetup {
 
         // Check value conservation
         uint256 totalUSXValue = usx.totalSupply() * usx.usxPrice() / 1e18;
-        uint256 totalUSDCBacking =
-            (usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx))) * 1e18;
+        uint256 totalUSDCBacking = (
+            usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx))
+        ) * DECIMAL_SCALE_FACTOR;
 
         console.log("Total USX Value (wei):", totalUSXValue);
         console.log("Total USDC Backing (scaled):", totalUSDCBacking);
@@ -406,7 +435,8 @@ contract InvariantTests is LocalDeployTestSetup {
 
         vm.prank(address(mockAssetManager));
         bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, totalBalance);
-        address(treasury).call(data);
+        (bool success,) = address(treasury).call(data);
+        require(success, "Profit report failed");
     }
 
     /// @notice Random loss report function for fuzzing
@@ -417,7 +447,8 @@ contract InvariantTests is LocalDeployTestSetup {
 
         vm.prank(address(mockAssetManager));
         bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, totalBalance);
-        address(treasury).call(data);
+        (bool success,) = address(treasury).call(data);
+        require(success, "Loss report failed");
     }
 
     /// @notice Random asset manager transfer to function for fuzzing
@@ -430,7 +461,8 @@ contract InvariantTests is LocalDeployTestSetup {
             vm.prank(address(mockAssetManager));
             bytes memory data =
                 abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, amount);
-            address(treasury).call(data);
+            (bool success,) = address(treasury).call(data);
+            require(success, "Transfer to asset manager failed");
         }
     }
 
@@ -444,7 +476,8 @@ contract InvariantTests is LocalDeployTestSetup {
             vm.prank(address(mockAssetManager));
             bytes memory data =
                 abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector, amount);
-            address(treasury).call(data);
+            (bool success,) = address(treasury).call(data);
+            require(success, "Transfer from asset manager failed");
         }
     }
 
@@ -459,11 +492,13 @@ contract InvariantTests is LocalDeployTestSetup {
         if (paramType == 0) {
             // Update buffer renewal rate
             bytes memory data = abi.encodeWithSelector(InsuranceBufferFacet.setBufferRenewalRate.selector, newValue);
-            address(treasury).call(data);
+            (bool success,) = address(treasury).call(data);
+            require(success, "Buffer renewal rate update failed");
         } else if (paramType == 1) {
             // Update buffer target fraction
             bytes memory data = abi.encodeWithSelector(InsuranceBufferFacet.setBufferTargetFraction.selector, newValue);
-            address(treasury).call(data);
+            (bool success,) = address(treasury).call(data);
+            require(success, "Buffer target fraction update failed");
         }
     }
 

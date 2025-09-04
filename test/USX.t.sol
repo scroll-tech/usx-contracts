@@ -212,6 +212,9 @@ contract USXTest is LocalDeployTestSetup {
         vm.prank(user);
         usx.deposit(100e6); // 100 USDC deposit
 
+        // Give the USX contract USDC to fulfill withdrawal requests
+        deal(address(usdc), address(usx), 100e6);
+
         // Verify USX was minted
         assertEq(usx.balanceOf(user), 100e18, "User should have 100 USX");
 
@@ -253,6 +256,9 @@ contract USXTest is LocalDeployTestSetup {
         vm.prank(user);
         usx.deposit(200e6); // 200 USDC deposit
 
+        // Give the USX contract USDC to fulfill withdrawal requests
+        deal(address(usdc), address(usx), 200e6);
+
         // Make multiple withdrawal requests
         vm.prank(user);
         usx.requestUSDC(50e18); // Request 50 USX withdrawal
@@ -276,6 +282,9 @@ contract USXTest is LocalDeployTestSetup {
         // Test that withdrawal requests are properly cleaned up
         vm.prank(user);
         usx.deposit(100e6); // 100 USDC deposit
+
+        // Give the USX contract USDC to fulfill withdrawal requests
+        deal(address(usdc), address(usx), 100e6);
 
         vm.prank(user);
         usx.requestUSDC(50e18); // Request 50 USX withdrawal
@@ -307,7 +316,7 @@ contract USXTest is LocalDeployTestSetup {
 
         uint256 finalBalance = usx.balanceOf(user);
         assertEq(finalBalance, initialBalance + mintAmount, "User should receive minted USX");
-        assertEq(usx.totalSupply(), 1000000000000000000000000 + mintAmount, "Total supply should increase");
+        assertEq(usx.totalSupply(), mintAmount, "Total supply should increase");
     }
 
     function test_mintUSX_revert_not_treasury() public {
@@ -334,7 +343,7 @@ contract USXTest is LocalDeployTestSetup {
 
         uint256 finalBalance = usx.balanceOf(user);
         assertEq(finalBalance, initialBalance - burnAmount, "User should have USX burned");
-        assertEq(usx.totalSupply(), 1000000000000000000000000 + mintAmount - burnAmount, "Total supply should decrease");
+        assertEq(usx.totalSupply(), mintAmount - burnAmount, "Total supply should decrease");
     }
 
     function test_burnUSX_revert_not_treasury() public {

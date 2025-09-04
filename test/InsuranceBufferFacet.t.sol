@@ -120,6 +120,17 @@ contract InsuranceBufferFacetTest is LocalDeployTestSetup {
     }
 
     function test_setBufferTargetFraction_success() public {
+        // First, seed the vault with USX so we have a realistic USX supply
+        vm.prank(user);
+        usx.deposit(500000e6); // 500,000 USDC deposit to get USX
+
+        // Deposit USX to sUSX vault to create realistic vault balance
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        vm.prank(user);
+        susx.deposit(usxBalance, user);
+
         // Test setting buffer target fraction as governance
         uint256 newFraction = 75000; // 7.5%
 
