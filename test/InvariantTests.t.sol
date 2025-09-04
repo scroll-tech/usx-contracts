@@ -271,52 +271,6 @@ contract InvariantTests is LocalDeployTestSetup {
         assertEq(feeRoundingError, 0, "Fee calculation should be exact - no rounding allowed");
     }
 
-    /// @notice Debug function to see actual values causing invariant failures
-    function test_debug_invariant_values() public {
-        console.log("=== DEBUG INVARIANT VALUES ===");
-
-        // Check if we're in initial state
-        if (usx.totalSupply() == 0) {
-            console.log("Initial state - no USX supply yet");
-            console.log("USX Total Supply:", usx.totalSupply());
-            console.log("sUSX Total Supply:", susx.totalSupply());
-            console.log("Treasury USDC:", usdc.balanceOf(address(treasury)));
-            console.log("Asset Manager USDC:", treasury.assetManagerUSDC());
-            console.log("USX Contract USDC:", usdc.balanceOf(address(usx)));
-            console.log("=== END DEBUG ===");
-            return;
-        }
-
-        // Check peg calculation
-        uint256 totalUSDCoutstanding =
-            usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx));
-        uint256 scaledUSDC = totalUSDCoutstanding * DECIMAL_SCALE_FACTOR;
-        uint256 expectedPeg = scaledUSDC / usx.totalSupply();
-        uint256 actualPeg = usx.usxPrice();
-
-        console.log("Total USDC Outstanding:", totalUSDCoutstanding);
-        console.log("USX Total Supply:", usx.totalSupply());
-        console.log("Scaled USDC:", scaledUSDC);
-        console.log("Expected Peg:", expectedPeg);
-        console.log("Actual Peg:", actualPeg);
-        console.log("Peg Difference:", actualPeg > expectedPeg ? actualPeg - expectedPeg : expectedPeg - actualPeg);
-
-        // Check value conservation
-        uint256 totalUSXValue = usx.totalSupply() * usx.usxPrice() / 1e18;
-        uint256 totalUSDCBacking = (
-            usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx))
-        ) * DECIMAL_SCALE_FACTOR;
-
-        console.log("Total USX Value (wei):", totalUSXValue);
-        console.log("Total USDC Backing (scaled):", totalUSDCBacking);
-        console.log(
-            "Value Conservation Difference:",
-            totalUSDCBacking > totalUSXValue ? totalUSDCBacking - totalUSXValue : totalUSXValue - totalUSDCBacking
-        );
-
-        console.log("=== END DEBUG ===");
-    }
-
     /*=========================== Fuzzing Functions =========================*/
 
     /// @notice Random time advancement for fuzzing
@@ -332,8 +286,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
     /// @notice Random USX deposit function for fuzzing
     function fuzz_usx_deposit(uint256 amount) public advanceTimeRandomly {
-        // Bound the amount to reasonable values
-        amount = bound(amount, 1e6, 1000000e6); // 1 USDC to 1M USDC
+        amount = bound(amount, 1e6, type(uint256).max); // 1 USDC to maximum possible
 
         // Get a random user
         address randomUser = getRandomUser();
@@ -347,8 +300,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
     /// @notice Random USX withdrawal request function for fuzzing
     function fuzz_usx_request_withdrawal(uint256 amount) public advanceTimeRandomly {
-        // Bound the amount to reasonable values
-        amount = bound(amount, 1e18, 1000000e18); // 1 USX to 1M USX
+        amount = bound(amount, 1e18, type(uint256).max); // 1 USX to maximum possible
 
         // Get a random user
         address randomUser = getRandomUser();
@@ -430,8 +382,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
     /// @notice Random profit report function for fuzzing
     function fuzz_report_profits(uint256 totalBalance) public advanceTimeRandomly {
-        // Bound the amount to reasonable values
-        totalBalance = bound(totalBalance, 1000e6, 10000000e6); // 1K to 10M USDC
+        totalBalance = bound(totalBalance, 1000e6, type(uint256).max); // Allow maximum possible profit
 
         vm.prank(address(mockAssetManager));
         bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, totalBalance);
@@ -442,8 +393,7 @@ contract InvariantTests is LocalDeployTestSetup {
     /// @notice Random loss report function for fuzzing
     /// @dev Foundry will call this with random parameters
     function fuzz_report_losses(uint256 totalBalance) public advanceTimeRandomly {
-        // Bound the amount to reasonable values
-        totalBalance = bound(totalBalance, 0, 10000000e6); // 0 to 10M USDC
+        totalBalance = bound(totalBalance, 0, type(uint256).max); // Allow maximum possible loss
 
         vm.prank(address(mockAssetManager));
         bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, totalBalance);
@@ -453,8 +403,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
     /// @notice Random asset manager transfer to function for fuzzing
     function fuzz_transfer_usdc_to_asset_manager(uint256 amount) public advanceTimeRandomly {
-        // Bound the amount to reasonable values
-        amount = bound(amount, 1000e6, 10000000e6); // 1K to 10M USDC
+        amount = bound(amount, 1000e6, type(uint256).max); // Allow maximum possible transfer
 
         // Only proceed if treasury has enough USDC
         if (usdc.balanceOf(address(treasury)) >= amount) {
@@ -468,8 +417,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
     /// @notice Random asset manager transfer from function for fuzzing
     function fuzz_transfer_usdc_from_asset_manager(uint256 amount) public advanceTimeRandomly {
-        // Bound the amount to reasonable values
-        amount = bound(amount, 1000e6, 10000000e6); // 1K to 10M USDC
+        amount = bound(amount, 1000e6, type(uint256).max); // Allow maximum possible transfer
 
         // Only proceed if asset manager has enough USDC
         if (treasury.assetManagerUSDC() >= amount) {
@@ -483,9 +431,8 @@ contract InvariantTests is LocalDeployTestSetup {
 
     /// @notice Random governance parameter update for fuzzing
     function fuzz_update_governance_params(uint256 paramType, uint256 newValue) public advanceTimeRandomly {
-        // Bound the parameter type and value
         paramType = bound(paramType, 0, 1); // 0: buffer renewal rate, 1: buffer target fraction
-        newValue = bound(newValue, 100, 20000); // Reasonable ranges for each parameter
+        newValue = bound(newValue, 0, type(uint256).max); // Allow maximum possible values
 
         vm.prank(governance);
 
@@ -499,6 +446,62 @@ contract InvariantTests is LocalDeployTestSetup {
             bytes memory data = abi.encodeWithSelector(InsuranceBufferFacet.setBufferTargetFraction.selector, newValue);
             (bool success,) = address(treasury).call(data);
             require(success, "Buffer target fraction update failed");
+        }
+    }
+
+    /// @notice Test extreme loss scenarios that could break the peg
+    function fuzz_extreme_loss_scenario(uint256 lossAmount) public advanceTimeRandomly {
+        // Test losses that could potentially break the peg or deplete the buffer
+        // This is specifically designed to trigger crisis conditions
+        lossAmount = bound(lossAmount, 0, type(uint256).max);
+
+        // First, ensure we have some assets to lose
+        if (treasury.assetManagerUSDC() > 0) {
+            vm.prank(address(mockAssetManager));
+            bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, lossAmount);
+            (bool success,) = address(treasury).call(data);
+            require(success, "Extreme loss report failed");
+        }
+    }
+
+    /// @notice Test extreme profit scenarios that could cause overflow
+    function fuzz_extreme_profit_scenario(uint256 profitAmount) public advanceTimeRandomly {
+        // Test profits that could potentially cause overflow or extreme share price changes
+        profitAmount = bound(profitAmount, 0, type(uint256).max);
+
+        vm.prank(address(mockAssetManager));
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, profitAmount);
+        (bool success,) = address(treasury).call(data);
+        require(success, "Extreme profit report failed");
+    }
+
+    /// @notice Test massive withdrawals that could trigger crisis conditions
+    function fuzz_massive_withdrawal_scenario(uint256 withdrawalAmount) public advanceTimeRandomly {
+        // Test withdrawals that could potentially break the peg or freeze withdrawals
+        withdrawalAmount = bound(withdrawalAmount, 1e18, type(uint256).max);
+
+        // Get a random user
+        address randomUser = getRandomUser();
+
+        // Only proceed if user has enough USX and withdrawals aren't frozen
+        if (usx.balanceOf(randomUser) >= withdrawalAmount && !usx.withdrawalsFrozen()) {
+            vm.prank(randomUser);
+            usx.requestUSDC(withdrawalAmount);
+        }
+    }
+
+    /// @notice Test extreme leverage scenarios
+    function fuzz_extreme_leverage_scenario(uint256 transferAmount) public advanceTimeRandomly {
+        // Test transfers that could potentially exceed max leverage or cause overflow
+        transferAmount = bound(transferAmount, 1000e6, type(uint256).max);
+
+        // Only proceed if treasury has enough USDC
+        if (usdc.balanceOf(address(treasury)) >= transferAmount) {
+            vm.prank(address(mockAssetManager));
+            bytes memory data =
+                abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, transferAmount);
+            (bool success,) = address(treasury).call(data);
+            require(success, "Extreme leverage transfer failed");
         }
     }
 
