@@ -140,7 +140,8 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         if ($.withdrawalRequests[withdrawalId].withdrawalBlock > $.lastEpochBlock) revert NextEpochNotStarted();
 
         // Get the total USX amount for the amount of sUSX being redeemed
-        uint256 USXAmount = Math.mulDiv($.withdrawalRequests[withdrawalId].amount, sharePrice(), 1e18, Math.Rounding.Floor);
+        uint256 USXAmount =
+            Math.mulDiv($.withdrawalRequests[withdrawalId].amount, sharePrice(), 1e18, Math.Rounding.Floor);
 
         // Distribute portion of USX to the Governance Warchest
         uint256 governanceWarchestPortion = withdrawalFee(USXAmount);

@@ -50,7 +50,8 @@ contract InsuranceBufferFacet is TreasuryStorage {
             uint256 totalProfitUSDC = _totalProfit;
 
             // Only use a portion of the profits for insurance buffer (not the entire system's USDC)
-            uint256 insuranceBufferAccrualUSDC = Math.mulDiv(totalProfitUSDC, $.bufferRenewalFraction, 1000000, Math.Rounding.Floor);
+            uint256 insuranceBufferAccrualUSDC =
+                Math.mulDiv(totalProfitUSDC, $.bufferRenewalFraction, 1000000, Math.Rounding.Floor);
 
             // Mint USX to the buffer
             $.USX.mintUSX(address(this), insuranceBufferAccrualUSDC * DECIMAL_SCALE_FACTOR);
