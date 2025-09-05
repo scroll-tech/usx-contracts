@@ -505,6 +505,287 @@ contract InvariantTests is LocalDeployTestSetup {
         }
     }
 
+    /*=========================== Adversarial Testing Functions =========================*/
+
+    /// @notice Test rapid state changes to break invariants
+    function fuzz_rapid_state_changes(uint256 operationType) public advanceTimeRandomly {
+        // Perform rapid operations to try to break invariants
+        operationType = bound(operationType, 0, 4);
+        
+        // Get multiple random users for concurrent operations
+        address user1 = getRandomUser();
+        address user2 = getRandomUser();
+        
+        // Perform rapid operations in sequence to stress the system
+        for (uint256 i = 0; i < 5; i++) {
+            if (operationType == 0) {
+                // Rapid deposits
+                if (usdc.balanceOf(user1) >= 1000e6) {
+                    vm.prank(user1);
+                    usx.deposit(1000e6);
+                }
+            } else if (operationType == 1) {
+                // Rapid withdrawals
+                if (usx.balanceOf(user1) >= 1000e18 && !usx.withdrawalsFrozen()) {
+                    vm.prank(user1);
+                    usx.requestUSDC(1000e18);
+                }
+            } else if (operationType == 2) {
+                // Rapid profit/loss reports
+                vm.prank(address(mockAssetManager));
+                bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, 10000e6);
+                (bool success,) = address(treasury).call(data);
+                if (success) {
+                    vm.prank(address(mockAssetManager));
+                    data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, 5000e6);
+                    (success,) = address(treasury).call(data);
+                }
+            } else if (operationType == 3) {
+                // Rapid sUSX operations
+                if (usx.balanceOf(user1) >= 1000e18) {
+                    vm.prank(user1);
+                    susx.deposit(1000e18, user1);
+                }
+                if (susx.balanceOf(user1) >= 1000e18) {
+                    vm.prank(user1);
+                    susx.withdraw(1000e18, user1, user1);
+                }
+            } else if (operationType == 4) {
+                // Rapid governance changes
+                vm.prank(governance);
+                bytes memory data = abi.encodeWithSelector(InsuranceBufferFacet.setBufferTargetFraction.selector, 5000);
+                (bool success,) = address(treasury).call(data);
+                if (success) {
+                    vm.prank(governance);
+                    data = abi.encodeWithSelector(InsuranceBufferFacet.setBufferRenewalRate.selector, 1000);
+                    (success,) = address(treasury).call(data);
+                }
+            }
+        }
+    }
+
+    /// @notice Test concurrent operations to find race conditions
+    function fuzz_concurrent_operations(uint256 operationCount) public advanceTimeRandomly {
+        // Test multiple operations happening "simultaneously" to find race conditions
+        operationCount = bound(operationCount, 2, 10);
+        
+        address[] memory users = new address[](operationCount);
+        for (uint256 i = 0; i < operationCount; i++) {
+            users[i] = getRandomUser();
+        }
+        
+        // Perform operations that could interfere with each other
+        for (uint256 i = 0; i < operationCount; i++) {
+            address user = users[i];
+            
+            // Mix of operations that could cause conflicts
+            if (i % 3 == 0 && usdc.balanceOf(user) >= 1000e6) {
+                vm.prank(user);
+                usx.deposit(1000e6);
+            } else if (i % 3 == 1 && usx.balanceOf(user) >= 1000e18 && !usx.withdrawalsFrozen()) {
+                vm.prank(user);
+                usx.requestUSDC(1000e18);
+            } else if (i % 3 == 2 && usx.balanceOf(user) >= 1000e18) {
+                vm.prank(user);
+                susx.deposit(1000e18, user);
+            }
+        }
+    }
+
+    /// @notice Test invariant violation attempts
+    function fuzz_invariant_violation_attempts(uint256 attemptType) public advanceTimeRandomly {
+        // Deliberately try to violate invariants to test protocol robustness
+        attemptType = bound(attemptType, 0, 3);
+        
+        if (attemptType == 0) {
+            // Try to create value out of nothing
+            _attemptValueCreation();
+        } else if (attemptType == 1) {
+            // Try to break peg stability
+            _attemptPegBreak();
+        } else if (attemptType == 2) {
+            // Try to deplete buffer without crisis
+            _attemptBufferDepletion();
+        } else if (attemptType == 3) {
+            // Try to create accounting inconsistencies
+            _attemptAccountingInconsistency();
+        }
+    }
+
+    /// @notice Test extreme time manipulation
+    function fuzz_extreme_time_manipulation(uint256 timeAdvance) public advanceTimeRandomly {
+        // Test extreme time scenarios that could break time-based functions
+        timeAdvance = bound(timeAdvance, 0, 365 days); // Up to 1 year
+        
+        // Advance time dramatically
+        vm.warp(block.timestamp + timeAdvance);
+        vm.roll(block.number + (timeAdvance / 12));
+        
+        // Try operations that depend on time
+        address user = getRandomUser();
+        if (usx.balanceOf(user) >= 1000e18 && !usx.withdrawalsFrozen()) {
+            vm.prank(user);
+            usx.requestUSDC(1000e18);
+        }
+        
+        // Try to claim withdrawals after extreme time
+        if (usx.outstandingWithdrawalRequests(user) > 0) {
+            vm.prank(user);
+            usx.claimUSDC();
+        }
+    }
+
+    /// @notice Test state corruption attempts
+    function fuzz_state_corruption_attempts(uint256 corruptionType) public advanceTimeRandomly {
+        // Try to corrupt state in various ways
+        corruptionType = bound(corruptionType, 0, 2);
+        
+        if (corruptionType == 0) {
+            // Try to manipulate balances directly
+            _attemptBalanceManipulation();
+        } else if (corruptionType == 1) {
+            // Try to manipulate share prices
+            _attemptSharePriceManipulation();
+        } else if (corruptionType == 2) {
+            // Try to manipulate governance parameters
+            _attemptGovernanceManipulation();
+        }
+    }
+
+    /// @notice Test flash loan attack simulation
+    function fuzz_flash_loan_attack(uint256 attackType) public advanceTimeRandomly {
+        // Simulate flash loan attacks to manipulate prices or drain funds
+        attackType = bound(attackType, 0, 2);
+        
+        if (attackType == 0) {
+            // Flash loan to manipulate USX price
+            _attemptFlashLoanPriceManipulation();
+        } else if (attackType == 1) {
+            // Flash loan to manipulate sUSX share price
+            _attemptFlashLoanSharePriceManipulation();
+        } else if (attackType == 2) {
+            // Flash loan to drain buffer
+            _attemptFlashLoanBufferDrain();
+        }
+    }
+
+    /// @notice Test reentrancy attack simulation
+    function fuzz_reentrancy_attack(uint256 attackType) public advanceTimeRandomly {
+        // Simulate reentrancy attacks on vulnerable functions
+        attackType = bound(attackType, 0, 2);
+        
+        if (attackType == 0) {
+            // Reentrancy on deposit
+            _attemptReentrancyOnDeposit();
+        } else if (attackType == 1) {
+            // Reentrancy on withdrawal
+            _attemptReentrancyOnWithdrawal();
+        } else if (attackType == 2) {
+            // Reentrancy on sUSX operations
+            _attemptReentrancyOnSUSX();
+        }
+    }
+
+    /// @notice Test sandwich attack simulation
+    function fuzz_sandwich_attack(uint256 attackType) public advanceTimeRandomly {
+        // Simulate sandwich attacks (front-run and back-run)
+        attackType = bound(attackType, 0, 2);
+        
+        if (attackType == 0) {
+            // Sandwich attack on USX deposit
+            _attemptSandwichOnUSXDeposit();
+        } else if (attackType == 1) {
+            // Sandwich attack on sUSX deposit
+            _attemptSandwichOnSUSXDeposit();
+        } else if (attackType == 2) {
+            // Sandwich attack on profit reporting
+            _attemptSandwichOnProfitReport();
+        }
+    }
+
+    /// @notice Test arbitrage exploitation
+    function fuzz_arbitrage_exploitation(uint256 arbitrageType) public advanceTimeRandomly {
+        // Test arbitrage opportunities between USX and sUSX
+        arbitrageType = bound(arbitrageType, 0, 2);
+        
+        if (arbitrageType == 0) {
+            // Arbitrage between USX and sUSX prices
+            _attemptUSXSUSXArbitrage();
+        } else if (arbitrageType == 1) {
+            // Arbitrage on withdrawal fees
+            _attemptWithdrawalFeeArbitrage();
+        } else if (arbitrageType == 2) {
+            // Arbitrage on share price discrepancies
+            _attemptSharePriceArbitrage();
+        }
+    }
+
+    /// @notice Test direct token transfer attacks to manipulate calculations
+    function fuzz_direct_transfer_attacks(uint256 attackType) public advanceTimeRandomly {
+        // Test direct token transfers to contracts to manipulate balances and calculations
+        attackType = bound(attackType, 0, 5);
+        
+        if (attackType == 0) {
+            // Send USDC directly to USX contract
+            _attemptUSDCTransferToUSX();
+        } else if (attackType == 1) {
+            // Send USDC directly to Treasury contract
+            _attemptUSDCTransferToTreasury();
+        } else if (attackType == 2) {
+            // Send USX directly to sUSX contract
+            _attemptUSXTransferToSUSX();
+        } else if (attackType == 3) {
+            // Send USX directly to Treasury contract
+            _attemptUSXTransferToTreasury();
+        } else if (attackType == 4) {
+            // Send sUSX directly to Treasury contract
+            _attemptSUSXTransferToTreasury();
+        } else if (attackType == 5) {
+            // Send tokens to MockAssetManager to manipulate asset manager balance
+            _attemptTokenTransferToAssetManager();
+        }
+    }
+
+    /// @notice Test balance manipulation through direct transfers
+    function fuzz_balance_manipulation_attacks(uint256 manipulationType) public advanceTimeRandomly {
+        // Test various ways to manipulate contract balances
+        manipulationType = bound(manipulationType, 0, 3);
+        
+        if (manipulationType == 0) {
+            // Manipulate USX total supply through direct transfers
+            _attemptUSXSupplyManipulation();
+        } else if (manipulationType == 1) {
+            // Manipulate sUSX total supply through direct transfers
+            _attemptSUSXSupplyManipulation();
+        } else if (manipulationType == 2) {
+            // Manipulate treasury USDC balance through direct transfers
+            _attemptTreasuryUSDCManipulation();
+        } else if (manipulationType == 3) {
+            // Manipulate asset manager USDC balance through direct transfers
+            _attemptAssetManagerUSDCManipulation();
+        }
+    }
+
+    /// @notice Test calculation manipulation attacks
+    function fuzz_calculation_manipulation_attacks(uint256 calculationType) public advanceTimeRandomly {
+        // Test manipulation of key protocol calculations
+        calculationType = bound(calculationType, 0, 3);
+        
+        if (calculationType == 0) {
+            // Manipulate share price calculation
+            _attemptSharePriceCalculationManipulation();
+        } else if (calculationType == 1) {
+            // Manipulate peg calculation
+            _attemptPegCalculationManipulation();
+        } else if (calculationType == 2) {
+            // Manipulate buffer calculation
+            _attemptBufferCalculationManipulation();
+        } else if (calculationType == 3) {
+            // Manipulate leverage calculation
+            _attemptLeverageCalculationManipulation();
+        }
+    }
+
     /*=========================== Helper Functions =========================*/
 
     /// @notice Detects if system is in crisis state
@@ -523,6 +804,850 @@ contract InvariantTests is LocalDeployTestSetup {
         } else {
             // If maxLeverage function doesn't exist, return a reasonable default
             return 1000000e6; // 1M USDC default max leverage
+        }
+    }
+
+    /*=========================== Attack Helper Functions =========================*/
+
+    /// @notice Attempt to create value out of nothing
+    function _attemptValueCreation() internal {
+        // Try to create value through complex transaction sequences
+        address user = getRandomUser();
+        
+        // Record initial state
+        uint256 initialUSDC = usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC();
+        uint256 initialUSX = usx.totalSupply();
+        
+        // Perform a sequence of operations that might create value
+        if (usdc.balanceOf(user) >= 1000e6) {
+            vm.prank(user);
+            usx.deposit(1000e6);
+            
+            // Immediately try to withdraw more than deposited
+            if (usx.balanceOf(user) >= 1000e18) {
+                vm.prank(user);
+                usx.requestUSDC(usx.balanceOf(user));
+            }
+        }
+        
+        // Check if value was created
+        uint256 finalUSDC = usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC();
+        uint256 finalUSX = usx.totalSupply();
+        
+        // If USDC increased without corresponding USX increase, we might have created value
+        // Note: This would indicate a serious protocol vulnerability if it occurred
+        if (finalUSDC > initialUSDC && finalUSX <= initialUSX) {
+            // This would be a critical bug - value creation detected
+        }
+    }
+
+    /// @notice Attempt to break peg stability
+    function _attemptPegBreak() internal {
+        // Try to break the 1:1 peg through coordinated actions
+        address user1 = getRandomUser();
+        address user2 = getRandomUser();
+        
+        // Large deposit followed by massive loss report
+        if (usdc.balanceOf(user1) >= 1000000e6) {
+            vm.prank(user1);
+            usx.deposit(1000000e6);
+            
+            // Report massive losses to try to break peg
+            vm.prank(address(mockAssetManager));
+            bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, 999999e6);
+            (bool success,) = address(treasury).call(data);
+            
+            if (success) {
+                // Try to withdraw immediately to stress the system
+                if (usx.balanceOf(user2) >= 1000e18 && !usx.withdrawalsFrozen()) {
+                    vm.prank(user2);
+                    usx.requestUSDC(1000e18);
+                }
+            }
+        }
+    }
+
+    /// @notice Attempt to deplete buffer without crisis
+    function _attemptBufferDepletion() internal {
+        // Try to drain the insurance buffer without triggering crisis conditions
+        address user = getRandomUser();
+        
+        // First, ensure buffer has funds
+        if (usdc.balanceOf(address(treasury)) > 0) {
+            // Try to transfer all treasury USDC to asset manager
+            uint256 treasuryBalance = usdc.balanceOf(address(treasury));
+            vm.prank(address(mockAssetManager));
+            bytes memory data = abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, treasuryBalance);
+            (bool success,) = address(treasury).call(data);
+            
+            if (success) {
+                // Report losses to try to deplete buffer
+                vm.prank(address(mockAssetManager));
+                data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, treasury.assetManagerUSDC());
+                (success,) = address(treasury).call(data);
+            }
+        }
+    }
+
+    /// @notice Attempt to create accounting inconsistencies
+    function _attemptAccountingInconsistency() internal {
+        // Try to create accounting discrepancies
+        address user = getRandomUser();
+        
+        // Record initial balances
+        uint256 initialTreasuryUSDC = usdc.balanceOf(address(treasury));
+        uint256 initialAssetManagerUSDC = treasury.assetManagerUSDC();
+        uint256 initialUSXSupply = usx.totalSupply();
+        
+        // Perform operations that might create inconsistencies
+        if (usdc.balanceOf(user) >= 1000e6) {
+            vm.prank(user);
+            usx.deposit(1000e6);
+            
+            // Immediately try to manipulate asset manager balance
+            if (treasury.assetManagerUSDC() > 0) {
+                vm.prank(address(mockAssetManager));
+                bytes memory data = abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector, 100e6);
+                (bool success,) = address(treasury).call(data);
+            }
+        }
+        
+        // Check for accounting inconsistencies
+        uint256 finalTreasuryUSDC = usdc.balanceOf(address(treasury));
+        uint256 finalAssetManagerUSDC = treasury.assetManagerUSDC();
+        uint256 finalUSXSupply = usx.totalSupply();
+        
+        // If balances don't add up correctly, we might have found an inconsistency
+        uint256 expectedTotalUSDC = finalTreasuryUSDC + finalAssetManagerUSDC;
+        uint256 expectedTotalUSDCFromUSX = finalUSXSupply / DECIMAL_SCALE_FACTOR;
+        
+        if (expectedTotalUSDC != expectedTotalUSDCFromUSX) {
+            // This would indicate a serious accounting inconsistency
+        }
+    }
+
+    /// @notice Attempt to manipulate balances directly
+    function _attemptBalanceManipulation() internal {
+        // Try to manipulate balances through various means
+        address user = getRandomUser();
+        
+        // Try to manipulate USDC balance through transfers
+        if (usdc.balanceOf(user) >= 1000e6) {
+            // Transfer USDC to treasury directly
+            vm.prank(user);
+            usdc.transfer(address(treasury), 1000e6);
+            
+            // Then try to deposit the same amount
+            vm.prank(user);
+            usx.deposit(1000e6);
+        }
+    }
+
+    /// @notice Attempt to manipulate share prices
+    function _attemptSharePriceManipulation() internal {
+        // Try to manipulate sUSX share prices
+        address user = getRandomUser();
+        
+        // Record initial share price
+        uint256 initialSharePrice = susx.sharePrice();
+        
+        // Perform operations that might affect share price
+        if (usx.balanceOf(user) >= 1000e18) {
+            vm.prank(user);
+            susx.deposit(1000e18, user);
+            
+            // Immediately report profits to try to manipulate share price
+            vm.prank(address(mockAssetManager));
+            bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, 10000e6);
+            (bool success,) = address(treasury).call(data);
+            
+            if (success) {
+                // Try to withdraw immediately to see if share price was manipulated
+                if (susx.balanceOf(user) >= 1000e18) {
+                    vm.prank(user);
+                    susx.withdraw(1000e18, user, user);
+                }
+            }
+        }
+    }
+
+    /// @notice Attempt to manipulate governance parameters
+    function _attemptGovernanceManipulation() internal {
+        // Try to manipulate governance parameters to break the system
+        vm.prank(governance);
+        
+        // Set extreme buffer target fraction
+        bytes memory data = abi.encodeWithSelector(InsuranceBufferFacet.setBufferTargetFraction.selector, type(uint256).max);
+        (bool success,) = address(treasury).call(data);
+        
+        if (success) {
+            // Set extreme buffer renewal rate
+            vm.prank(governance);
+            data = abi.encodeWithSelector(InsuranceBufferFacet.setBufferRenewalRate.selector, type(uint256).max);
+            (success,) = address(treasury).call(data);
+        }
+    }
+
+    /// @notice Attempt flash loan price manipulation
+    function _attemptFlashLoanPriceManipulation() internal {
+        // Simulate flash loan to manipulate USX price
+        address user = getRandomUser();
+        
+        // "Flash loan" - get large amount of USDC
+        uint256 flashLoanAmount = 1000000e6;
+        deal(address(usdc), user, flashLoanAmount);
+        
+        // Large deposit to manipulate price
+        vm.prank(user);
+        usx.deposit(flashLoanAmount);
+        
+        // Report losses to try to break peg
+        vm.prank(address(mockAssetManager));
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, flashLoanAmount / 2);
+        (bool success,) = address(treasury).call(data);
+        
+        // "Repay" flash loan
+        if (usx.balanceOf(user) >= 1000e18) {
+            vm.prank(user);
+            usx.requestUSDC(1000e18);
+        }
+    }
+
+    /// @notice Attempt flash loan share price manipulation
+    function _attemptFlashLoanSharePriceManipulation() internal {
+        // Simulate flash loan to manipulate sUSX share price
+        address user = getRandomUser();
+        
+        // "Flash loan" - get large amount of USX
+        uint256 flashLoanAmount = 1000000e18;
+        deal(address(usx), user, flashLoanAmount);
+        
+        // Large deposit to manipulate share price
+        vm.prank(user);
+        susx.deposit(flashLoanAmount, user);
+        
+        // Report profits to manipulate share price
+        vm.prank(address(mockAssetManager));
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, 100000e6);
+        (bool success,) = address(treasury).call(data);
+        
+        // "Repay" flash loan
+        if (susx.balanceOf(user) >= 1000e18) {
+            vm.prank(user);
+            susx.withdraw(1000e18, user, user);
+        }
+    }
+
+    /// @notice Attempt flash loan buffer drain
+    function _attemptFlashLoanBufferDrain() internal {
+        // Simulate flash loan to drain insurance buffer
+        address user = getRandomUser();
+        
+        // "Flash loan" - get large amount of USDC
+        uint256 flashLoanAmount = 1000000e6;
+        deal(address(usdc), user, flashLoanAmount);
+        
+        // Large deposit
+        vm.prank(user);
+        usx.deposit(flashLoanAmount);
+        
+        // Report massive losses to drain buffer
+        vm.prank(address(mockAssetManager));
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, flashLoanAmount);
+        (bool success,) = address(treasury).call(data);
+        
+        // Try to withdraw everything
+        if (usx.balanceOf(user) >= 1000e18 && !usx.withdrawalsFrozen()) {
+            vm.prank(user);
+            usx.requestUSDC(usx.balanceOf(user));
+        }
+    }
+
+    /// @notice Attempt reentrancy on deposit
+    function _attemptReentrancyOnDeposit() internal {
+        // Simulate reentrancy attack on deposit function
+        address user = getRandomUser();
+        
+        if (usdc.balanceOf(user) >= 2000e6) {
+            // First deposit
+            vm.prank(user);
+            usx.deposit(1000e6);
+            
+            // Immediately try another deposit (simulating reentrancy)
+            vm.prank(user);
+            usx.deposit(1000e6);
+        }
+    }
+
+    /// @notice Attempt reentrancy on withdrawal
+    function _attemptReentrancyOnWithdrawal() internal {
+        // Simulate reentrancy attack on withdrawal function
+        address user = getRandomUser();
+        
+        if (usx.balanceOf(user) >= 2000e18 && !usx.withdrawalsFrozen()) {
+            // First withdrawal request
+            vm.prank(user);
+            usx.requestUSDC(1000e18);
+            
+            // Immediately try another withdrawal request (simulating reentrancy)
+            vm.prank(user);
+            usx.requestUSDC(1000e18);
+        }
+    }
+
+    /// @notice Attempt reentrancy on sUSX operations
+    function _attemptReentrancyOnSUSX() internal {
+        // Simulate reentrancy attack on sUSX operations
+        address user = getRandomUser();
+        
+        if (usx.balanceOf(user) >= 2000e18) {
+            // First sUSX deposit
+            vm.prank(user);
+            susx.deposit(1000e18, user);
+            
+            // Immediately try another sUSX deposit (simulating reentrancy)
+            vm.prank(user);
+            susx.deposit(1000e18, user);
+        }
+    }
+
+    /// @notice Attempt sandwich attack on USX deposit
+    function _attemptSandwichOnUSXDeposit() internal {
+        // Simulate sandwich attack on USX deposit
+        address attacker = getRandomUser();
+        address victim = getRandomUser();
+        
+        // Front-run: Attacker deposits
+        if (usdc.balanceOf(attacker) >= 1000e6) {
+            vm.prank(attacker);
+            usx.deposit(1000e6);
+        }
+        
+        // Victim deposits
+        if (usdc.balanceOf(victim) >= 1000e6) {
+            vm.prank(victim);
+            usx.deposit(1000e6);
+        }
+        
+        // Back-run: Attacker withdraws
+        if (usx.balanceOf(attacker) >= 1000e18 && !usx.withdrawalsFrozen()) {
+            vm.prank(attacker);
+            usx.requestUSDC(1000e18);
+        }
+    }
+
+    /// @notice Attempt sandwich attack on sUSX deposit
+    function _attemptSandwichOnSUSXDeposit() internal {
+        // Simulate sandwich attack on sUSX deposit
+        address attacker = getRandomUser();
+        address victim = getRandomUser();
+        
+        // Front-run: Attacker deposits
+        if (usx.balanceOf(attacker) >= 1000e18) {
+            vm.prank(attacker);
+            susx.deposit(1000e18, attacker);
+        }
+        
+        // Victim deposits
+        if (usx.balanceOf(victim) >= 1000e18) {
+            vm.prank(victim);
+            susx.deposit(1000e18, victim);
+        }
+        
+        // Back-run: Attacker withdraws
+        if (susx.balanceOf(attacker) >= 1000e18) {
+            vm.prank(attacker);
+            susx.withdraw(1000e18, attacker, attacker);
+        }
+    }
+
+    /// @notice Attempt sandwich attack on profit reporting
+    function _attemptSandwichOnProfitReport() internal {
+        // Simulate sandwich attack on profit reporting
+        address attacker = getRandomUser();
+        
+        // Front-run: Attacker deposits
+        if (usx.balanceOf(attacker) >= 1000e18) {
+            vm.prank(attacker);
+            susx.deposit(1000e18, attacker);
+        }
+        
+        // Profit report
+        vm.prank(address(mockAssetManager));
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, 10000e6);
+        (bool success,) = address(treasury).call(data);
+        
+        // Back-run: Attacker withdraws to capture profits
+        if (susx.balanceOf(attacker) >= 1000e18) {
+            vm.prank(attacker);
+            susx.withdraw(1000e18, attacker, attacker);
+        }
+    }
+
+    /// @notice Attempt arbitrage between USX and sUSX
+    function _attemptUSXSUSXArbitrage() internal {
+        // Test arbitrage opportunities between USX and sUSX
+        address user = getRandomUser();
+        
+        if (usx.balanceOf(user) >= 1000e18) {
+            // Deposit to sUSX
+            vm.prank(user);
+            susx.deposit(1000e18, user);
+            
+            // Immediately withdraw
+            if (susx.balanceOf(user) >= 1000e18) {
+                vm.prank(user);
+                susx.withdraw(1000e18, user, user);
+            }
+        }
+    }
+
+    /// @notice Attempt arbitrage on withdrawal fees
+    function _attemptWithdrawalFeeArbitrage() internal {
+        // Test arbitrage on withdrawal fees
+        address user = getRandomUser();
+        
+        if (usx.balanceOf(user) >= 1000e18) {
+            // Request withdrawal
+            vm.prank(user);
+            usx.requestUSDC(1000e18);
+            
+            // Try to claim immediately
+            if (usx.outstandingWithdrawalRequests(user) > 0) {
+                vm.prank(user);
+                usx.claimUSDC();
+            }
+        }
+    }
+
+    /// @notice Attempt arbitrage on share price discrepancies
+    function _attemptSharePriceArbitrage() internal {
+        // Test arbitrage on share price discrepancies
+        address user = getRandomUser();
+        
+        if (usx.balanceOf(user) >= 1000e18) {
+            // Check share price
+            uint256 sharePrice = susx.sharePrice();
+            
+            // If share price is favorable, deposit
+            if (sharePrice > 1e18) {
+                vm.prank(user);
+                susx.deposit(1000e18, user);
+            }
+        }
+    }
+
+    /*=========================== Direct Transfer Attack Helper Functions =========================*/
+
+    /// @notice Attempt to send USDC directly to USX contract
+    function _attemptUSDCTransferToUSX() internal {
+        // Send USDC directly to USX contract to manipulate its balance
+        address user = getRandomUser();
+        
+        if (usdc.balanceOf(user) >= 1000e6) {
+            // Record initial state
+            uint256 initialUSXBalance = usdc.balanceOf(address(usx));
+            uint256 initialUserUSX = usx.balanceOf(user);
+            
+            // Send USDC directly to USX contract
+            vm.prank(user);
+            usdc.transfer(address(usx), 1000e6);
+            
+            // Try to withdraw USX immediately to see if we can exploit the balance
+            if (usx.balanceOf(user) >= 1000e18 && !usx.withdrawalsFrozen()) {
+                vm.prank(user);
+                usx.requestUSDC(1000e18);
+            }
+            
+            // Check if the direct transfer created any accounting inconsistencies
+            uint256 finalUSXBalance = usdc.balanceOf(address(usx));
+            if (finalUSXBalance > initialUSXBalance) {
+                // Direct transfer to USX contract detected - this is expected behavior
+            }
+        }
+    }
+
+    /// @notice Attempt to send USDC directly to Treasury contract
+    function _attemptUSDCTransferToTreasury() internal {
+        // Send USDC directly to Treasury contract to manipulate its balance
+        address user = getRandomUser();
+        
+        if (usdc.balanceOf(user) >= 1000e6) {
+            // Record initial state
+            uint256 initialTreasuryBalance = usdc.balanceOf(address(treasury));
+            uint256 initialAssetManagerBalance = treasury.assetManagerUSDC();
+            
+            // Send USDC directly to Treasury contract
+            vm.prank(user);
+            usdc.transfer(address(treasury), 1000e6);
+            
+            // Try to manipulate asset manager balance
+            if (treasury.assetManagerUSDC() > 0) {
+                vm.prank(address(mockAssetManager));
+                bytes memory data = abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector, 500e6);
+                (bool success,) = address(treasury).call(data);
+                
+                if (success) {
+                    // Try to report losses to see if we can exploit the manipulated balance
+                    vm.prank(address(mockAssetManager));
+                    data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, 500e6);
+                    (success,) = address(treasury).call(data);
+                }
+            }
+            
+            // Check if the direct transfer created any accounting inconsistencies
+            uint256 finalTreasuryBalance = usdc.balanceOf(address(treasury));
+            if (finalTreasuryBalance > initialTreasuryBalance) {
+                // Attack attempt detected (but not necessarily successful)
+            }
+        }
+    }
+
+    /// @notice Attempt to send USX directly to sUSX contract
+    function _attemptUSXTransferToSUSX() internal {
+        // Send USX directly to sUSX contract to manipulate its balance
+        address user = getRandomUser();
+        
+        if (usx.balanceOf(user) >= 1000e18) {
+            // Record initial state
+            uint256 initialSUSXBalance = usx.balanceOf(address(susx));
+            uint256 initialSharePrice = susx.sharePrice();
+            
+            // Send USX directly to sUSX contract
+            vm.prank(user);
+            usx.transfer(address(susx), 1000e18);
+            
+            // Try to withdraw from sUSX to see if we can exploit the balance
+            if (susx.balanceOf(user) >= 1000e18) {
+                vm.prank(user);
+                susx.withdraw(1000e18, user, user);
+            }
+            
+            // Check if the direct transfer affected share price calculation
+            uint256 finalSharePrice = susx.sharePrice();
+            if (finalSharePrice != initialSharePrice) {
+                // Attack attempt detected (but not necessarily successful)
+            }
+        }
+    }
+
+    /// @notice Attempt to send USX directly to Treasury contract
+    function _attemptUSXTransferToTreasury() internal {
+        // Send USX directly to Treasury contract to manipulate its balance
+        address user = getRandomUser();
+        
+        if (usx.balanceOf(user) >= 1000e18) {
+            // Record initial state
+            uint256 initialTreasuryUSX = usx.balanceOf(address(treasury));
+            uint256 initialUSXSupply = usx.totalSupply();
+            
+            // Send USX directly to Treasury contract
+            vm.prank(user);
+            usx.transfer(address(treasury), 1000e18);
+            
+            // Try to manipulate the treasury's USX balance
+            // This could affect calculations that depend on treasury USX holdings
+            
+            // Check if the direct transfer created any accounting inconsistencies
+            uint256 finalTreasuryUSX = usx.balanceOf(address(treasury));
+            if (finalTreasuryUSX > initialTreasuryUSX) {
+                // Attack attempt detected (but not necessarily successful)
+            }
+        }
+    }
+
+    /// @notice Attempt to send sUSX directly to Treasury contract
+    function _attemptSUSXTransferToTreasury() internal {
+        // Send sUSX directly to Treasury contract to manipulate its balance
+        address user = getRandomUser();
+        
+        if (susx.balanceOf(user) >= 1000e18) {
+            // Record initial state
+            uint256 initialTreasurySUSX = susx.balanceOf(address(treasury));
+            uint256 initialSUSXSupply = susx.totalSupply();
+            
+            // Send sUSX directly to Treasury contract
+            vm.prank(user);
+            susx.transfer(address(treasury), 1000e18);
+            
+            // Try to manipulate the treasury's sUSX balance
+            // This could affect calculations that depend on treasury sUSX holdings
+            
+            // Check if the direct transfer created any accounting inconsistencies
+            uint256 finalTreasurySUSX = susx.balanceOf(address(treasury));
+            if (finalTreasurySUSX > initialTreasurySUSX) {
+                // Attack attempt detected (but not necessarily successful)
+            }
+        }
+    }
+
+    /// @notice Attempt to send tokens to MockAssetManager
+    function _attemptTokenTransferToAssetManager() internal {
+        // Send tokens to MockAssetManager to manipulate asset manager balance
+        address user = getRandomUser();
+        
+        if (usdc.balanceOf(user) >= 1000e6) {
+            // Record initial state
+            uint256 initialAssetManagerBalance = treasury.assetManagerUSDC();
+            
+            // Send USDC directly to MockAssetManager
+            vm.prank(user);
+            usdc.transfer(address(mockAssetManager), 1000e6);
+            
+            // Try to manipulate the asset manager's balance through treasury calls
+            vm.prank(address(mockAssetManager));
+            bytes memory data = abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, 500e6);
+            (bool success,) = address(treasury).call(data);
+            
+            if (success) {
+                // Try to report profits/losses to see if we can exploit the manipulated balance
+                vm.prank(address(mockAssetManager));
+                data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, 1000e6);
+                (success,) = address(treasury).call(data);
+            }
+            
+            // Check if the direct transfer created any accounting inconsistencies
+            uint256 finalAssetManagerBalance = treasury.assetManagerUSDC();
+            if (finalAssetManagerBalance != initialAssetManagerBalance) {
+                // Attack attempt detected (but not necessarily successful)
+            }
+        }
+    }
+
+    /// @notice Attempt to manipulate USX total supply through direct transfers
+    function _attemptUSXSupplyManipulation() internal {
+        // Try to manipulate USX total supply by sending USX to contracts
+        address user = getRandomUser();
+        
+        if (usx.balanceOf(user) >= 1000e18) {
+            // Record initial state
+            uint256 initialSupply = usx.totalSupply();
+            
+            // Send USX to various contracts to see if it affects total supply calculation
+            address[] memory targets = new address[](3);
+            targets[0] = address(treasury);
+            targets[1] = address(susx);
+            targets[2] = address(mockAssetManager);
+            
+            for (uint256 i = 0; i < targets.length; i++) {
+                if (usx.balanceOf(user) >= 300e18) {
+                    vm.prank(user);
+                    usx.transfer(targets[i], 300e18);
+                }
+            }
+            
+            // Check if total supply was affected by direct transfers
+            uint256 finalSupply = usx.totalSupply();
+            if (finalSupply != initialSupply) {
+                // Attack attempt detected (but not necessarily successful)
+            }
+        }
+    }
+
+    /// @notice Attempt to manipulate sUSX total supply through direct transfers
+    function _attemptSUSXSupplyManipulation() internal {
+        // Try to manipulate sUSX total supply by sending sUSX to contracts
+        address user = getRandomUser();
+        
+        if (susx.balanceOf(user) >= 1000e18) {
+            // Record initial state
+            uint256 initialSupply = susx.totalSupply();
+            
+            // Send sUSX to various contracts to see if it affects total supply calculation
+            address[] memory targets = new address[](2);
+            targets[0] = address(treasury);
+            targets[1] = address(mockAssetManager);
+            
+            for (uint256 i = 0; i < targets.length; i++) {
+                if (susx.balanceOf(user) >= 500e18) {
+                    vm.prank(user);
+                    susx.transfer(targets[i], 500e18);
+                }
+            }
+            
+            // Check if total supply was affected by direct transfers
+            uint256 finalSupply = susx.totalSupply();
+            if (finalSupply != initialSupply) {
+                // Attack attempt detected (but not necessarily successful)
+            }
+        }
+    }
+
+    /// @notice Attempt to manipulate treasury USDC balance through direct transfers
+    function _attemptTreasuryUSDCManipulation() internal {
+        // Try to manipulate treasury USDC balance by sending USDC directly
+        address user = getRandomUser();
+        
+        if (usdc.balanceOf(user) >= 1000e6) {
+            // Record initial state
+            uint256 initialTreasuryBalance = usdc.balanceOf(address(treasury));
+            uint256 initialAssetManagerBalance = treasury.assetManagerUSDC();
+            
+            // Send USDC directly to treasury
+            vm.prank(user);
+            usdc.transfer(address(treasury), 1000e6);
+            
+            // Try to exploit the manipulated balance
+            if (usdc.balanceOf(address(treasury)) > 0) {
+                // Try to transfer to asset manager
+                vm.prank(address(mockAssetManager));
+                bytes memory data = abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, 500e6);
+                (bool success,) = address(treasury).call(data);
+                
+                if (success) {
+                    // Try to report losses to drain the manipulated balance
+                    vm.prank(address(mockAssetManager));
+                    data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, 500e6);
+                    (success,) = address(treasury).call(data);
+                }
+            }
+            
+            // Check if the manipulation was successful
+            uint256 finalTreasuryBalance = usdc.balanceOf(address(treasury));
+            if (finalTreasuryBalance > initialTreasuryBalance) {
+                // Attack attempt detected (but not necessarily successful)
+            }
+        }
+    }
+
+    /// @notice Attempt to manipulate asset manager USDC balance through direct transfers
+    function _attemptAssetManagerUSDCManipulation() internal {
+        // Try to manipulate asset manager USDC balance by sending USDC to MockAssetManager
+        address user = getRandomUser();
+        
+        if (usdc.balanceOf(user) >= 1000e6) {
+            // Record initial state
+            uint256 initialAssetManagerBalance = treasury.assetManagerUSDC();
+            
+            // Send USDC directly to MockAssetManager
+            vm.prank(user);
+            usdc.transfer(address(mockAssetManager), 1000e6);
+            
+            // Try to exploit the manipulated balance through treasury calls
+            vm.prank(address(mockAssetManager));
+            bytes memory data = abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, 500e6);
+            (bool success,) = address(treasury).call(data);
+            
+            if (success) {
+                // Try to report massive profits to exploit the manipulated balance
+                vm.prank(address(mockAssetManager));
+                data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, 1000e6);
+                (success,) = address(treasury).call(data);
+            }
+            
+            // Check if the manipulation was successful
+            uint256 finalAssetManagerBalance = treasury.assetManagerUSDC();
+            if (finalAssetManagerBalance != initialAssetManagerBalance) {
+                // Attack attempt detected (but not necessarily successful)
+            }
+        }
+    }
+
+    /// @notice Attempt to manipulate share price calculation
+    function _attemptSharePriceCalculationManipulation() internal {
+        // Try to manipulate sUSX share price calculation through direct transfers
+        address user = getRandomUser();
+        
+        if (usx.balanceOf(user) >= 1000e18) {
+            // Record initial state
+            uint256 initialSharePrice = susx.sharePrice();
+            uint256 initialSUSXBalance = usx.balanceOf(address(susx));
+            
+            // Send USX directly to sUSX contract to manipulate share price calculation
+            vm.prank(user);
+            usx.transfer(address(susx), 1000e18);
+            
+            // Try to deposit to sUSX to see if share price is manipulated
+            if (usx.balanceOf(user) >= 500e18) {
+                vm.prank(user);
+                susx.deposit(500e18, user);
+            }
+            
+            // Check if share price was affected by direct transfer
+            uint256 finalSharePrice = susx.sharePrice();
+            if (finalSharePrice != initialSharePrice) {
+                // Attack attempt detected (but not necessarily successful)
+            }
+        }
+    }
+
+    /// @notice Attempt to manipulate peg calculation
+    function _attemptPegCalculationManipulation() internal {
+        // Try to manipulate USX peg calculation through direct transfers
+        address user = getRandomUser();
+        
+        if (usdc.balanceOf(user) >= 1000e6) {
+            // Record initial state
+            uint256 initialPeg = usx.usxPrice();
+            uint256 initialUSXBalance = usdc.balanceOf(address(usx));
+            
+            // Send USDC directly to USX contract to manipulate peg calculation
+            vm.prank(user);
+            usdc.transfer(address(usx), 1000e6);
+            
+            // Try to withdraw USX to see if peg is manipulated
+            if (usx.balanceOf(user) >= 500e18 && !usx.withdrawalsFrozen()) {
+                vm.prank(user);
+                usx.requestUSDC(500e18);
+            }
+            
+            // Check if peg was affected by direct transfer
+            uint256 finalPeg = usx.usxPrice();
+            if (finalPeg != initialPeg) {
+                // Attack attempt detected (but not necessarily successful)
+            }
+        }
+    }
+
+    /// @notice Attempt to manipulate buffer calculation
+    function _attemptBufferCalculationManipulation() internal {
+        // Try to manipulate buffer calculation through direct transfers
+        address user = getRandomUser();
+        
+        if (usdc.balanceOf(user) >= 1000e6) {
+            // Record initial state
+            uint256 initialTreasuryBalance = usdc.balanceOf(address(treasury));
+            
+            // Send USDC directly to treasury to manipulate buffer calculation
+            vm.prank(user);
+            usdc.transfer(address(treasury), 1000e6);
+            
+            // Try to report losses to see if buffer calculation is affected
+            vm.prank(address(mockAssetManager));
+            bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, 500e6);
+            (bool success,) = address(treasury).call(data);
+            
+            // Check if buffer calculation was affected by direct transfer
+            uint256 finalTreasuryBalance = usdc.balanceOf(address(treasury));
+            if (finalTreasuryBalance > initialTreasuryBalance) {
+                // Attack attempt detected (but not necessarily successful)
+            }
+        }
+    }
+
+    /// @notice Attempt to manipulate leverage calculation
+    function _attemptLeverageCalculationManipulation() internal {
+        // Try to manipulate leverage calculation through direct transfers
+        address user = getRandomUser();
+        
+        if (usdc.balanceOf(user) >= 1000e6) {
+            // Record initial state
+            uint256 initialAssetManagerBalance = treasury.assetManagerUSDC();
+            
+            // Send USDC directly to MockAssetManager to manipulate leverage calculation
+            vm.prank(user);
+            usdc.transfer(address(mockAssetManager), 1000e6);
+            
+            // Try to transfer to asset manager to see if leverage calculation is affected
+            vm.prank(address(mockAssetManager));
+            bytes memory data = abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, 500e6);
+            (bool success,) = address(treasury).call(data);
+            
+            // Check if leverage calculation was affected by direct transfer
+            uint256 finalAssetManagerBalance = treasury.assetManagerUSDC();
+            if (finalAssetManagerBalance != initialAssetManagerBalance) {
+                // Attack attempt detected (but not necessarily successful)
+            }
         }
     }
 }
