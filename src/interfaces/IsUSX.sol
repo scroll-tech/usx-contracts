@@ -23,4 +23,9 @@ interface IsUSX {
 
     // Epoch management
     function updateLastEpochBlock() external;
+
+    // Deposit freezing functions
+    function freezeDeposits() external;
+    function unfreeze() external;
+    function depositsFrozen() external view returns (bool);
 }

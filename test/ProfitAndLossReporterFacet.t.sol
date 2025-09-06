@@ -5,6 +5,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
 import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
+import {InsuranceBufferFacet} from "../src/facets/InsuranceBufferFacet.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // TODO: Test profit/loss report with 0 value
@@ -295,6 +296,203 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
 
         // Should revert due to zero value change
         assertFalse(success);
+    }
+
+    function test_reportLosses_stage2_freezes_susx_deposits() public {
+        // Test that reportLosses freezes sUSX deposits when vault USX is burned (Stage 2)
+
+        // Setup: Create a scenario where losses exceed insurance buffer but not vault
+        uint256 initialBalance = 5000e6; // 5,000 USDC
+        uint256 lossAmount = 2000e6; // 2,000 USDC loss
+        uint256 finalBalance = initialBalance - lossAmount;
+
+        // Give treasury some USDC and set initial asset manager balance
+        deal(address(usdc), address(treasury), 5000e6);
+
+        // Give sUSX vault some USX to allow leverage
+        vm.prank(address(treasury));
+        usx.mintUSX(address(susx), 1000e18); // 1000 USX in vault
+
+        vm.prank(address(mockAssetManager));
+        bytes memory transferData =
+            abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, initialBalance);
+        (bool transferSuccess,) = address(treasury).call(transferData);
+        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+
+        // Give sUSX vault some USX to burn
+        uint256 vaultUSX = 2000e18; // 2,000 USX in vault (more than enough)
+        vm.prank(address(treasury));
+        usx.mintUSX(address(susx), vaultUSX);
+
+        // Give insurance buffer some USX (small amount, so losses exceed buffer)
+        uint256 bufferUSX = 100e18; // Small buffer
+        vm.prank(address(treasury));
+        usx.mintUSX(address(treasury), bufferUSX);
+        vm.prank(address(treasury));
+        bytes memory topUpBufferData = abi.encodeWithSelector(InsuranceBufferFacet.topUpBuffer.selector, 100e6);
+        (bool topUpSuccess,) = address(treasury).call(topUpBufferData);
+        require(topUpSuccess, "topUpBuffer should succeed");
+
+        // Verify initial state
+        assertFalse(susx.depositsFrozen(), "sUSX deposits should not be frozen initially");
+        assertFalse(usx.frozen(), "USX should not be frozen initially");
+
+        // Report losses that exceed buffer but not vault
+        vm.prank(address(mockAssetManager));
+        bytes memory reportLossesData =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, finalBalance);
+        (bool reportSuccess,) = address(treasury).call(reportLossesData);
+        require(reportSuccess, "reportLosses should succeed");
+
+        // Verify sUSX deposits are frozen (Stage 2)
+        assertTrue(susx.depositsFrozen(), "sUSX deposits should be frozen after Stage 2");
+
+        // Verify USX is not frozen yet (Stage 3 not reached)
+        assertFalse(usx.frozen(), "USX should not be frozen after Stage 2");
+    }
+
+    function test_reportLosses_stage3_freezes_usx_deposits_and_withdrawals() public {
+        // Test that reportLosses freezes USX deposits and withdrawals when stage 3 is reached
+
+        // Setup: Create a scenario where losses exceed both buffer and vault
+        uint256 initialBalance = 5000e6; // 5,000 USDC
+        uint256 lossAmount = 3500e6; // 3,500 USDC loss (exceeds both buffer and vault)
+        uint256 finalBalance = initialBalance - lossAmount;
+
+        // Give treasury some USDC and set initial asset manager balance
+        deal(address(usdc), address(treasury), 5000e6);
+
+        // Give sUSX vault some USX to allow leverage
+        vm.prank(address(treasury));
+        usx.mintUSX(address(susx), 1000e18); // 1000 USX in vault
+
+        vm.prank(address(mockAssetManager));
+        bytes memory transferData =
+            abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, initialBalance);
+        (bool transferSuccess,) = address(treasury).call(transferData);
+        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+
+        // Give sUSX vault some USX to burn (but not all)
+        uint256 vaultUSX = 1500e18; // 1,500 USX in vault
+        vm.prank(address(treasury));
+        usx.mintUSX(address(susx), vaultUSX);
+
+        // Give insurance buffer some USX (small amount, so losses exceed buffer)
+        uint256 bufferUSX = 200e18; // Small buffer
+        vm.prank(address(treasury));
+        usx.mintUSX(address(treasury), bufferUSX);
+        vm.prank(address(treasury));
+        bytes memory topUpBufferData = abi.encodeWithSelector(InsuranceBufferFacet.topUpBuffer.selector, 200e6);
+        (bool topUpSuccess,) = address(treasury).call(topUpBufferData);
+        require(topUpSuccess, "topUpBuffer should succeed");
+
+        // Give users some USX to keep in circulation (realistic scenario)
+        uint256 userUSX = 1000e18; // 1,000 USX in user wallets
+        vm.prank(address(treasury));
+        usx.mintUSX(user, userUSX);
+
+        // Verify initial state
+        assertFalse(susx.depositsFrozen(), "sUSX deposits should not be frozen initially");
+        assertFalse(usx.frozen(), "USX should not be frozen initially");
+
+        // Report losses that exceed both buffer and vault
+        vm.prank(address(mockAssetManager));
+        bytes memory reportLossesData =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, finalBalance);
+        (bool reportSuccess,) = address(treasury).call(reportLossesData);
+        require(reportSuccess, "reportLosses should succeed");
+
+        // Verify sUSX deposits are frozen (Stage 2)
+        assertTrue(susx.depositsFrozen(), "sUSX deposits should be frozen after Stage 2");
+
+        // Verify USX deposits and withdrawals are frozen (Stage 3)
+        assertTrue(usx.frozen(), "USX should be frozen after Stage 3");
+
+        // Verify some USX remains in circulation (realistic scenario)
+        uint256 remainingSupply = usx.totalSupply();
+        assertTrue(remainingSupply > 0, "Some USX should remain in circulation");
+        assertTrue(remainingSupply >= userUSX, "User USX should remain untouched");
+    }
+
+    function test_reportLosses_stage1_no_freezing() public {
+        // Test that reportLosses doesn't freeze anything when losses are covered by insurance buffer
+
+        // Setup: Create a scenario where losses are fully covered by insurance buffer
+        uint256 initialBalance = 2000e6; // 2,000 USDC
+        uint256 lossAmount = 500e6; // 500 USDC loss (covered by buffer)
+        uint256 finalBalance = initialBalance - lossAmount;
+
+        // Give treasury some USDC and set initial asset manager balance
+        deal(address(usdc), address(treasury), 5000e6);
+
+        // Give sUSX vault some USX to allow leverage
+        vm.prank(address(treasury));
+        usx.mintUSX(address(susx), 1000e18); // 1000 USX in vault
+
+        vm.prank(address(mockAssetManager));
+        bytes memory transferData =
+            abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, initialBalance);
+        (bool transferSuccess,) = address(treasury).call(transferData);
+        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+
+        // Give insurance buffer enough USX to cover losses
+        uint256 bufferUSX = 1000e18; // Large buffer
+        vm.prank(address(treasury));
+        usx.mintUSX(address(treasury), bufferUSX);
+        vm.prank(address(treasury));
+        bytes memory topUpBufferData = abi.encodeWithSelector(InsuranceBufferFacet.topUpBuffer.selector, 1000e6);
+        (bool topUpSuccess,) = address(treasury).call(topUpBufferData);
+        require(topUpSuccess, "topUpBuffer should succeed");
+
+        // Verify initial state
+        assertFalse(susx.depositsFrozen(), "sUSX deposits should not be frozen initially");
+        assertFalse(usx.frozen(), "USX should not be frozen initially");
+
+        // Report losses that are covered by buffer
+        vm.prank(address(mockAssetManager));
+        bytes memory reportLossesData =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, finalBalance);
+        (bool reportSuccess,) = address(treasury).call(reportLossesData);
+        require(reportSuccess, "reportLosses should succeed");
+
+        // Verify nothing is frozen (Stage 1 only)
+        assertFalse(susx.depositsFrozen(), "sUSX deposits should not be frozen after Stage 1");
+        assertFalse(usx.frozen(), "USX should not be frozen after Stage 1");
+    }
+
+    function test_reportLosses_edge_case_zero_losses() public {
+        // Test reportLosses with zero losses (no freezing should occur)
+
+        uint256 initialBalance = 2000e6; // 2,000 USDC
+        uint256 finalBalance = initialBalance; // No losses
+
+        // Give treasury some USDC and set initial asset manager balance
+        deal(address(usdc), address(treasury), 5000e6);
+
+        // Give sUSX vault some USX to allow leverage
+        vm.prank(address(treasury));
+        usx.mintUSX(address(susx), 1000e18); // 1000 USX in vault
+
+        vm.prank(address(mockAssetManager));
+        bytes memory transferData =
+            abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, initialBalance);
+        (bool transferSuccess,) = address(treasury).call(transferData);
+        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+
+        // Verify initial state
+        assertFalse(susx.depositsFrozen(), "sUSX deposits should not be frozen initially");
+        assertFalse(usx.frozen(), "USX should not be frozen initially");
+
+        // Report zero losses
+        vm.prank(address(mockAssetManager));
+        bytes memory reportLossesData =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, finalBalance);
+        (bool reportSuccess,) = address(treasury).call(reportLossesData);
+        require(reportSuccess, "reportLosses should succeed");
+
+        // Verify nothing is frozen
+        assertFalse(susx.depositsFrozen(), "sUSX deposits should not be frozen with zero losses");
+        assertFalse(usx.frozen(), "USX should not be frozen with zero losses");
     }
 
     /*=========================== Governance Function Tests =========================*/

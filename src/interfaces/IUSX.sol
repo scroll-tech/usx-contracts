@@ -16,11 +16,11 @@ interface IUSX {
     function mintUSX(address to, uint256 amount) external;
     function burnUSX(address from, uint256 amount) external;
     function updatePeg(uint256 newPeg) external;
-    function freezeWithdrawals() external;
-    function unfreezeWithdrawals() external;
+    function freeze() external;
+    function unfreeze() external;
 
     // State getters
     function usxPrice() external view returns (uint256);
-    function withdrawalsFrozen() external view returns (bool);
+    function frozen() external view returns (bool);
     function governanceWarchest() external view returns (address);
 }

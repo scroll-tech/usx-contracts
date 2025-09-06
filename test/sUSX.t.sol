@@ -732,4 +732,114 @@ contract sUSXTest is LocalDeployTestSetup {
 
         assertEq(assets, 0, "Should return 0 assets for zero withdrawal");
     }
+
+    /*=========================== Deposit Freezing Tests =========================*/
+
+    function test_freezeDeposits_success() public {
+        // Test freezeDeposits through treasury (full flow)
+        // Since freezeDeposits is onlyTreasury, we need to impersonate treasury
+
+        bool initialFreezeState = susx.depositsFrozen();
+        assertFalse(initialFreezeState, "Deposits should not be frozen initially");
+
+        // Impersonate the treasury to call freezeDeposits
+        vm.prank(address(treasury));
+        susx.freezeDeposits();
+
+        bool finalFreezeState = susx.depositsFrozen();
+        assertTrue(finalFreezeState, "Deposits should be frozen");
+
+        // Test that frozen deposits prevent deposits
+        // Give user USX and approve sUSX to spend it
+        vm.prank(address(treasury));
+        usx.mintUSX(user, 1000e18);
+        vm.prank(user);
+        usx.approve(address(susx), 100e18);
+
+        vm.prank(user);
+        vm.expectRevert(sUSX.DepositsFrozen.selector);
+        susx.deposit(100e18, user);
+    }
+
+    function test_freezeDeposits_revert_not_treasury() public {
+        vm.prank(user);
+        vm.expectRevert(sUSX.NotTreasury.selector);
+        susx.freezeDeposits();
+    }
+
+    function test_unfreeze_success() public {
+        // Test unfreeze through governance (full flow)
+        // Since unfreeze is onlyGovernance, we need to impersonate governance
+
+        // First freeze deposits
+        vm.prank(address(treasury));
+        susx.freezeDeposits();
+        assertTrue(susx.depositsFrozen(), "Deposits should be frozen");
+
+        // Then unfreeze deposits
+        vm.prank(governance);
+        susx.unfreeze();
+
+        bool finalFreezeState = susx.depositsFrozen();
+        assertFalse(finalFreezeState, "Deposits should be unfrozen");
+
+        // Test that unfrozen deposits allow deposits
+        // Give user USX and approve sUSX to spend it
+        vm.prank(address(treasury));
+        usx.mintUSX(user, 1000e18);
+        vm.prank(user);
+        usx.approve(address(susx), 100e18);
+
+        vm.prank(user);
+        susx.deposit(100e18, user);
+        // Should not revert
+    }
+
+    function test_unfreeze_revert_not_governance() public {
+        vm.prank(user);
+        vm.expectRevert(sUSX.NotGovernance.selector);
+        susx.unfreeze();
+    }
+
+    function test_depositsFrozen_view() public {
+        // Test depositsFrozen view function
+        assertFalse(susx.depositsFrozen(), "Deposits should not be frozen initially");
+
+        // Freeze deposits
+        vm.prank(address(treasury));
+        susx.freezeDeposits();
+
+        assertTrue(susx.depositsFrozen(), "Deposits should be frozen");
+    }
+
+    function test_deposit_revert_when_frozen() public {
+        // Test that deposits revert when frozen
+        vm.prank(address(treasury));
+        susx.freezeDeposits();
+
+        // Give user USX and approve sUSX to spend it
+        vm.prank(address(treasury));
+        usx.mintUSX(user, 1000e18);
+        vm.prank(user);
+        usx.approve(address(susx), 100e18);
+
+        vm.prank(user);
+        vm.expectRevert(sUSX.DepositsFrozen.selector);
+        susx.deposit(100e18, user);
+    }
+
+    function test_deposit_success_when_unfrozen() public {
+        // Test that deposits work when unfrozen
+        assertFalse(susx.depositsFrozen(), "Deposits should not be frozen initially");
+
+        // Give user USX and approve sUSX to spend it
+        vm.prank(address(treasury));
+        usx.mintUSX(user, 1000e18);
+        vm.prank(user);
+        usx.approve(address(susx), 100e18);
+
+        vm.prank(user);
+        susx.deposit(100e18, user);
+        // Should not revert
+    }
 }

@@ -192,11 +192,11 @@ contract USXTest is LocalDeployTestSetup {
 
         // Freeze withdrawals
         vm.prank(address(treasury));
-        usx.freezeWithdrawals();
+        usx.freeze();
 
         // Try to request USDC withdrawal while frozen
         vm.prank(user);
-        vm.expectRevert(USX.WithdrawalsFrozen.selector);
+        vm.expectRevert(USX.Frozen.selector);
         usx.requestUSDC(50e18);
 
         // Verify no withdrawal request was recorded
@@ -380,47 +380,21 @@ contract USXTest is LocalDeployTestSetup {
         usx.updatePeg(2e18);
     }
 
-    function test_freezeWithdrawals_success() public {
-        // Test freezeWithdrawals through the treasury (full flow)
-        // Since freezeWithdrawals is onlyTreasury, we need to impersonate the treasury
+    function test_unfreeze_success() public {
+        // Test unfreeze through governance (full flow)
+        // Since unfreeze is onlyGovernance, we need to impersonate governance
 
-        bool initialFreezeState = usx.withdrawalsFrozen();
-        assertFalse(initialFreezeState, "Withdrawals should not be frozen initially");
-
-        // Impersonate the treasury to call freezeWithdrawals
+        // First freeze both deposits and withdrawals
         vm.prank(address(treasury));
-        usx.freezeWithdrawals();
+        usx.freeze();
+        assertTrue(usx.frozen(), "Contract should be frozen");
 
-        bool finalFreezeState = usx.withdrawalsFrozen();
-        assertTrue(finalFreezeState, "Withdrawals should be frozen");
-
-        // Test that frozen withdrawals prevent withdrawal requests
-        vm.prank(user);
-        vm.expectRevert(USX.WithdrawalsFrozen.selector);
-        usx.requestUSDC(100e18);
-    }
-
-    function test_freezeWithdrawals_revert_not_treasury() public {
-        vm.prank(user);
-        vm.expectRevert(USX.NotTreasury.selector);
-        usx.freezeWithdrawals();
-    }
-
-    function test_unfreezeWithdrawals_success() public {
-        // Test unfreezeWithdrawals through governance (full flow)
-        // Since unfreezeWithdrawals is onlyGovernance, we need to impersonate governance
-
-        // First freeze withdrawals
-        vm.prank(address(treasury));
-        usx.freezeWithdrawals();
-        assertTrue(usx.withdrawalsFrozen(), "Withdrawals should be frozen");
-
-        // Then unfreeze withdrawals
+        // Then unfreeze both deposits and withdrawals
         vm.prank(governanceWarchest);
-        usx.unfreezeWithdrawals();
+        usx.unfreeze();
 
-        bool finalFreezeState = usx.withdrawalsFrozen();
-        assertFalse(finalFreezeState, "Withdrawals should be unfrozen");
+        bool finalFreezeState = usx.frozen();
+        assertFalse(finalFreezeState, "Contract should be unfrozen");
 
         // Test that unfrozen withdrawals allow withdrawal requests
         // First give the user some USX to request withdrawal for
@@ -433,10 +407,52 @@ contract USXTest is LocalDeployTestSetup {
         // Should not revert
     }
 
-    function test_unfreezeWithdrawals_revert_not_governance() public {
+    function test_unfreeze_revert_not_governance() public {
         vm.prank(user);
         vm.expectRevert(USX.NotGovernance.selector);
-        usx.unfreezeWithdrawals();
+        usx.unfreeze();
+    }
+
+    function test_freeze_success() public {
+        // Test freeze through treasury (full flow)
+        // Since freeze is onlyTreasury, we need to impersonate treasury
+
+        bool initialFreezeState = usx.frozen();
+        assertFalse(initialFreezeState, "Contract should not be frozen initially");
+
+        // Impersonate the treasury to call freeze
+        vm.prank(address(treasury));
+        usx.freeze();
+
+        bool finalFreezeState = usx.frozen();
+        assertTrue(finalFreezeState, "Contract should be frozen");
+
+        // Test that frozen state prevents deposits
+        vm.prank(user);
+        vm.expectRevert(USX.Frozen.selector);
+        usx.deposit(100e6);
+
+        // Test that frozen state prevents withdrawals
+        vm.prank(user);
+        vm.expectRevert(USX.Frozen.selector);
+        usx.requestUSDC(100e18);
+    }
+
+    function test_freeze_revert_not_treasury() public {
+        vm.prank(user);
+        vm.expectRevert(USX.NotTreasury.selector);
+        usx.freeze();
+    }
+
+    function test_frozen_view() public {
+        // Test frozen view function
+        assertFalse(usx.frozen(), "Contract should not be frozen initially");
+
+        // Freeze contract
+        vm.prank(address(treasury));
+        usx.freeze();
+
+        assertTrue(usx.frozen(), "Contract should be frozen");
     }
 
     /*=========================== Admin Function Tests =========================*/

@@ -95,10 +95,13 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         if (remainingLossesAfterInsuranceBuffer > 0) {
             uint256 remainingLossesAfterVault = _distributeLosses(remainingLossesAfterInsuranceBuffer);
 
-            // 3. Finally if neither of these cover the losses, update the peg to adjust the USX:USDC ratio and freeze withdrawal temporarily
+            // Freeze sUSX vault deposits when vault USX is burned
+            $.sUSX.freezeDeposits();
+
+            // 3. Finally if neither of these cover the losses, update the peg to adjust the USX:USDC ratio and freeze both deposits and withdrawals
             if (remainingLossesAfterVault > 0) {
                 _updatePeg();
-                $.USX.freezeWithdrawals();
+                $.USX.freeze();
             }
         }
     }

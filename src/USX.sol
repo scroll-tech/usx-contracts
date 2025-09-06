@@ -17,6 +17,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     error NotTreasury();
     error UserNotWhitelisted();
     error WithdrawalsFrozen();
+    error Frozen();
     error NoOutstandingWithdrawalRequests();
     error InsufficientUSDC();
     error TreasuryAlreadySet();
@@ -50,7 +51,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     struct USXStorage {
         IERC20 USDC;
         ITreasury treasury;
-        bool withdrawalsFrozen;
+        bool frozen;
         address governanceWarchest;
         address admin;
         uint256 totalOutstandingWithdrawalAmount;
@@ -113,6 +114,9 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         // Check if user is whitelisted
         if (!$.whitelistedUsers[msg.sender]) revert UserNotWhitelisted();
 
+        // Check if contract is frozen
+        if ($.frozen) revert Frozen();
+
         // Calculate USDC distribution: keep what's needed for withdrawal requests, send excess to treasury
         uint256 usdcForContract =
             _amount <= $.totalOutstandingWithdrawalAmount ? _amount : $.totalOutstandingWithdrawalAmount;
@@ -140,7 +144,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         USXStorage storage $ = _getStorage();
 
         // Check if withdrawals are frozen
-        if ($.withdrawalsFrozen) revert WithdrawalsFrozen();
+        if ($.frozen) revert Frozen();
 
         // Check the USX price to determine how much USDC the user will receive
         // For 1:1 exchange rate: 1 USX = 1 USDC
@@ -180,10 +184,10 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
 
     /*=========================== Governance Functions =========================*/
 
-    /// @notice Unfreeze withdrawals, allowing users to withdraw again
-    function unfreezeWithdrawals() public onlyGovernance {
+    /// @notice Unfreeze deposits and withdrawals, allowing users to deposit and withdraw again
+    function unfreeze() public onlyGovernance {
         USXStorage storage $ = _getStorage();
-        $.withdrawalsFrozen = false;
+        $.frozen = false;
     }
 
     /// @notice Set new governance address
@@ -235,11 +239,11 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         $.usxPrice = newPeg;
     }
 
-    /// @notice Freeze withdrawals, preventing users from redeeming USX
-    /// @dev Used by Treasury to freeze withdrawals when peg is broken
-    function freezeWithdrawals() public onlyTreasury {
+    /// @notice Freeze deposits and withdrawals, preventing users from depositing and redeeming USX
+    /// @dev Used by Treasury to freeze operations when peg is broken
+    function freeze() public onlyTreasury {
         USXStorage storage $ = _getStorage();
-        $.withdrawalsFrozen = true;
+        $.frozen = true;
     }
 
     /*=========================== UUPS Functions =========================*/
@@ -258,8 +262,8 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         return _getStorage().treasury;
     }
 
-    function withdrawalsFrozen() public view returns (bool) {
-        return _getStorage().withdrawalsFrozen;
+    function frozen() public view returns (bool) {
+        return _getStorage().frozen;
     }
 
     function governanceWarchest() public view returns (address) {

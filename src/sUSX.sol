@@ -26,6 +26,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     error InvalidWithdrawalFeeFraction();
     error TreasuryAlreadySet();
     error USXTransferFailed();
+    error DepositsFrozen();
 
     /*=========================== Events =========================*/
 
@@ -58,6 +59,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         uint256 lastEpochBlock; // block number of the last epoch
         uint256 withdrawalIdCounter;
         uint256 epochDuration; //  duration of epoch in blocks, (default == 216000 (30days))
+        bool depositsFrozen; // true = deposits are frozen, false = deposits are allowed
         mapping(uint256 => WithdrawalRequest) withdrawalRequests;
     }
 
@@ -222,6 +224,12 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         emit GovernanceTransferred(oldGovernance, newGovernance);
     }
 
+    /// @notice Unfreeze deposits, allowing users to deposit again
+    function unfreeze() external onlyGovernance {
+        SUSXStorage storage $ = _getStorage();
+        $.depositsFrozen = false;
+    }
+
     /*=========================== Treasury Functions =========================*/
 
     /// @notice Updates lastEpochBlock to the current block number
@@ -233,7 +241,25 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         emit EpochAdvanced(oldEpochBlock, block.number);
     }
 
+    /// @notice Freeze deposits, preventing users from depositing USX
+    /// @dev Used by Treasury to freeze deposits if a loss is reported that is large enough to exceed Insurance Buffer and burn USX in sUSX vault
+    function freezeDeposits() external onlyTreasury {
+        SUSXStorage storage $ = _getStorage();
+        $.depositsFrozen = true;
+    }
+
     /*=========================== Internal Functions =========================*/
+
+    /// @dev Override default ERC4626 to check if deposits are frozen
+    function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
+        SUSXStorage storage $ = _getStorage();
+
+        // Check if deposits are frozen
+        if ($.depositsFrozen) revert DepositsFrozen();
+
+        // Call parent implementation
+        super._deposit(caller, receiver, assets, shares);
+    }
 
     /// @dev User must wait for withdrawalPeriod to pass before unstaking (withdrawalPeriod)
     /// @dev Override default ERC4626 for the 2 step withdrawal process in protocol
@@ -310,5 +336,9 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
     function withdrawalRequests(uint256 id) public view returns (WithdrawalRequest memory) {
         return _getStorage().withdrawalRequests[id];
+    }
+
+    function depositsFrozen() public view returns (bool) {
+        return _getStorage().depositsFrozen;
     }
 }

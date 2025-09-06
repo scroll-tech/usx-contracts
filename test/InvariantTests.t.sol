@@ -55,7 +55,7 @@ contract InvariantTests is LocalDeployTestSetup {
         // Initialize state tracking
         previousTotalSupply = usx.totalSupply();
         previousPegPrice = usx.usxPrice();
-        previousWithdrawalsFrozen = usx.withdrawalsFrozen();
+        previousWithdrawalsFrozen = usx.frozen();
     }
 
     function _setupTestUsers() internal {
@@ -306,7 +306,7 @@ contract InvariantTests is LocalDeployTestSetup {
         address randomUser = getRandomUser();
 
         // Only proceed if user has enough USX and withdrawals aren't frozen
-        if (usx.balanceOf(randomUser) >= amount && !usx.withdrawalsFrozen()) {
+        if (usx.balanceOf(randomUser) >= amount && !usx.frozen()) {
             vm.prank(randomUser);
             usx.requestUSDC(amount);
         }
@@ -484,7 +484,7 @@ contract InvariantTests is LocalDeployTestSetup {
         address randomUser = getRandomUser();
 
         // Only proceed if user has enough USX and withdrawals aren't frozen
-        if (usx.balanceOf(randomUser) >= withdrawalAmount && !usx.withdrawalsFrozen()) {
+        if (usx.balanceOf(randomUser) >= withdrawalAmount && !usx.frozen()) {
             vm.prank(randomUser);
             usx.requestUSDC(withdrawalAmount);
         }
@@ -526,7 +526,7 @@ contract InvariantTests is LocalDeployTestSetup {
                 }
             } else if (operationType == 1) {
                 // Rapid withdrawals
-                if (usx.balanceOf(user1) >= 1000e18 && !usx.withdrawalsFrozen()) {
+                if (usx.balanceOf(user1) >= 1000e18 && !usx.frozen()) {
                     vm.prank(user1);
                     usx.requestUSDC(1000e18);
                 }
@@ -582,7 +582,7 @@ contract InvariantTests is LocalDeployTestSetup {
             if (i % 3 == 0 && usdc.balanceOf(user) >= 1000e6) {
                 vm.prank(user);
                 usx.deposit(1000e6);
-            } else if (i % 3 == 1 && usx.balanceOf(user) >= 1000e18 && !usx.withdrawalsFrozen()) {
+            } else if (i % 3 == 1 && usx.balanceOf(user) >= 1000e18 && !usx.frozen()) {
                 vm.prank(user);
                 usx.requestUSDC(1000e18);
             } else if (i % 3 == 2 && usx.balanceOf(user) >= 1000e18) {
@@ -623,7 +623,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
         // Try operations that depend on time
         address user = getRandomUser();
-        if (usx.balanceOf(user) >= 1000e18 && !usx.withdrawalsFrozen()) {
+        if (usx.balanceOf(user) >= 1000e18 && !usx.frozen()) {
             vm.prank(user);
             usx.requestUSDC(1000e18);
         }
@@ -790,7 +790,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
     /// @notice Detects if system is in crisis state
     function isInCrisisState() public view returns (bool) {
-        return usx.usxPrice() < 1e18 || usx.withdrawalsFrozen();
+        return usx.usxPrice() < 1e18 || usx.frozen();
     }
 
     /// @notice Gets the current max leverage
@@ -859,7 +859,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
             if (success) {
                 // Try to withdraw immediately to stress the system
-                if (usx.balanceOf(user2) >= 1000e18 && !usx.withdrawalsFrozen()) {
+                if (usx.balanceOf(user2) >= 1000e18 && !usx.frozen()) {
                     vm.prank(user2);
                     usx.requestUSDC(1000e18);
                 }
@@ -1063,7 +1063,7 @@ contract InvariantTests is LocalDeployTestSetup {
         (bool success,) = address(treasury).call(data);
 
         // Try to withdraw everything
-        if (usx.balanceOf(user) >= 1000e18 && !usx.withdrawalsFrozen()) {
+        if (usx.balanceOf(user) >= 1000e18 && !usx.frozen()) {
             vm.prank(user);
             usx.requestUSDC(usx.balanceOf(user));
         }
@@ -1090,7 +1090,7 @@ contract InvariantTests is LocalDeployTestSetup {
         // Simulate reentrancy attack on withdrawal function
         address user = getRandomUser();
 
-        if (usx.balanceOf(user) >= 2000e18 && !usx.withdrawalsFrozen()) {
+        if (usx.balanceOf(user) >= 2000e18 && !usx.frozen()) {
             // First withdrawal request
             vm.prank(user);
             usx.requestUSDC(1000e18);
@@ -1136,7 +1136,7 @@ contract InvariantTests is LocalDeployTestSetup {
         }
 
         // Back-run: Attacker withdraws
-        if (usx.balanceOf(attacker) >= 1000e18 && !usx.withdrawalsFrozen()) {
+        if (usx.balanceOf(attacker) >= 1000e18 && !usx.frozen()) {
             vm.prank(attacker);
             usx.requestUSDC(1000e18);
         }
@@ -1260,7 +1260,7 @@ contract InvariantTests is LocalDeployTestSetup {
             usdc.transfer(address(usx), 1000e6);
 
             // Try to withdraw USX immediately to see if we can exploit the balance
-            if (usx.balanceOf(user) >= 1000e18 && !usx.withdrawalsFrozen()) {
+            if (usx.balanceOf(user) >= 1000e18 && !usx.frozen()) {
                 vm.prank(user);
                 usx.requestUSDC(1000e18);
             }
@@ -1596,7 +1596,7 @@ contract InvariantTests is LocalDeployTestSetup {
             usdc.transfer(address(usx), 1000e6);
 
             // Try to withdraw USX to see if peg is manipulated
-            if (usx.balanceOf(user) >= 500e18 && !usx.withdrawalsFrozen()) {
+            if (usx.balanceOf(user) >= 500e18 && !usx.frozen()) {
                 vm.prank(user);
                 usx.requestUSDC(500e18);
             }
