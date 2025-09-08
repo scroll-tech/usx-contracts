@@ -138,7 +138,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         _mint(msg.sender, Math.mulDiv(_amount, 1e12, 1, Math.Rounding.Floor)); // Scale USDC (6 decimals) to USX (18 decimals)
     }
 
-    /// @notice Redeem USX to get USDC (begin withdrawal request)
+    /// @notice Redeem USX to get USDC (automatically send if available, otherwise create withdrawal request)
     /// @param _USXredeemed The amount of USX to redeem
     function requestUSDC(uint256 _USXredeemed) public {
         USXStorage storage $ = _getStorage();
@@ -155,11 +155,17 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         // Burn the USX
         _burn(msg.sender, _USXredeemed);
 
-        // Record the outstanding withdrawal request
-        $.totalOutstandingWithdrawalAmount += usdcAmount;
-        $.outstandingWithdrawalRequests[msg.sender] += usdcAmount;
-
-        // TODO: Consider automatically sending USDC to user if available
+        // Check if contract has enough USDC to fulfill the request immediately
+        uint256 contractUSDCBalance = $.USDC.balanceOf(address(this));
+        
+        if (contractUSDCBalance >= usdcAmount) {
+            // Automatically send USDC to user if available
+            $.USDC.transfer(msg.sender, usdcAmount);
+        } else {
+            // Record the outstanding withdrawal request if insufficient USDC
+            $.totalOutstandingWithdrawalAmount += usdcAmount;
+            $.outstandingWithdrawalRequests[msg.sender] += usdcAmount;
+        }
     }
 
     // TODO: Consider allowing partial claims as well

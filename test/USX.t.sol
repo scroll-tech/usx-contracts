@@ -94,43 +94,105 @@ contract USXTest is LocalDeployTestSetup {
 
     /*=========================== Withdrawal Request Tests =========================*/
 
-    function test_requestUSDC_success() public {
-        // Test the complete flow: deposit -> requestUSDC
+    function test_requestUSDC_success_automatic_transfer() public {
+        // Test the complete flow: deposit -> requestUSDC with automatic USDC transfer
         vm.prank(user);
         usx.deposit(100e6); // 100 USDC deposit
 
         // Verify USX was minted
         assertEq(usx.balanceOf(user), 100e18);
 
-        // Request USDC withdrawal
+        // Give the USX contract USDC to fulfill withdrawal requests automatically
+        deal(address(usdc), address(usx), 100e6);
+
+        uint256 userUSDCBalanceBefore = usdc.balanceOf(user);
+
+        // Request USDC withdrawal - should automatically transfer USDC
         vm.prank(user);
         usx.requestUSDC(50e18); // Request 50 USX withdrawal
 
-        // Verify withdrawal request was recorded
+        // Verify USX was burned
+        assertEq(usx.balanceOf(user), 50e18, "User should have 50 USX remaining");
+
+        // Verify no withdrawal request was recorded (automatic transfer)
+        assertEq(usx.outstandingWithdrawalRequests(user), 0, "User should have no withdrawal request");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0");
+
+        // Verify user received USDC automatically
+        uint256 userUSDCBalanceAfter = usdc.balanceOf(user);
+        assertEq(userUSDCBalanceAfter, userUSDCBalanceBefore + 50e6, "User should receive 50 USDC automatically");
+    }
+
+    function test_requestUSDC_fallback_to_withdrawal_request() public {
+        // Test the fallback behavior when USDC is not available on contract
+        vm.prank(user);
+        usx.deposit(100e6); // 100 USDC deposit
+
+        // Verify USX was minted
+        assertEq(usx.balanceOf(user), 100e18);
+
+        // Ensure contract has no USDC (or insufficient USDC)
+        uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
+        if (contractUSDCBalance > 0) {
+            // Transfer any existing USDC to treasury to simulate insufficient balance
+            vm.prank(address(usx));
+            usdc.transfer(address(treasury), contractUSDCBalance);
+        }
+
+        // Request USDC withdrawal - should create withdrawal request
+        vm.prank(user);
+        usx.requestUSDC(50e18); // Request 50 USX withdrawal
+
+        // Verify USX was burned
+        assertEq(usx.balanceOf(user), 50e18, "User should have 50 USX remaining");
+
+        // Verify withdrawal request was recorded (fallback behavior)
         assertEq(usx.outstandingWithdrawalRequests(user), 50e6, "User should have 50 USDC withdrawal request");
         assertEq(usx.totalOutstandingWithdrawalAmount(), 50e6, "Total outstanding should be 50 USDC");
     }
 
     /*=========================== Additional Request USDC Tests =========================*/
 
-    function test_requestUSDC_multiple_requests() public {
-        // Test multiple withdrawal requests in sequence
+    function test_requestUSDC_multiple_requests_mixed_behavior() public {
+        // Test multiple withdrawal requests with mixed automatic transfer and fallback behavior
         vm.prank(user);
         usx.deposit(300e6); // 300 USDC deposit to get USX
 
-        // Make multiple withdrawal requests
+        // Give contract some USDC for first request (automatic transfer)
+        deal(address(usdc), address(usx), 50e6);
+
+        uint256 userUSDCBalanceBefore = usdc.balanceOf(user);
+
+        // First request - should automatically transfer USDC
         vm.prank(user);
         usx.requestUSDC(50e18); // Request 50 USX withdrawal
 
+        // Verify first request was automatically fulfilled
+        assertEq(usx.outstandingWithdrawalRequests(user), 0, "First request should be automatically fulfilled");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "No outstanding requests after first");
+
+        // Verify user received USDC
+        uint256 userUSDCBalanceAfterFirst = usdc.balanceOf(user);
+        assertEq(userUSDCBalanceAfterFirst, userUSDCBalanceBefore + 50e6, "User should receive 50 USDC automatically");
+
+        // Drain contract USDC for remaining requests (fallback behavior)
+        uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
+        if (contractUSDCBalance > 0) {
+            vm.prank(address(usx));
+            usdc.transfer(address(treasury), contractUSDCBalance);
+        }
+
+        // Second request - should create withdrawal request
         vm.prank(user);
         usx.requestUSDC(30e18); // Request 30 USX withdrawal
 
+        // Third request - should create withdrawal request
         vm.prank(user);
         usx.requestUSDC(20e18); // Request 20 USX withdrawal
 
-        // Verify total outstanding
-        assertEq(usx.totalOutstandingWithdrawalAmount(), 100e6, "Total outstanding should be 100 USDC");
-        assertEq(usx.outstandingWithdrawalRequests(user), 100e6, "User should have 100 USDC withdrawal request");
+        // Verify remaining requests were recorded as withdrawal requests
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 50e6, "Total outstanding should be 50 USDC");
+        assertEq(usx.outstandingWithdrawalRequests(user), 50e6, "User should have 50 USDC withdrawal request");
     }
 
     function test_requestUSDC_zero_amount() public {
@@ -141,14 +203,22 @@ contract USXTest is LocalDeployTestSetup {
         vm.prank(user);
         usx.requestUSDC(0);
 
-        // Verify no withdrawal request was recorded
+        // Verify no withdrawal request was recorded and no USDC was transferred
         assertEq(usx.outstandingWithdrawalRequests(user), 0, "User should have no withdrawal request for zero amount");
         assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0 for zero amount");
+        assertEq(usdc.balanceOf(address(usx)), 0, "Contract should have no USDC transferred for zero amount");
     }
 
-    function test_requestUSDC_large_amount() public {
+    function test_requestUSDC_large_amount_withdrawal_request() public {
         vm.prank(user);
         usx.deposit(1000000e6); // 1,000,000 USDC deposit to get USX
+
+        // Ensure contract has no USDC for large withdrawal (creates withdrawal request)
+        uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
+        if (contractUSDCBalance > 0) {
+            vm.prank(address(usx));
+            usdc.transfer(address(treasury), contractUSDCBalance);
+        }
 
         // Request large amount withdrawal
         vm.prank(user);
@@ -162,6 +232,13 @@ contract USXTest is LocalDeployTestSetup {
     function test_requestUSDC_outstanding_amount_tracking() public {
         vm.prank(user);
         usx.deposit(1000e6); // 1,000 USDC deposit to get USX
+
+        // Ensure contract has no USDC for withdrawal requests
+        uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
+        if (contractUSDCBalance > 0) {
+            vm.prank(address(usx));
+            usdc.transfer(address(treasury), contractUSDCBalance);
+        }
 
         // Make multiple requests and verify tracking
         vm.prank(user);
@@ -206,25 +283,32 @@ contract USXTest is LocalDeployTestSetup {
 
     /*=========================== Claim USDC Tests =========================*/
 
-    function test_claimUSDC_success() public {
-        // Test the complete flow: deposit -> requestUSDC -> claimUSDC
+    function test_claimUSDC_success_with_withdrawal_request() public {
+        // Test the complete flow: deposit -> requestUSDC (creates withdrawal request) -> claimUSDC
         // First, deposit USDC to get USX
         vm.prank(user);
         usx.deposit(100e6); // 100 USDC deposit
 
-        // Give the USX contract USDC to fulfill withdrawal requests
-        deal(address(usdc), address(usx), 100e6);
+        // Ensure contract has no USDC initially (creates withdrawal request)
+        uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
+        if (contractUSDCBalance > 0) {
+            vm.prank(address(usx));
+            usdc.transfer(address(treasury), contractUSDCBalance);
+        }
 
         // Verify USX was minted
         assertEq(usx.balanceOf(user), 100e18, "User should have 100 USX");
 
-        // Request USDC withdrawal
+        // Request USDC withdrawal (should create withdrawal request)
         vm.prank(user);
         usx.requestUSDC(50e18); // Request 50 USX withdrawal
 
         // Verify withdrawal request was recorded
         assertEq(usx.outstandingWithdrawalRequests(user), 50e6, "User should have 50 USDC withdrawal request");
         assertEq(usx.totalOutstandingWithdrawalAmount(), 50e6, "Total outstanding should be 50 USDC");
+
+        // Now give the USX contract USDC to fulfill withdrawal requests
+        deal(address(usdc), address(usx), 100e6);
 
         // Claim USDC
         vm.prank(user);
@@ -256,8 +340,12 @@ contract USXTest is LocalDeployTestSetup {
         vm.prank(user);
         usx.deposit(200e6); // 200 USDC deposit
 
-        // Give the USX contract USDC to fulfill withdrawal requests
-        deal(address(usdc), address(usx), 200e6);
+        // Ensure contract has no USDC initially (creates withdrawal requests)
+        uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
+        if (contractUSDCBalance > 0) {
+            vm.prank(address(usx));
+            usdc.transfer(address(treasury), contractUSDCBalance);
+        }
 
         // Make multiple withdrawal requests
         vm.prank(user);
@@ -268,6 +356,9 @@ contract USXTest is LocalDeployTestSetup {
 
         // Verify total outstanding
         assertEq(usx.totalOutstandingWithdrawalAmount(), 80e6, "Total outstanding should be 80 USDC");
+
+        // Now give the USX contract USDC to fulfill withdrawal requests
+        deal(address(usdc), address(usx), 200e6);
 
         // Claim USDC (this claims all outstanding requests)
         vm.prank(user);
@@ -283,14 +374,21 @@ contract USXTest is LocalDeployTestSetup {
         vm.prank(user);
         usx.deposit(100e6); // 100 USDC deposit
 
-        // Give the USX contract USDC to fulfill withdrawal requests
-        deal(address(usdc), address(usx), 100e6);
+        // Ensure contract has no USDC initially (creates withdrawal request)
+        uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
+        if (contractUSDCBalance > 0) {
+            vm.prank(address(usx));
+            usdc.transfer(address(treasury), contractUSDCBalance);
+        }
 
         vm.prank(user);
         usx.requestUSDC(50e18); // Request 50 USX withdrawal
 
         // Verify request exists
         assertEq(usx.outstandingWithdrawalRequests(user), 50e6, "User should have 50 USDC withdrawal request");
+
+        // Now give the USX contract USDC to fulfill withdrawal requests
+        deal(address(usdc), address(usx), 100e6);
 
         // Claim USDC
         vm.prank(user);
@@ -703,4 +801,96 @@ contract USXTest is LocalDeployTestSetup {
         vm.expectRevert(USX.NoOutstandingWithdrawalRequests.selector);
         usx.claimUSDC();
     }
+
+    function test_requestUSDC_exact_contract_balance() public {
+        // Test when request amount exactly matches contract USDC balance
+        vm.prank(user);
+        usx.deposit(100e6); // 100 USDC deposit
+
+        // Give contract exactly 50 USDC
+        deal(address(usdc), address(usx), 50e6);
+
+        uint256 userUSDCBalanceBefore = usdc.balanceOf(user);
+
+        // Request exactly 50 USX (50 USDC)
+        vm.prank(user);
+        usx.requestUSDC(50e18);
+
+        // Should automatically transfer all available USDC
+        assertEq(usx.outstandingWithdrawalRequests(user), 0, "Should be automatically fulfilled");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "No outstanding requests");
+
+        uint256 userUSDCBalanceAfter = usdc.balanceOf(user);
+        assertEq(userUSDCBalanceAfter, userUSDCBalanceBefore + 50e6, "User should receive exactly 50 USDC");
+        assertEq(usdc.balanceOf(address(usx)), 0, "Contract should have no USDC left");
+    }
+
+    function test_requestUSDC_partial_automatic_transfer() public {
+        // Test when contract has some USDC but not enough for full request
+        vm.prank(user);
+        usx.deposit(100e6); // 100 USDC deposit
+
+        // Give contract only 30 USDC (less than requested 50)
+        deal(address(usdc), address(usx), 30e6);
+
+        uint256 userUSDCBalanceBefore = usdc.balanceOf(user);
+
+        // Request 50 USX (50 USDC) but contract only has 30
+        vm.prank(user);
+        usx.requestUSDC(50e18);
+
+        // Should create withdrawal request for full amount (no partial automatic transfer)
+        assertEq(usx.outstandingWithdrawalRequests(user), 50e6, "Should create withdrawal request for full amount");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 50e6, "Total outstanding should be 50 USDC");
+
+        // User should not receive any USDC automatically
+        uint256 userUSDCBalanceAfter = usdc.balanceOf(user);
+        assertEq(userUSDCBalanceAfter, userUSDCBalanceBefore, "User should not receive USDC automatically");
+        assertEq(usdc.balanceOf(address(usx)), 30e6, "Contract should still have 30 USDC");
+    }
+
+    function test_requestUSDC_zero_contract_balance() public {
+        // Test when contract has zero USDC balance
+        vm.prank(user);
+        usx.deposit(100e6); // 100 USDC deposit
+
+        // Ensure contract has no USDC
+        uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
+        if (contractUSDCBalance > 0) {
+            vm.prank(address(usx));
+            usdc.transfer(address(treasury), contractUSDCBalance);
+        }
+
+        // Request USDC withdrawal
+        vm.prank(user);
+        usx.requestUSDC(50e18);
+
+        // Should create withdrawal request
+        assertEq(usx.outstandingWithdrawalRequests(user), 50e6, "Should create withdrawal request");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 50e6, "Total outstanding should be 50 USDC");
+        assertEq(usdc.balanceOf(address(usx)), 0, "Contract should have no USDC");
+    }
+
+    function test_requestUSDC_large_amount_automatic_transfer() public {
+        // Test automatic transfer with large amounts
+        vm.prank(user);
+        usx.deposit(1000000e6); // 1,000,000 USDC deposit
+
+        // Give contract enough USDC for large withdrawal
+        deal(address(usdc), address(usx), 500000e6);
+
+        uint256 userUSDCBalanceBefore = usdc.balanceOf(user);
+
+        // Request large amount withdrawal
+        vm.prank(user);
+        usx.requestUSDC(500000e18); // Request 500,000 USX withdrawal
+
+        // Should automatically transfer USDC
+        assertEq(usx.outstandingWithdrawalRequests(user), 0, "Should be automatically fulfilled");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "No outstanding requests");
+
+        uint256 userUSDCBalanceAfter = usdc.balanceOf(user);
+        assertEq(userUSDCBalanceAfter, userUSDCBalanceBefore + 500000e6, "User should receive 500,000 USDC automatically");
+    }
+
 }
