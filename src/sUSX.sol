@@ -7,13 +7,14 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ITreasury} from "./interfaces/ITreasury.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title sUSX
 /// @notice The main contract for the sUSX token, allowing USX holders to stake to share in protocols profits
 /// @dev ERC4626 vault
 
-contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
+contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     /*=========================== Errors =========================*/
 
     error ZeroAddress();
@@ -99,9 +100,10 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     function initialize(address _usx, address _treasury, address _governance) public initializer {
         if (_usx == address(0) || _governance == address(0)) revert ZeroAddress();
 
-        // Initialize ERC4626 and ERC20
+        // Initialize ERC4626, ERC20, and ReentrancyGuard
         __ERC4626_init(IERC20(_usx));
         __ERC20_init("sUSX Token", "sUSX");
+        __ReentrancyGuard_init();
 
         SUSXStorage storage $ = _getStorage();
         $.USX = IERC20(_usx);
@@ -133,7 +135,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     /// @dev Allowed after withdrawalPeriod AND epoch the user made withdrawal on is finished, after Gross Profits has been counted
     ///     Portion is sent to the Governance Warchest (withdrawalFee applied here)
     /// @param withdrawalId The id of the withdrawal to claim
-    function claimWithdraw(uint256 withdrawalId) public {
+    function claimWithdraw(uint256 withdrawalId) public nonReentrant {
         SUSXStorage storage $ = _getStorage();
 
         // Check if the withdrawal request is unclaimed

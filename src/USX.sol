@@ -7,9 +7,10 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ITreasury} from "./interfaces/ITreasury.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-contract USX is ERC20Upgradeable, UUPSUpgradeable {
+contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
 
     /*=========================== Errors =========================*/
@@ -90,8 +91,9 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     {
         if (_USDC == address(0) || _governanceWarchest == address(0) || _admin == address(0)) revert ZeroAddress();
 
-        // Initialize ERC20
+        // Initialize ERC20 and ReentrancyGuard
         __ERC20_init("USX Token", "USX");
+        __ReentrancyGuard_init();
 
         USXStorage storage $ = _getStorage();
         $.USDC = IERC20(_USDC);
@@ -149,7 +151,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
 
     /// @notice Redeem USX to get USDC (automatically send if available, otherwise create withdrawal request)
     /// @param _USXredeemed The amount of USX to redeem
-    function requestUSDC(uint256 _USXredeemed) public {
+    function requestUSDC(uint256 _USXredeemed) public nonReentrant {
         USXStorage storage $ = _getStorage();
 
         // Check if withdrawals are frozen
@@ -180,7 +182,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
 
     /// @notice Claim USDC (fulfill withdrawal request)
     /// @dev Allows partial claims if there is some USDC available for users total claim
-    function claimUSDC() public {
+    function claimUSDC() public nonReentrant {
         USXStorage storage $ = _getStorage();
 
         // Check if user has outstanding withdrawal requests

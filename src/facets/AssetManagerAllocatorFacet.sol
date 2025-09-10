@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import {TreasuryStorage} from "../TreasuryStorage.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 // Standaradized interface for Asset Manager's contract
@@ -14,7 +15,7 @@ interface IAssetManager {
 /// @notice Handles the allocation of USDC between the treasury and the Asset Manager
 /// @dev Facet for TreasuryDiamond contract
 
-contract AssetManagerAllocatorFacet is TreasuryStorage {
+contract AssetManagerAllocatorFacet is TreasuryStorage, ReentrancyGuardUpgradeable {
     /*=========================== Public Functions =========================*/
 
     /// @notice Returns the maximum USDC allocation allowed based on current leverage settings
@@ -76,7 +77,7 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
 
     /// @notice Transfers USDC from the treasury to the Asset Manager
     /// @param _amount The amount of USDC to transfer
-    function transferUSDCtoAssetManager(uint256 _amount) external onlyAssetManager {
+    function transferUSDCtoAssetManager(uint256 _amount) external onlyAssetManager nonReentrant {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
 
         // Check if the transfer would exceed the max leverage
@@ -89,7 +90,7 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
 
     /// @notice Transfers USDC from the Asset Manager to the treasury
     /// @param _amount The amount of USDC to transfer
-    function transferUSDCFromAssetManager(uint256 _amount) external onlyAssetManager {
+    function transferUSDCFromAssetManager(uint256 _amount) external onlyAssetManager nonReentrant {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         $.assetManagerUSDC -= _amount;
         IAssetManager($.assetManager).withdraw(_amount);

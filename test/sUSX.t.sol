@@ -635,12 +635,13 @@ contract sUSXTest is LocalDeployTestSetup {
         vm.prank(user);
         uint256 shares = susx.deposit(usxBalance, user);
 
-        // Create withdrawal requests with smaller amounts to avoid balance issues
+        // Create withdrawal requests with different amounts to test storage
         uint256 withdrawalAmount1 = shares / 10; // 10% of shares
+        uint256 withdrawalAmount2 = shares / 20; // 5% of shares (different amount)
 
         // Convert shares to assets for withdraw function
         uint256 assets1 = susx.previewRedeem(withdrawalAmount1);
-        uint256 assets2 = susx.previewRedeem(withdrawalAmount1); // Use same amount for both
+        uint256 assets2 = susx.previewRedeem(withdrawalAmount2); // Use different amount
 
         vm.prank(user);
         susx.withdraw(assets1, user, user); // ID 0

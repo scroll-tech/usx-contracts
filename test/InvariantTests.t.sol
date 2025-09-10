@@ -159,9 +159,9 @@ contract InvariantTests is LocalDeployTestSetup {
         uint256 usxPrice = usx.usxPrice();
 
         if (usxPrice > 0) {
-            // Allow only minimal tolerance for fees/rounding (0.5%)
-            uint256 minAllowedPrice = usxPrice * 995 / 1000; // 99.5% (allowing for withdrawal fees)
-            uint256 maxAllowedPrice = usxPrice * 1005 / 1000; // 100.5% (allowing for small rewards)
+            // Allow only minimal tolerance for fees/rounding (0.1%)
+            uint256 minAllowedPrice = usxPrice * 999 / 1000; // 99.9% (allowing for withdrawal fees)
+            uint256 maxAllowedPrice = usxPrice * 1001 / 1000; // 100.1% (allowing for small rewards)
 
             assertGe(sharePrice, minAllowedPrice, "Share price too low compared to USX price");
             assertLe(sharePrice, maxAllowedPrice, "Share price too high compared to USX price");

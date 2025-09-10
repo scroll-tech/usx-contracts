@@ -4,13 +4,14 @@ pragma solidity 0.8.30;
 import {TreasuryStorage} from "../TreasuryStorage.sol";
 import {InsuranceBufferFacet} from "./InsuranceBufferFacet.sol";
 import {AssetManagerAllocatorFacet} from "./AssetManagerAllocatorFacet.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title ProfitAndLossReporterFacet
 /// @notice Handles the reporting of profits and losses to the protocol by the Asset Manager
 /// @dev Facet for USX Protocol Treasury Diamond contract
 
-contract ProfitAndLossReporterFacet is TreasuryStorage {
+contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeable {
     /*=========================== Public Functions =========================*/
 
     /// @notice Calculates the success fee for the Goverance Warchest based on successFeeFraction
@@ -56,7 +57,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
 
     /// @notice Asset Manager reports total balance of USDC they hold, profits or losses calculated from this value
     /// @param totalBalance The total balance of USDC held by the Asset Manager
-    function assetManagerReport(uint256 totalBalance) public onlyAssetManager {
+    function assetManagerReport(uint256 totalBalance) public onlyAssetManager nonReentrant {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         // Check if the peg is broken
         bool pegBroken = $.USX.usxPrice() < 1e18;
