@@ -41,14 +41,14 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
     /// @dev Determines what is the USX balance removed in calculating sharePrice() calculated as profitPerBlock(current_block - lastEpochBlock)
     function substractProfitLatestEpoch() public view returns (uint256 profitToSubtract) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        
+
         uint256 finalBlock = $.sUSX.lastEpochBlock() + $.sUSX.epochDuration();
         uint256 currentBlock = block.number;
-        if(currentBlock >= finalBlock || $.netEpochProfits == 0) {
+        if (currentBlock >= finalBlock || $.netEpochProfits == 0) {
             return 0;
-            }
+        }
         uint256 blocks = finalBlock - currentBlock; // should substract all profits at the beginning of a new epoch
-        profitToSubtract =  profitPerBlock() * blocks; // all regular math checks required
+        profitToSubtract = profitPerBlock() * blocks; // all regular math checks required
     }
 
     /*=========================== Asset Manager Functions =========================*/
@@ -99,7 +99,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
                 uint256 remainingLossesAfterVault = _distributeLosses(remainingLossesAfterInsuranceBuffer);
 
                 // Freeze sUSX vault deposits when vault USX is burned
-                $.sUSX.freezeDeposits();
+                $.sUSX.freezeDeposits() ;
 
                 // 3. Finally if neither of these cover the losses, update the peg to adjust the USX:USDC ratio and freeze both deposits and withdrawals
                 if (remainingLossesAfterVault > 0) {
@@ -180,5 +180,4 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
             remainingLosses = (lossesUSX - vaultUSXBalance) / DECIMAL_SCALE_FACTOR;
         }
     }
-
 }

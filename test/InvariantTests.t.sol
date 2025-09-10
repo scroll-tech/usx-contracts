@@ -458,7 +458,8 @@ contract InvariantTests is LocalDeployTestSetup {
         // First, ensure we have some assets to lose
         if (treasury.assetManagerUSDC() > 0) {
             vm.prank(address(mockAssetManager));
-            bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, lossAmount);
+            bytes memory data =
+                abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, lossAmount);
             (bool success,) = address(treasury).call(data);
             require(success, "Extreme loss report failed");
         }
@@ -533,7 +534,8 @@ contract InvariantTests is LocalDeployTestSetup {
             } else if (operationType == 2) {
                 // Rapid profit/loss reports
                 vm.prank(address(mockAssetManager));
-                bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 10000e6);
+                bytes memory data =
+                    abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 10000e6);
                 (bool success,) = address(treasury).call(data);
                 if (success) {
                     vm.prank(address(mockAssetManager));
@@ -1059,7 +1061,8 @@ contract InvariantTests is LocalDeployTestSetup {
 
         // Report massive losses to drain buffer
         vm.prank(address(mockAssetManager));
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, flashLoanAmount);
+        bytes memory data =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, flashLoanAmount);
         (bool success,) = address(treasury).call(data);
 
         // Try to withdraw everything

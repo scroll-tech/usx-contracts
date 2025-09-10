@@ -154,7 +154,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 newTotalBalance = 1100e6; // 1100 USDC (100 USDC profit)
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
+        bytes memory data =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(assetManager);
         (bool success,) = address(treasury).call(data);
@@ -167,7 +168,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 newTotalBalance = 1100e6; // 1100 USDC
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
+        bytes memory data =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(user); // Not asset manager
         (bool success,) = address(treasury).call(data);
@@ -201,7 +203,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 newTotalBalance = 900e6; // 900 USDC (100 USDC loss from 1000 USDC)
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
+        bytes memory data =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(assetManager);
         (bool success,) = address(treasury).call(data);
@@ -235,7 +238,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 newTotalBalance = 1000e6; // Same balance as initial
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
+        bytes memory data =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(assetManager);
         (bool success,) = address(treasury).call(data);
@@ -250,7 +254,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 newTotalBalance = 900e6; // 900 USDC (100 USDC loss)
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
+        bytes memory data =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(assetManager);
         (bool success,) = address(treasury).call(data);
@@ -263,7 +268,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 newTotalBalance = 900e6; // 900 USDC
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
+        bytes memory data =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(user); // Not asset manager
         (bool success,) = address(treasury).call(data);
@@ -276,7 +282,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 newTotalBalance = 1100e6; // 1100 USDC (100 USDC profit)
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
+        bytes memory data =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(assetManager);
         (bool success,) = address(treasury).call(data);
@@ -289,7 +296,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 newTotalBalance = INITIAL_BALANCE; // Same balance
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
+        bytes memory data =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(assetManager);
         (bool success,) = address(treasury).call(data);
@@ -863,7 +871,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
 
     function test_undistributed_profits_carryover() public {
         console.log("=== TESTING UNDISTRIBUTED PROFITS CARRYOVER ===");
-        
+
         // Setup
         vm.prank(user);
         usx.deposit(1000e6);
@@ -872,15 +880,13 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         usx.approve(address(susx), usxBalance);
         vm.prank(user);
         susx.deposit(usxBalance, user);
-        
+
         vm.prank(assetManager);
-        bytes memory transferData = abi.encodeWithSelector(
-            AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
-            1000e6
-        );
+        bytes memory transferData =
+            abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, 1000e6);
         (bool transferSuccess,) = address(treasury).call(transferData);
         require(transferSuccess, "transferUSDCtoAssetManager should succeed");
-        
+
         console.log("\n=== EPOCH 1: First Profit Report ===");
         vm.prank(assetManager);
         bytes memory firstReportData = abi.encodeWithSelector(
@@ -889,27 +895,28 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         );
         (bool firstReportSuccess,) = address(treasury).call(firstReportData);
         require(firstReportSuccess, "First assetManagerReport should succeed");
-        
+
         // Get initial undistributed amount
-        bytes memory substractProfitLatestEpochData = abi.encodeWithSelector(
-            ProfitAndLossReporterFacet.substractProfitLatestEpoch.selector
-        );
-        (bool substractProfitLatestEpochSuccess, bytes memory substractProfitLatestEpochResult) = address(treasury).call(substractProfitLatestEpochData);
+        bytes memory substractProfitLatestEpochData =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.substractProfitLatestEpoch.selector);
+        (bool substractProfitLatestEpochSuccess, bytes memory substractProfitLatestEpochResult) =
+            address(treasury).call(substractProfitLatestEpochData);
         require(substractProfitLatestEpochSuccess, "substractProfitLatestEpoch call failed");
         uint256 epoch1InitialUndistributed = abi.decode(substractProfitLatestEpochResult, (uint256));
-        
+
         console.log("Epoch 1 initial undistributed:", epoch1InitialUndistributed);
-        
+
         console.log("\n=== ADVANCING TIME BY HALF EPOCH ===");
         uint256 halfEpochDuration = susx.epochDuration() / 2;
         vm.roll(block.number + halfEpochDuration);
-        
-        (bool substractProfitLatestEpochSuccess2, bytes memory substractProfitLatestEpochResult2) = address(treasury).call(substractProfitLatestEpochData);
+
+        (bool substractProfitLatestEpochSuccess2, bytes memory substractProfitLatestEpochResult2) =
+            address(treasury).call(substractProfitLatestEpochData);
         require(substractProfitLatestEpochSuccess2, "substractProfitLatestEpoch call failed");
         uint256 epoch1HalfUndistributed = abi.decode(substractProfitLatestEpochResult2, (uint256));
-        
+
         console.log("Epoch 1 undistributed after half epoch:", epoch1HalfUndistributed);
-        
+
         console.log("\n=== EPOCH 2: Early Reporting (Before Epoch 1 Ends) ===");
         vm.prank(assetManager);
         bytes memory secondReportData = abi.encodeWithSelector(
@@ -918,35 +925,42 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         );
         (bool secondReportSuccess,) = address(treasury).call(secondReportData);
         require(secondReportSuccess, "Second assetManagerReport should succeed");
-        
+
         // Get values after second report
-        (bool substractProfitLatestEpochSuccess3, bytes memory substractProfitLatestEpochResult3) = address(treasury).call(substractProfitLatestEpochData);
+        (bool substractProfitLatestEpochSuccess3, bytes memory substractProfitLatestEpochResult3) =
+            address(treasury).call(substractProfitLatestEpochData);
         require(substractProfitLatestEpochSuccess3, "substractProfitLatestEpoch call failed");
         uint256 epoch2InitialUndistributed = abi.decode(substractProfitLatestEpochResult3, (uint256));
-        
+
         console.log("Epoch 2 initial undistributed:", epoch2InitialUndistributed);
-        
+
         console.log("\n=== VERIFICATION ===");
         console.log("Epoch 1 had", epoch1HalfUndistributed, "USDC remaining");
         console.log("Epoch 2 now shows", epoch2InitialUndistributed, "USDC undistributed");
-        
+
         // Verify the carryover worked
-        assertTrue(epoch2InitialUndistributed > epoch1HalfUndistributed, "Epoch 2 should have more undistributed rewards than Epoch 1's carryover");
+        assertTrue(
+            epoch2InitialUndistributed > epoch1HalfUndistributed,
+            "Epoch 2 should have more undistributed rewards than Epoch 1's carryover"
+        );
         console.log("Carryover mechanism is working correctly!");
-        
+
         // Test that the system continues to distribute linearly
         console.log("\n=== TESTING LINEAR DISTRIBUTION ===");
         vm.roll(block.number + 1000);
         uint256 sharePriceAfter1000Blocks = susx.sharePrice();
         console.log("Share price after advancing 1000 blocks:", sharePriceAfter1000Blocks);
-        
-        (bool substractProfitLatestEpochSuccess4, bytes memory substractProfitLatestEpochResult4) = address(treasury).call(substractProfitLatestEpochData);
+
+        (bool substractProfitLatestEpochSuccess4, bytes memory substractProfitLatestEpochResult4) =
+            address(treasury).call(substractProfitLatestEpochData);
         require(substractProfitLatestEpochSuccess4, "substractProfitLatestEpoch call failed");
         uint256 undistributedAfter1000Blocks = abi.decode(substractProfitLatestEpochResult4, (uint256));
         console.log("Undistributed rewards after 1000 blocks:", undistributedAfter1000Blocks);
-        
+
         // Verify that undistributed rewards are decreasing (linear distribution)
-        assertTrue(undistributedAfter1000Blocks < epoch2InitialUndistributed, "Undistributed rewards should decrease over time");
+        assertTrue(
+            undistributedAfter1000Blocks < epoch2InitialUndistributed, "Undistributed rewards should decrease over time"
+        );
         console.log("Linear distribution is working correctly!");
     }
 }
