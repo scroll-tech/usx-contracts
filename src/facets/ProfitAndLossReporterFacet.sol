@@ -37,15 +37,26 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         return $.netEpochProfits / blocksRemainingInEpoch;
     }
 
+    /// @notice Calculates the cumulative profits for previous epoch that needs to be still distributed
+    /// @dev Determines what is the USX balance removed in calculating sharePrice() calculated as profitPerBlock(current_block - lastEpochBlock)
+    function substractProfitLatestEpoch() public view returns (uint256 profitToSubtract) {
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        
+        uint256 finalBlock = $.sUSX.lastEpochBlock() + $.sUSX.epochDuration();
+        uint256 currentBlock = block.number;
+        if(currentBlock >= finalBlock || $.netEpochProfits == 0) {
+            return 0;
+            }
+        uint256 blocks = finalBlock - currentBlock; // should substract all profits at the beginning of a new epoch
+        profitToSubtract =  profitPerBlock() * blocks; // all regular math checks required
+    }
+
     /*=========================== Asset Manager Functions =========================*/
 
     /// @notice Asset Manager reports total balance of USDC they hold, profits calculated from this value
     /// @param totalBalance The total balance of USDC held by the Asset Manager
     function reportProfits(uint256 totalBalance) public onlyAssetManager {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        // Next epoch is started
-        $.sUSX.updateLastEpochBlock();
-
         // Check if the peg is broken
         bool pegBroken = $.USX.usxPrice() < 1e18;
 
@@ -60,10 +71,12 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         if (currentNetDeposits < previousNetDeposits) revert LossesDetectedUseReportLossesFunction();
         uint256 grossProfit = currentNetDeposits - previousNetDeposits;
 
-        // If peg is broken, recover it first
+        // If peg is broken, recover it and distribute the remaining profits
         if (pegBroken) {
-            uint256 profitsRemaining = _recoverPeg(grossProfit);
-            // Distribute any remaining profits after peg recovery
+            // Calculate the profits available after peg recovery
+            uint256 profitsRemaining = (currentNetDeposits * DECIMAL_SCALE_FACTOR) - $.USX.totalSupply();
+
+            // Distribute any remaining profits
             if (profitsRemaining > 0) {
                 _distributeProfits(profitsRemaining);
             }
@@ -73,15 +86,17 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
             // Distribute profits to the stakers, with a portion going to the Insurance Buffer and Governance Warchest
             _distributeProfits(grossProfit);
         }
+
+        // Next epoch is started
+        $.sUSX.updateLastEpochBlock();
     }
 
     /// @notice Asset Manager reports total balance of USDC they hold, losses calculated from this value
     /// @param totalBalance The total balance of USDC held by the Asset Manager
     function reportLosses(uint256 totalBalance) public onlyAssetManager {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        // Next epoch is started
-        $.sUSX.updateLastEpochBlock();
 
+        // Update to use reportProfits logic
         if (totalBalance > $.assetManagerUSDC) revert ProfitsDetectedUseReportProfitsFunction();
         uint256 grossLoss = $.assetManagerUSDC - totalBalance;
 
@@ -104,6 +119,9 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
                 $.USX.freeze();
             }
         }
+
+        // Next epoch is started
+        $.sUSX.updateLastEpochBlock();
     }
 
     /*=========================== Governance Functions =========================*/
@@ -118,16 +136,14 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
 
     /*=========================== Internal Functions =========================*/
 
-    /// @notice Updates peg, by taking all outstanding USDC in the system (treasury & asset manager holdings) and dividing them by total supply of USX.
-    /// @return The updated peg
+    /// @notice Updates peg, by taking all outstanding USDC in the system (treasury & asset manager holdings) and dividing them by total supply of USX
     /// @dev USDC has 6 decimals, USX has 18 decimals, so we need to scale USDC up by 10^12
-    function _updatePeg() internal returns (uint256) {
+    function _updatePeg() internal {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         uint256 totalUSDCoutstanding = AssetManagerAllocatorFacet(address(this)).netDeposits();
         uint256 scaledUSDC = totalUSDCoutstanding * DECIMAL_SCALE_FACTOR;
         uint256 updatedPeg = scaledUSDC / $.USX.totalSupply();
         $.USX.updatePeg(updatedPeg);
-        return updatedPeg;
     }
 
     /// @notice Distributes profits to the Insurance Buffer and Governance Warchest, and sUSX contract (USX stakers)
@@ -173,28 +189,4 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         }
     }
 
-    /// @notice Recovers the broken peg by minting USX to restore 1:1 backing ratio
-    /// @param availableProfits The USDC profits available for peg recovery
-    /// @return profitsRemainingAfterPegRecovery The USDC profits remaining after peg recovery
-    function _recoverPeg(uint256 availableProfits) internal returns (uint256 profitsRemainingAfterPegRecovery) {
-        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-
-        // Calculate how much USX needs to be minted to restore 1:1 peg
-        uint256 totalUSDC = AssetManagerAllocatorFacet(address(this)).netDeposits();
-        uint256 totalUSX = $.USX.totalSupply();
-        uint256 usxNeededForPeg = totalUSX - Math.mulDiv(totalUSDC, DECIMAL_SCALE_FACTOR, 1e18, Math.Rounding.Floor);
-
-        // Convert profits to USX (profits in USDC, need to scale to USX)
-        uint256 profitsInUSX = availableProfits * DECIMAL_SCALE_FACTOR;
-
-        if (profitsInUSX >= usxNeededForPeg) {
-            // Full peg recovery possible
-            $.USX.mintUSX(address($.sUSX), usxNeededForPeg);
-            profitsRemainingAfterPegRecovery = availableProfits - (usxNeededForPeg / DECIMAL_SCALE_FACTOR);
-        } else {
-            // Partial peg recovery - use all available profits
-            $.USX.mintUSX(address($.sUSX), profitsInUSX);
-            profitsRemainingAfterPegRecovery = 0;
-        }
-    }
 }

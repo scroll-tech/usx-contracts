@@ -17,10 +17,11 @@ interface ITreasury {
     // Insurance Buffer functions
     function bufferTarget() external view returns (uint256);
 
-    // Profit/Loss functions
+    // Profit/Loss Reporter functions
     function successFee(uint256 profitAmount) external view returns (uint256);
     function profitLatestEpoch() external view returns (uint256);
     function profitPerBlock() external view returns (uint256);
+    function substractProfitLatestEpoch() external view returns (uint256);
     function reportProfits(uint256 totalBalance) external;
     function reportLosses(uint256 totalBalance) external;
     function setSuccessFeeFraction(uint256 _successFeeFraction) external;

@@ -160,7 +160,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     }
 
     /// @notice Returns the current share price of sUSX
-    /// @dev Calculated using on chain USX balance and linear profit accrual (USX.balanceOf(this) + linear scaled profits from last epoch)
+    /// @dev Calculated using on chain USX balance and linear profit accrual (USX.balanceOf(this) - profits not yet distributed for last epoch)
     /// @return The current share price of sUSX
     function sharePrice() public view returns (uint256) {
         uint256 supply = totalSupply();
@@ -172,8 +172,8 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
         SUSXStorage storage $ = _getStorage();
         uint256 base = $.USX.balanceOf(address(this));
-        uint256 rewards = $.treasury.profitLatestEpoch();
-        uint256 totalUSX = base + rewards;
+        uint256 undistributedRewards = $.treasury.substractProfitLatestEpoch();
+        uint256 totalUSX = base - undistributedRewards;
 
         return Math.mulDiv(totalUSX, 1e18, supply, Math.Rounding.Floor);
     }
