@@ -140,6 +140,9 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
     function _distributeProfits(uint256 profits) internal {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
 
+        // Calculate any undistributed profits from the previous epoch
+        uint256 undistributedFromPreviousEpoch = substractProfitLatestEpoch();
+
         // Portion of the profits are added to the Insurance Buffer
         uint256 insuranceBufferProfits = InsuranceBufferFacet(address(this)).topUpBuffer(profits);
 
@@ -153,8 +156,8 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         uint256 stakerProfitsUSX = stakerProfits * DECIMAL_SCALE_FACTOR;
         $.USX.mintUSX(address($.sUSX), stakerProfitsUSX);
 
-        // Update netEpochProfits
-        $.netEpochProfits = stakerProfits;
+        // Update netEpochProfits to include both new profits and carryover from previous epoch
+        $.netEpochProfits = stakerProfits + undistributedFromPreviousEpoch;
     }
 
     /// @notice Distributes losses to the sUSX contract (USX stakers)
