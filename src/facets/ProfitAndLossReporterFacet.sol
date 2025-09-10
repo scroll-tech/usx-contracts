@@ -81,7 +81,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
                 uint256 scaledNetDeposits = currentNetDeposits * DECIMAL_SCALE_FACTOR;
                 uint256 totalSupply = $.USX.totalSupply();
 
-                // Safe subtraction: only distribute if we have sufficient backing
+                // If we have profits beyond peg recovery, distribute them
                 if (scaledNetDeposits > totalSupply) {
                     _distributeProfits(scaledNetDeposits - totalSupply);
                 }
