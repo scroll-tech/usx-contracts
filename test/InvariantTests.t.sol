@@ -385,7 +385,7 @@ contract InvariantTests is LocalDeployTestSetup {
         totalBalance = bound(totalBalance, 1000e6, type(uint256).max); // Allow maximum possible profit
 
         vm.prank(address(mockAssetManager));
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, totalBalance);
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, totalBalance);
         (bool success,) = address(treasury).call(data);
         require(success, "Profit report failed");
     }
@@ -396,7 +396,7 @@ contract InvariantTests is LocalDeployTestSetup {
         totalBalance = bound(totalBalance, 0, type(uint256).max); // Allow maximum possible loss
 
         vm.prank(address(mockAssetManager));
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, totalBalance);
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, totalBalance);
         (bool success,) = address(treasury).call(data);
         require(success, "Loss report failed");
     }
@@ -458,7 +458,7 @@ contract InvariantTests is LocalDeployTestSetup {
         // First, ensure we have some assets to lose
         if (treasury.assetManagerUSDC() > 0) {
             vm.prank(address(mockAssetManager));
-            bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, lossAmount);
+            bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, lossAmount);
             (bool success,) = address(treasury).call(data);
             require(success, "Extreme loss report failed");
         }
@@ -470,7 +470,7 @@ contract InvariantTests is LocalDeployTestSetup {
         profitAmount = bound(profitAmount, 0, type(uint256).max);
 
         vm.prank(address(mockAssetManager));
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, profitAmount);
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, profitAmount);
         (bool success,) = address(treasury).call(data);
         require(success, "Extreme profit report failed");
     }
@@ -533,11 +533,11 @@ contract InvariantTests is LocalDeployTestSetup {
             } else if (operationType == 2) {
                 // Rapid profit/loss reports
                 vm.prank(address(mockAssetManager));
-                bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, 10000e6);
+                bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 10000e6);
                 (bool success,) = address(treasury).call(data);
                 if (success) {
                     vm.prank(address(mockAssetManager));
-                    data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, 5000e6);
+                    data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 5000e6);
                     (success,) = address(treasury).call(data);
                 }
             } else if (operationType == 3) {
@@ -854,7 +854,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
             // Report massive losses to try to break peg
             vm.prank(address(mockAssetManager));
-            bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, 999999e6);
+            bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 999999e6);
             (bool success,) = address(treasury).call(data);
 
             if (success) {
@@ -885,7 +885,7 @@ contract InvariantTests is LocalDeployTestSetup {
                 // Report losses to try to deplete buffer
                 vm.prank(address(mockAssetManager));
                 data = abi.encodeWithSelector(
-                    ProfitAndLossReporterFacet.reportLosses.selector, treasury.assetManagerUSDC()
+                    ProfitAndLossReporterFacet.assetManagerReport.selector, treasury.assetManagerUSDC()
                 );
                 (success,) = address(treasury).call(data);
             }
@@ -962,7 +962,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
             // Immediately report profits to try to manipulate share price
             vm.prank(address(mockAssetManager));
-            bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, 10000e6);
+            bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 10000e6);
             (bool success,) = address(treasury).call(data);
 
             if (success) {
@@ -1009,7 +1009,7 @@ contract InvariantTests is LocalDeployTestSetup {
         // Report losses to try to break peg
         vm.prank(address(mockAssetManager));
         bytes memory data =
-            abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, flashLoanAmount / 2);
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, flashLoanAmount / 2);
         (bool success,) = address(treasury).call(data);
 
         // "Repay" flash loan
@@ -1034,7 +1034,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
         // Report profits to manipulate share price
         vm.prank(address(mockAssetManager));
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, 100000e6);
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 100000e6);
         (bool success,) = address(treasury).call(data);
 
         // "Repay" flash loan
@@ -1059,7 +1059,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
         // Report massive losses to drain buffer
         vm.prank(address(mockAssetManager));
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, flashLoanAmount);
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, flashLoanAmount);
         (bool success,) = address(treasury).call(data);
 
         // Try to withdraw everything
@@ -1180,7 +1180,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
         // Profit report
         vm.prank(address(mockAssetManager));
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, 10000e6);
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 10000e6);
         (bool success,) = address(treasury).call(data);
 
         // Back-run: Attacker withdraws to capture profits
@@ -1297,7 +1297,7 @@ contract InvariantTests is LocalDeployTestSetup {
                 if (success) {
                     // Try to report losses to see if we can exploit the manipulated balance
                     vm.prank(address(mockAssetManager));
-                    data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, 500e6);
+                    data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 500e6);
                     (success,) = address(treasury).call(data);
                 }
             }
@@ -1410,7 +1410,7 @@ contract InvariantTests is LocalDeployTestSetup {
             if (success) {
                 // Try to report profits/losses to see if we can exploit the manipulated balance
                 vm.prank(address(mockAssetManager));
-                data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, 1000e6);
+                data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 1000e6);
                 (success,) = address(treasury).call(data);
             }
 
@@ -1506,7 +1506,7 @@ contract InvariantTests is LocalDeployTestSetup {
                 if (success) {
                     // Try to report losses to drain the manipulated balance
                     vm.prank(address(mockAssetManager));
-                    data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, 500e6);
+                    data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 500e6);
                     (success,) = address(treasury).call(data);
                 }
             }
@@ -1541,7 +1541,7 @@ contract InvariantTests is LocalDeployTestSetup {
             if (success) {
                 // Try to report massive profits to exploit the manipulated balance
                 vm.prank(address(mockAssetManager));
-                data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, 1000e6);
+                data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 1000e6);
                 (success,) = address(treasury).call(data);
             }
 
@@ -1624,7 +1624,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
             // Try to report losses to see if buffer calculation is affected
             vm.prank(address(mockAssetManager));
-            bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, 500e6);
+            bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 500e6);
             (bool success,) = address(treasury).call(data);
 
             // Check if buffer calculation was affected by direct transfer

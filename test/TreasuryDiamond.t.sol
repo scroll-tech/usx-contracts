@@ -97,8 +97,8 @@ contract TreasuryDiamondTest is LocalDeployTestSetup {
         assertTrue(treasury.facets(ProfitAndLossReporterFacet.successFee.selector) != address(0));
         assertTrue(treasury.facets(ProfitAndLossReporterFacet.profitLatestEpoch.selector) != address(0));
         assertTrue(treasury.facets(ProfitAndLossReporterFacet.profitPerBlock.selector) != address(0));
-        assertTrue(treasury.facets(ProfitAndLossReporterFacet.reportProfits.selector) != address(0));
-        assertTrue(treasury.facets(ProfitAndLossReporterFacet.reportLosses.selector) != address(0));
+        assertTrue(treasury.facets(ProfitAndLossReporterFacet.assetManagerReport.selector) != address(0));
+        assertTrue(treasury.facets(ProfitAndLossReporterFacet.assetManagerReport.selector) != address(0));
         assertTrue(treasury.facets(ProfitAndLossReporterFacet.setSuccessFeeFraction.selector) != address(0));
     }
 

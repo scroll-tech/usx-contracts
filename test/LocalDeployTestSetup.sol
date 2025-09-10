@@ -159,8 +159,8 @@ contract LocalDeployTestSetup is Test {
         profitLossSelectors[0] = ProfitAndLossReporterFacet.successFee.selector;
         profitLossSelectors[1] = ProfitAndLossReporterFacet.profitLatestEpoch.selector;
         profitLossSelectors[2] = ProfitAndLossReporterFacet.profitPerBlock.selector;
-        profitLossSelectors[3] = ProfitAndLossReporterFacet.reportProfits.selector;
-        profitLossSelectors[4] = ProfitAndLossReporterFacet.reportLosses.selector;
+        profitLossSelectors[3] = ProfitAndLossReporterFacet.substractProfitLatestEpoch.selector;
+        profitLossSelectors[4] = ProfitAndLossReporterFacet.assetManagerReport.selector;
         profitLossSelectors[5] = ProfitAndLossReporterFacet.setSuccessFeeFraction.selector;
 
         // Add facets to diamond

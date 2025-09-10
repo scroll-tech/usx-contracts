@@ -150,11 +150,11 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
 
     /*=========================== Report Profits Function Tests =========================*/
 
-    function test_reportProfits_success() public {
+    function test_assetManagerReport_profits_success() public {
         uint256 newTotalBalance = 1100e6; // 1100 USDC (100 USDC profit)
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, newTotalBalance);
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(assetManager);
         (bool success,) = address(treasury).call(data);
@@ -163,11 +163,11 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         // The actual profit distribution logic is working correctly with real contracts
     }
 
-    function test_reportProfits_revert_not_asset_manager() public {
+    function test_assetManagerReport_profits_revert_not_asset_manager() public {
         uint256 newTotalBalance = 1100e6; // 1100 USDC
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, newTotalBalance);
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(user); // Not asset manager
         (bool success,) = address(treasury).call(data);
@@ -176,7 +176,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertFalse(success);
     }
 
-    function test_reportProfits_revert_losses_detected() public {
+    function test_assetManagerReport_profits_revert_losses_detected() public {
         // First, seed the vault with USX so we have leverage to work with
         vm.prank(user);
         usx.deposit(500000e6); // 500,000 USDC deposit to get USX
@@ -201,16 +201,16 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 newTotalBalance = 900e6; // 900 USDC (100 USDC loss from 1000 USDC)
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, newTotalBalance);
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(assetManager);
         (bool success,) = address(treasury).call(data);
 
-        // Should revert due to losses detected
-        assertFalse(success);
+        // Should succeed since assetManagerReport handles both profits and losses automatically
+        assertTrue(success);
     }
 
-    function test_reportProfits_revert_zero_change() public {
+    function test_assetManagerReport_profits_revert_zero_change() public {
         // First, seed the vault with USX so we have leverage to work with
         vm.prank(user);
         usx.deposit(500000e6); // 500,000 USDC deposit to get USX
@@ -235,7 +235,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 newTotalBalance = 1000e6; // Same balance as initial
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, newTotalBalance);
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(assetManager);
         (bool success,) = address(treasury).call(data);
@@ -246,11 +246,11 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
 
     /*=========================== Report Losses Function Tests =========================*/
 
-    function test_reportLosses_success() public {
+    function test_assetManagerReport_losses_success() public {
         uint256 newTotalBalance = 900e6; // 900 USDC (100 USDC loss)
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, newTotalBalance);
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(assetManager);
         (bool success,) = address(treasury).call(data);
@@ -259,11 +259,11 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         // The actual loss distribution logic is working correctly with real contracts
     }
 
-    function test_reportLosses_revert_not_asset_manager() public {
+    function test_assetManagerReport_losses_revert_not_asset_manager() public {
         uint256 newTotalBalance = 900e6; // 900 USDC
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, newTotalBalance);
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(user); // Not asset manager
         (bool success,) = address(treasury).call(data);
@@ -272,33 +272,33 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertFalse(success);
     }
 
-    function test_reportLosses_revert_profits_detected() public {
+    function test_assetManagerReport_losses_revert_profits_detected() public {
         uint256 newTotalBalance = 1100e6; // 1100 USDC (100 USDC profit)
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, newTotalBalance);
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(assetManager);
         (bool success,) = address(treasury).call(data);
 
-        // Should revert due to profits detected
-        assertFalse(success);
+        // Should succeed since assetManagerReport handles both profits and losses automatically
+        assertTrue(success);
     }
 
-    function test_reportLosses_revert_zero_change() public {
+    function test_assetManagerReport_losses_revert_zero_change() public {
         uint256 newTotalBalance = INITIAL_BALANCE; // Same balance
 
         // Call through Treasury
-        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, newTotalBalance);
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, newTotalBalance);
 
         vm.prank(assetManager);
         (bool success,) = address(treasury).call(data);
 
-        // Should revert due to zero value change
-        assertFalse(success);
+        // Should succeed since assetManagerReport handles zero change automatically
+        assertTrue(success);
     }
 
-    function test_reportLosses_stage2_freezes_susx_deposits() public {
+    function test_assetManagerReport_losses_stage2_freezes_susx_deposits() public {
         // Test that reportLosses freezes sUSX deposits when vault USX is burned (Stage 2)
 
         // Setup: Create a scenario where losses exceed insurance buffer but not vault
@@ -340,7 +340,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         // Report losses that exceed buffer but not vault
         vm.prank(address(mockAssetManager));
         bytes memory reportLossesData =
-            abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, finalBalance);
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, finalBalance);
         (bool reportSuccess,) = address(treasury).call(reportLossesData);
         require(reportSuccess, "reportLosses should succeed");
 
@@ -351,7 +351,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertFalse(usx.frozen(), "USX should not be frozen after Stage 2");
     }
 
-    function test_reportLosses_stage3_freezes_usx_deposits_and_withdrawals() public {
+    function test_assetManagerReport_losses_stage3_freezes_usx_deposits_and_withdrawals() public {
         // Test that reportLosses freezes USX deposits and withdrawals when stage 3 is reached
 
         // Setup: Create a scenario where losses exceed both buffer and vault
@@ -398,7 +398,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         // Report losses that exceed both buffer and vault
         vm.prank(address(mockAssetManager));
         bytes memory reportLossesData =
-            abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, finalBalance);
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, finalBalance);
         (bool reportSuccess,) = address(treasury).call(reportLossesData);
         require(reportSuccess, "reportLosses should succeed");
 
@@ -414,7 +414,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertTrue(remainingSupply >= userUSX, "User USX should remain untouched");
     }
 
-    function test_reportLosses_stage1_no_freezing() public {
+    function test_assetManagerReport_losses_stage1_no_freezing() public {
         // Test that reportLosses doesn't freeze anything when losses are covered by insurance buffer
 
         // Setup: Create a scenario where losses are fully covered by insurance buffer
@@ -451,7 +451,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         // Report losses that are covered by buffer
         vm.prank(address(mockAssetManager));
         bytes memory reportLossesData =
-            abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, finalBalance);
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, finalBalance);
         (bool reportSuccess,) = address(treasury).call(reportLossesData);
         require(reportSuccess, "reportLosses should succeed");
 
@@ -460,7 +460,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertFalse(usx.frozen(), "USX should not be frozen after Stage 1");
     }
 
-    function test_reportLosses_edge_case_zero_losses() public {
+    function test_assetManagerReport_losses_edge_case_zero_losses() public {
         // Test reportLosses with zero losses (no freezing should occur)
 
         uint256 initialBalance = 2000e6; // 2,000 USDC
@@ -486,7 +486,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         // Report zero losses
         vm.prank(address(mockAssetManager));
         bytes memory reportLossesData =
-            abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, finalBalance);
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, finalBalance);
         (bool reportSuccess,) = address(treasury).call(reportLossesData);
         require(reportSuccess, "reportLosses should succeed");
 
@@ -668,7 +668,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
 
     /*=========================== Missing Coverage Tests =========================*/
 
-    function test_reportLosses_small_loss_fully_covered_by_buffer() public {
+    function test_assetManagerReport_losses_small_loss_fully_covered_by_buffer() public {
         // Setup: Create a small loss that can be fully covered by the insurance buffer
         uint256 smallLoss = 100e6; // 100 USDC loss
 
@@ -699,7 +699,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         // Asset manager reports a loss (900 USDC, which is 100 USDC less than the 1000 USDC baseline)
         vm.prank(assetManager);
         bytes memory reportLossesData = abi.encodeWithSelector(
-            ProfitAndLossReporterFacet.reportLosses.selector,
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
             900e6 // 900 USDC (100 USDC less than previous 1000 USDC)
         );
         (bool reportLossesSuccess,) = address(treasury).call(reportLossesData);
@@ -716,7 +716,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         // The _distributeLosses function should not be called since remainingLossesAfterInsuranceBuffer = 0
     }
 
-    function test_reportLosses_profits_detected_revert() public {
+    function test_assetManagerReport_losses_profits_detected_revert() public {
         // Setup: Asset manager reports a balance higher than current assetManagerUSDC
         uint256 currentBalance = 1000e6; // Current balance
         uint256 reportedBalance = 1500e6; // Higher reported balance (profit)
@@ -724,11 +724,11 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         // Asset manager reports profits instead of losses
         vm.prank(assetManager);
         bytes memory reportLossesData =
-            abi.encodeWithSelector(ProfitAndLossReporterFacet.reportLosses.selector, reportedBalance);
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, reportedBalance);
         (bool reportLossesSuccess,) = address(treasury).call(reportLossesData);
 
-        // Should fail because profits were detected
-        assertFalse(reportLossesSuccess, "reportLosses should fail when profits are detected");
+        // Should succeed since assetManagerReport handles both profits and losses automatically
+        assertTrue(reportLossesSuccess, "assetManagerReport should succeed when profits are detected");
     }
 
     function test_distributeLosses_sufficient_vault_balance() public {
@@ -755,7 +755,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         // Asset manager reports a loss (1000 USDC, which is 1000 USDC less than the 2000 USDC baseline)
         vm.prank(assetManager);
         bytes memory reportLossesData = abi.encodeWithSelector(
-            ProfitAndLossReporterFacet.reportLosses.selector,
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
             1000e6 // 1000 USDC (1000 USDC less than previous 2000 USDC)
         );
         (bool reportLossesSuccess,) = address(treasury).call(reportLossesData);
@@ -806,7 +806,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         // Asset manager reports profits (insufficient for full peg recovery)
         vm.prank(assetManager);
         bytes memory reportProfitsData = abi.encodeWithSelector(
-            ProfitAndLossReporterFacet.reportProfits.selector,
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
             60000e6 // 60,000 USDC total (10k profit, insufficient for full recovery)
         );
         (bool reportProfitsSuccess,) = address(treasury).call(reportProfitsData);
@@ -857,5 +857,96 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         );
 
         console.log("=== END DEBUG ===");
+    }
+
+    /*=========================== Carryover Logic Tests =========================*/
+
+    function test_undistributed_profits_carryover() public {
+        console.log("=== TESTING UNDISTRIBUTED PROFITS CARRYOVER ===");
+        
+        // Setup
+        vm.prank(user);
+        usx.deposit(1000e6);
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        vm.prank(user);
+        susx.deposit(usxBalance, user);
+        
+        vm.prank(assetManager);
+        bytes memory transferData = abi.encodeWithSelector(
+            AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
+            1000e6
+        );
+        (bool transferSuccess,) = address(treasury).call(transferData);
+        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        
+        console.log("\n=== EPOCH 1: First Profit Report ===");
+        vm.prank(assetManager);
+        bytes memory firstReportData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
+            1100e6 // 100 USDC profit
+        );
+        (bool firstReportSuccess,) = address(treasury).call(firstReportData);
+        require(firstReportSuccess, "First assetManagerReport should succeed");
+        
+        // Get initial undistributed amount
+        bytes memory substractProfitLatestEpochData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.substractProfitLatestEpoch.selector
+        );
+        (bool substractProfitLatestEpochSuccess, bytes memory substractProfitLatestEpochResult) = address(treasury).call(substractProfitLatestEpochData);
+        require(substractProfitLatestEpochSuccess, "substractProfitLatestEpoch call failed");
+        uint256 epoch1InitialUndistributed = abi.decode(substractProfitLatestEpochResult, (uint256));
+        
+        console.log("Epoch 1 initial undistributed:", epoch1InitialUndistributed);
+        
+        console.log("\n=== ADVANCING TIME BY HALF EPOCH ===");
+        uint256 halfEpochDuration = susx.epochDuration() / 2;
+        vm.roll(block.number + halfEpochDuration);
+        
+        (bool substractProfitLatestEpochSuccess2, bytes memory substractProfitLatestEpochResult2) = address(treasury).call(substractProfitLatestEpochData);
+        require(substractProfitLatestEpochSuccess2, "substractProfitLatestEpoch call failed");
+        uint256 epoch1HalfUndistributed = abi.decode(substractProfitLatestEpochResult2, (uint256));
+        
+        console.log("Epoch 1 undistributed after half epoch:", epoch1HalfUndistributed);
+        
+        console.log("\n=== EPOCH 2: Early Reporting (Before Epoch 1 Ends) ===");
+        vm.prank(assetManager);
+        bytes memory secondReportData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
+            1200e6 // Another 100 USDC profit
+        );
+        (bool secondReportSuccess,) = address(treasury).call(secondReportData);
+        require(secondReportSuccess, "Second assetManagerReport should succeed");
+        
+        // Get values after second report
+        (bool substractProfitLatestEpochSuccess3, bytes memory substractProfitLatestEpochResult3) = address(treasury).call(substractProfitLatestEpochData);
+        require(substractProfitLatestEpochSuccess3, "substractProfitLatestEpoch call failed");
+        uint256 epoch2InitialUndistributed = abi.decode(substractProfitLatestEpochResult3, (uint256));
+        
+        console.log("Epoch 2 initial undistributed:", epoch2InitialUndistributed);
+        
+        console.log("\n=== VERIFICATION ===");
+        console.log("Epoch 1 had", epoch1HalfUndistributed, "USDC remaining");
+        console.log("Epoch 2 now shows", epoch2InitialUndistributed, "USDC undistributed");
+        
+        // Verify the carryover worked
+        assertTrue(epoch2InitialUndistributed > epoch1HalfUndistributed, "Epoch 2 should have more undistributed rewards than Epoch 1's carryover");
+        console.log("Carryover mechanism is working correctly!");
+        
+        // Test that the system continues to distribute linearly
+        console.log("\n=== TESTING LINEAR DISTRIBUTION ===");
+        vm.roll(block.number + 1000);
+        uint256 sharePriceAfter1000Blocks = susx.sharePrice();
+        console.log("Share price after advancing 1000 blocks:", sharePriceAfter1000Blocks);
+        
+        (bool substractProfitLatestEpochSuccess4, bytes memory substractProfitLatestEpochResult4) = address(treasury).call(substractProfitLatestEpochData);
+        require(substractProfitLatestEpochSuccess4, "substractProfitLatestEpoch call failed");
+        uint256 undistributedAfter1000Blocks = abi.decode(substractProfitLatestEpochResult4, (uint256));
+        console.log("Undistributed rewards after 1000 blocks:", undistributedAfter1000Blocks);
+        
+        // Verify that undistributed rewards are decreasing (linear distribution)
+        assertTrue(undistributedAfter1000Blocks < epoch2InitialUndistributed, "Undistributed rewards should decrease over time");
+        console.log("Linear distribution is working correctly!");
     }
 }

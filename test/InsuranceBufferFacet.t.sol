@@ -229,7 +229,7 @@ contract InsuranceBufferFacetTest is LocalDeployTestSetup {
 
     /*=========================== topUpBuffer Integration Tests =========================*/
 
-    function test_topUpBuffer_through_reportProfits_success() public {
+    function test_topUpBuffer_through_assetManagerReport_success() public {
         // Test topUpBuffer functionality through REAL profit reporting flow
         // First, create realistic USX balances through user deposits
         vm.prank(user);
@@ -264,14 +264,14 @@ contract InsuranceBufferFacetTest is LocalDeployTestSetup {
 
         // Asset manager reports the new total balance (including profits)
         vm.prank(assetManager);
-        bytes memory reportProfitsData = abi.encodeWithSelector(
-            ProfitAndLossReporterFacet.reportProfits.selector,
+        bytes memory assetManagerReportData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
             150000e6 // 150,000 USDC total balance (100k initial + 50k profit)
         );
-        (bool reportProfitsSuccess,) = address(treasury).call(reportProfitsData);
+        (bool assetManagerReportSuccess,) = address(treasury).call(assetManagerReportData);
 
         // Should succeed
-        assertTrue(reportProfitsSuccess, "reportProfits should succeed");
+        assertTrue(assetManagerReportSuccess, "assetManagerReport should succeed");
 
         // Check if buffer was topped up
         uint256 finalBufferSize = usx.balanceOf(address(treasury));
@@ -292,7 +292,7 @@ contract InsuranceBufferFacetTest is LocalDeployTestSetup {
         }
     }
 
-    function test_topUpBuffer_through_reportProfits_large_profit() public {
+    function test_topUpBuffer_through_assetManagerReport_large_profit() public {
         // Test topUpBuffer with large profits
         // First, create realistic USX balances through user deposits
         vm.prank(user);
@@ -324,14 +324,14 @@ contract InsuranceBufferFacetTest is LocalDeployTestSetup {
 
         // Asset manager earns 300,000 USDC profit (total balance now 500,000 USDC)
         vm.prank(assetManager);
-        bytes memory reportProfitsData = abi.encodeWithSelector(
-            ProfitAndLossReporterFacet.reportProfits.selector,
+        bytes memory assetManagerReportData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
             500000e6 // 500,000 USDC total balance (200k initial + 300k profit)
         );
-        (bool reportProfitsSuccess,) = address(treasury).call(reportProfitsData);
+        (bool assetManagerReportSuccess,) = address(treasury).call(assetManagerReportData);
 
         // Should succeed
-        assertTrue(reportProfitsSuccess, "reportProfits should succeed");
+        assertTrue(assetManagerReportSuccess, "assetManagerReport should succeed");
 
         // Check if buffer was topped up
         uint256 finalBufferSize = usx.balanceOf(address(treasury));
@@ -346,7 +346,7 @@ contract InsuranceBufferFacetTest is LocalDeployTestSetup {
         }
     }
 
-    function test_topUpBuffer_through_reportProfits_no_topup_needed() public {
+    function test_topUpBuffer_through_assetManagerReport_no_topup_needed() public {
         // Test that topUpBuffer doesn't run when buffer is already at or above target
         // First, create realistic USX balances through user deposits
         vm.prank(user);
@@ -398,14 +398,14 @@ contract InsuranceBufferFacetTest is LocalDeployTestSetup {
 
         // Asset manager earns 5,000 USDC profit (total balance now 10,000 USDC)
         vm.prank(assetManager);
-        bytes memory reportProfitsData = abi.encodeWithSelector(
-            ProfitAndLossReporterFacet.reportProfits.selector,
+        bytes memory assetManagerReportData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
             10000e6 // 10,000 USDC total balance (5k initial + 5k profit)
         );
-        (bool reportProfitsSuccess,) = address(treasury).call(reportProfitsData);
+        (bool assetManagerReportSuccess,) = address(treasury).call(assetManagerReportData);
 
         // Should succeed
-        assertTrue(reportProfitsSuccess, "reportProfits should succeed");
+        assertTrue(assetManagerReportSuccess, "assetManagerReport should succeed");
 
         // Check if buffer was topped up
         uint256 finalBufferSize = usx.balanceOf(address(treasury));
@@ -433,7 +433,7 @@ contract InsuranceBufferFacetTest is LocalDeployTestSetup {
         }
     }
 
-    function test_topUpBuffer_through_reportProfits_zero_profit() public {
+    function test_topUpBuffer_through_assetManagerReport_zero_profit() public {
         // Test topUpBuffer behavior with zero profit (edge case)
         // First, create realistic USX balances through user deposits
         vm.prank(user);
@@ -465,14 +465,14 @@ contract InsuranceBufferFacetTest is LocalDeployTestSetup {
 
         // Asset manager reports same balance (no profit earned)
         vm.prank(assetManager);
-        bytes memory reportProfitsData = abi.encodeWithSelector(
-            ProfitAndLossReporterFacet.reportProfits.selector,
+        bytes memory assetManagerReportData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
             10000e6 // 10,000 USDC total balance (10k initial + 0k profit)
         );
-        (bool reportProfitsSuccess,) = address(treasury).call(reportProfitsData);
+        (bool assetManagerReportSuccess,) = address(treasury).call(assetManagerReportData);
 
         // Should succeed even with zero profit
-        assertTrue(reportProfitsSuccess, "reportProfits should succeed with zero profit");
+        assertTrue(assetManagerReportSuccess, "assetManagerReport should succeed with zero profit");
 
         // Check buffer size - should remain the same since no profit to top up with
         uint256 finalBufferSize = usx.balanceOf(address(treasury));

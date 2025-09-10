@@ -890,7 +890,8 @@ contract USXTest is LocalDeployTestSetup {
         assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "No outstanding requests");
 
         uint256 userUSDCBalanceAfter = usdc.balanceOf(user);
-        assertEq(userUSDCBalanceAfter, userUSDCBalanceBefore + 500000e6, "User should receive 500,000 USDC automatically");
+        assertEq(
+            userUSDCBalanceAfter, userUSDCBalanceBefore + 500000e6, "User should receive 500,000 USDC automatically"
+        );
     }
-
 }

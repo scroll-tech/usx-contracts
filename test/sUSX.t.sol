@@ -178,7 +178,7 @@ contract sUSXTest is LocalDeployTestSetup {
         // Asset manager earns 500 USDC profit (total balance now 1000 USDC)
         vm.prank(assetManager);
         bytes memory reportProfitsData = abi.encodeWithSelector(
-            ProfitAndLossReporterFacet.reportProfits.selector,
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
             1000e6 // 1000 USDC total balance (500k initial + 500k profit)
         );
         (bool success,) = address(treasury).call(reportProfitsData);
@@ -200,7 +200,7 @@ contract sUSXTest is LocalDeployTestSetup {
         // Asset manager earns additional 500 USDC profit (total balance now 1500 USDC)
         vm.prank(assetManager);
         bytes memory secondReportData = abi.encodeWithSelector(
-            ProfitAndLossReporterFacet.reportProfits.selector,
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
             1500e6 // 1500 USDC total balance (1000k previous + 500k additional profit)
         );
         (bool secondSuccess,) = address(treasury).call(secondReportData);
@@ -258,7 +258,7 @@ contract sUSXTest is LocalDeployTestSetup {
         // Asset manager earns 500 USDC profit (total balance now 1000 USDC)
         vm.prank(assetManager);
         bytes memory firstReportData = abi.encodeWithSelector(
-            ProfitAndLossReporterFacet.reportProfits.selector,
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
             1000e6 // 1000 USDC total balance (500k initial + 500k profit)
         );
         (bool firstSuccess,) = address(treasury).call(firstReportData);
@@ -272,7 +272,7 @@ contract sUSXTest is LocalDeployTestSetup {
         // Asset manager earns additional 500 USDC profit (total balance now 1500 USDC)
         vm.prank(assetManager);
         bytes memory secondReportData = abi.encodeWithSelector(
-            ProfitAndLossReporterFacet.reportProfits.selector,
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
             1500e6 // 1500 USDC total balance (1000k previous + 500k additional profit)
         );
         (bool secondSuccess,) = address(treasury).call(secondReportData);
@@ -385,7 +385,7 @@ contract sUSXTest is LocalDeployTestSetup {
         // Start new epoch (this happens when asset manager reports profits/losses)
         vm.prank(assetManager);
         bytes memory reportData = abi.encodeWithSelector(
-            ProfitAndLossReporterFacet.reportProfits.selector,
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
             1000e6 // Report same balance (no profit)
         );
         (bool success,) = address(treasury).call(reportData);
@@ -501,7 +501,7 @@ contract sUSXTest is LocalDeployTestSetup {
 
         // Start new epoch
         vm.prank(assetManager);
-        bytes memory reportData = abi.encodeWithSelector(ProfitAndLossReporterFacet.reportProfits.selector, 1000e6);
+        bytes memory reportData = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 1000e6);
         (bool success,) = address(treasury).call(reportData);
         require(success, "reportProfits should succeed");
 
@@ -552,7 +552,7 @@ contract sUSXTest is LocalDeployTestSetup {
 
         vm.prank(assetManager);
         bytes memory reportData = abi.encodeWithSelector(
-            ProfitAndLossReporterFacet.reportProfits.selector,
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
             1500e6 // 1500 USDC total (1000 initial + 500 profit)
         );
         (bool success,) = address(treasury).call(reportData);
