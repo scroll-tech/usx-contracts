@@ -182,27 +182,31 @@ contract RoundingAnalysis is Test {
 
     function _analyzeSUSXSharePriceRounding() internal {
         uint256 totalSupply = susx.totalSupply();
-        uint256 totalAssets = susx.totalAssets();
 
         if (totalSupply > 0) {
-            try susx.sharePrice() returns (uint256 actualSharePrice) {
-                uint256 expectedSharePrice = (totalAssets * 1e18) / totalSupply;
-                uint256 roundingAmount = actualSharePrice > expectedSharePrice
-                    ? actualSharePrice - expectedSharePrice
-                    : expectedSharePrice - actualSharePrice;
+            // Get actual share price from the contract
+            uint256 actualSharePrice = susx.sharePrice();
+            
+            // Calculate expected share price using simple division (no Math.mulDiv)
+            uint256 totalAssets = susx.totalAssets();
+            uint256 expectedSharePrice = (totalAssets * 1e18) / totalSupply;
+            
+            // Check for rounding differences between actual and expected
+            uint256 roundingAmount = actualSharePrice > expectedSharePrice
+                ? actualSharePrice - expectedSharePrice
+                : expectedSharePrice - actualSharePrice;
 
-                if (roundingAmount > 0) {
-                    _addRoundingEvent(
-                        "sUSX.sol",
-                        "Share Price Calculation",
-                        totalAssets,
-                        expectedSharePrice,
-                        actualSharePrice,
-                        roundingAmount,
-                        actualSharePrice < expectedSharePrice
-                    );
-                }
-            } catch {}
+            if (roundingAmount > 0) {
+                _addRoundingEvent(
+                    "sUSX.sol",
+                    "Share Price Calculation",
+                    totalAssets,
+                    expectedSharePrice,
+                    actualSharePrice,
+                    roundingAmount,
+                    actualSharePrice < expectedSharePrice
+                );
+            }
         }
     }
 
