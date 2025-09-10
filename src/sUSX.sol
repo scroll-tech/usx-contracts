@@ -153,8 +153,8 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
         uint256 USXAmount =
             Math.mulDiv($.withdrawalRequests[withdrawalId].amount, sharePrice(), 1e18, Math.Rounding.Floor);
 
-        // Burn sUSX shares equal to USX amount
-        _burn(msg.sender, USXAmount);
+        // Burn sUSX shares
+        _burn(msg.sender, $.withdrawalRequests[withdrawalId].amount);
 
         // Distribute portion of USX to the Governance Warchest
         uint256 governanceWarchestPortion = withdrawalFee(USXAmount);
