@@ -86,7 +86,6 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertEq(successFeeAmount, expectedFee);
     }
 
-
     function test_profitLatestEpoch_default_value() public {
         // Call through Treasury
         bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.profitLatestEpoch.selector);
@@ -144,7 +143,6 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         // Should return 0 since netEpochProfits is still 0
         assertEq(profitPerBlock, 0);
     }
-
 
     function test_assetManagerReport_profits_success() public {
         uint256 newTotalBalance = 1100e6; // 1100 USDC (100 USDC profit)
@@ -243,7 +241,6 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         // Should succeed even with zero profit (this is valid behavior)
         assertTrue(success);
     }
-
 
     function test_assetManagerReport_losses_success() public {
         uint256 newTotalBalance = 900e6; // 900 USDC (100 USDC loss)
@@ -604,7 +601,6 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertTrue(success);
     }
 
-
     /*=========================== INTEGRATION TESTS =========================*/
 
     function test_successFee_edge_cases() public {
@@ -938,7 +934,6 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         console.log("=== END DEBUG ===");
     }
 
-
     function test_undistributed_profits_carryover() public {
         console.log("=== TESTING UNDISTRIBUTED PROFITS CARRYOVER ===");
 
@@ -1034,17 +1029,16 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         console.log("Linear distribution is working correctly!");
     }
 
-
     function test_simple_profit_reporting() public {
         console.log("\n=== SIMPLE PROFIT REPORTING TEST ===");
-        
+
         // Setup: User deposits 1000 USDC
         vm.prank(user);
         usx.deposit(1000e6); // 1000 USDC
-        
+
         uint256 initialUSXSupply = usx.totalSupply();
         console.log("Initial USX supply:", initialUSXSupply / 1e18);
-        
+
         // Asset manager reports 100 USDC profit (total balance 100 USDC)
         vm.prank(assetManager);
         bytes memory reportData = abi.encodeWithSelector(
@@ -1053,30 +1047,30 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         );
         (bool success,) = address(treasury).call(reportData);
         require(success, "Profit report should succeed");
-        
+
         uint256 finalUSXSupply = usx.totalSupply();
         uint256 usxMinted = finalUSXSupply - initialUSXSupply;
-        
+
         console.log("Final USX supply:", finalUSXSupply / 1e18);
         console.log("USX minted:", usxMinted / 1e18);
-        
+
         // Verify: 100 USDC profit should mint ~100 USX
         assertGt(usxMinted, 0, "USX should be minted for profits");
         assertEq(usxMinted, 100e18, "USX minted should equal profit amount");
-        
+
         console.log("Profit reporting works correctly");
     }
 
     function test_loss_insurance_buffer_only() public {
         console.log("\n=== LOSS: INSURANCE BUFFER ONLY ===");
-        
+
         // Setup: Large deposit to create buffer
         vm.prank(user);
         usx.deposit(10000e6); // 10,000 USDC
-        
+
         uint256 initialUSXSupply = usx.totalSupply();
         console.log("Initial USX supply:", initialUSXSupply / 1e18);
-        
+
         // First create profits to build up insurance buffer
         vm.prank(assetManager);
         bytes memory profitData = abi.encodeWithSelector(
@@ -1085,10 +1079,10 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         );
         (bool profitSuccess,) = address(treasury).call(profitData);
         require(profitSuccess, "Profit report should succeed");
-        
+
         uint256 afterProfitUSXSupply = usx.totalSupply();
         console.log("USX supply after profit:", afterProfitUSXSupply / 1e18);
-        
+
         // Now report small loss (100 USDC) - should only affect insurance buffer
         vm.prank(assetManager);
         bytes memory reportData = abi.encodeWithSelector(
@@ -1097,47 +1091,45 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         );
         (bool success,) = address(treasury).call(reportData);
         require(success, "Loss report should succeed");
-        
+
         // Check that USX supply is unchanged (loss covered by buffer)
         uint256 finalUSXSupply = usx.totalSupply();
         console.log("Final USX supply:", finalUSXSupply / 1e18);
-        
+
         // Verify: 100 USX should be burned to cover the loss
         uint256 usxBurned = afterProfitUSXSupply - finalUSXSupply;
         assertEq(usxBurned, 100e18, "100 USX should be burned to cover the loss");
-        
+
         console.log("Small loss covered by insurance buffer (100 USX burned)");
     }
 
     function test_loss_insurance_buffer_and_vault() public {
         console.log("\n=== LOSS: INSURANCE BUFFER + VAULT ===");
-        
+
         // Setup: Create large deposit and sUSX vault
         vm.prank(user);
         usx.deposit(10000e6); // 10,000 USDC
-        
+
         // Deposit USX to sUSX vault
         uint256 usxBalance = usx.balanceOf(user);
         vm.prank(user);
         usx.approve(address(susx), usxBalance);
         vm.prank(user);
         susx.deposit(usxBalance, user);
-        
+
         uint256 initialUSXSupply = usx.totalSupply();
         uint256 initialVaultUSX = usx.balanceOf(address(susx));
-        
+
         console.log("Initial USX supply:", initialUSXSupply / 1e18);
         console.log("Initial vault USX:", initialVaultUSX / 1e18);
-        
+
         // Set asset manager first
         vm.prank(governance);
-        bytes memory setAssetManagerData = abi.encodeWithSelector(
-            AssetManagerAllocatorFacet.setAssetManager.selector, 
-            address(mockAssetManager)
-        );
+        bytes memory setAssetManagerData =
+            abi.encodeWithSelector(AssetManagerAllocatorFacet.setAssetManager.selector, address(mockAssetManager));
         (bool success,) = address(treasury).call(setAssetManagerData);
         require(success, "setAssetManager should succeed");
-        
+
         // Transfer 5000 USDC to asset manager
         vm.prank(assetManager);
         bytes memory transferData = abi.encodeWithSelector(
@@ -1146,7 +1138,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         );
         (bool transferSuccess,) = address(treasury).call(transferData);
         require(transferSuccess, "Transfer should succeed");
-        
+
         // Report large loss (2000 USDC) - should burn insurance buffer + some vault USX
         vm.prank(assetManager);
         bytes memory reportData = abi.encodeWithSelector(
@@ -1155,21 +1147,21 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         );
         (success,) = address(treasury).call(reportData);
         require(success, "Loss report should succeed");
-        
+
         uint256 finalUSXSupply = usx.totalSupply();
         uint256 finalVaultUSX = usx.balanceOf(address(susx));
         uint256 usxBurned = initialUSXSupply - finalUSXSupply;
         uint256 vaultUSXBurned = initialVaultUSX - finalVaultUSX;
-        
+
         console.log("Final USX supply:", finalUSXSupply / 1e18);
         console.log("Final vault USX:", finalVaultUSX / 1e18);
         console.log("USX burned:", usxBurned / 1e18);
         console.log("Vault USX burned:", vaultUSXBurned / 1e18);
-        
+
         // Verify: Some USX should be burned
         assertGt(usxBurned, 0, "USX should be burned for large losses");
         assertGt(vaultUSXBurned, 0, "Vault USX should be burned");
-        
+
         console.log("Large loss burns insurance buffer and vault USX");
     }
 }

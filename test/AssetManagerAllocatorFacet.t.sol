@@ -146,7 +146,6 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         assertEq(maxLeverage, expectedMaxLeverage);
     }
 
-
     function test_checkMaxLeverage_within_limit() public {
         // First, seed the vault with USX so we have leverage to work with
         vm.prank(user);
@@ -254,7 +253,6 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         // Should reject very large allocation
         assertFalse(allowed);
     }
-
 
     function test_netDeposits_empty_treasury() public {
         // Ensure treasury has no USDC by transferring it all out
@@ -431,7 +429,6 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         // Should revert due to zero address
         assertFalse(success);
     }
-
 
     function test_transferUSDCtoAssetManager_success() public {
         // First, seed the vault with USX so we have leverage to work with

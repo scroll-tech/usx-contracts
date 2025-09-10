@@ -151,7 +151,6 @@ contract USXTest is LocalDeployTestSetup {
         assertEq(usx.totalOutstandingWithdrawalAmount(), 50e6, "Total outstanding should be 50 USDC");
     }
 
-
     function test_requestUSDC_multiple_requests_mixed_behavior() public {
         // Test multiple withdrawal requests with mixed automatic transfer and fallback behavior
         vm.prank(user);
@@ -279,7 +278,6 @@ contract USXTest is LocalDeployTestSetup {
         assertEq(usx.outstandingWithdrawalRequests(user), 0, "User should have no withdrawal request when frozen");
         assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0 when frozen");
     }
-
 
     function test_claimUSDC_success_with_withdrawal_request() public {
         // Test the complete flow: deposit -> requestUSDC (creates withdrawal request) -> claimUSDC
@@ -838,7 +836,6 @@ contract USXTest is LocalDeployTestSetup {
         usx.setGovernance(address(0));
     }
 
-
     function test_whitelisted_users_mapping() public {
         // Test that whitelisted users mapping works correctly
 
@@ -869,7 +866,6 @@ contract USXTest is LocalDeployTestSetup {
     }
 
     /*=========================== INTEGRATION TESTS =========================*/
-
 
     function test_claimUSDC_revert_no_outstanding_requests() public {
         // Setup: User with no outstanding withdrawal requests

@@ -186,11 +186,11 @@ contract RoundingAnalysis is Test {
         if (totalSupply > 0) {
             // Get actual share price from the contract
             uint256 actualSharePrice = susx.sharePrice();
-            
+
             // Calculate expected share price using simple division (no Math.mulDiv)
             uint256 totalAssets = susx.totalAssets();
             uint256 expectedSharePrice = (totalAssets * 1e18) / totalSupply;
-            
+
             // Check for rounding differences between actual and expected
             uint256 roundingAmount = actualSharePrice > expectedSharePrice
                 ? actualSharePrice - expectedSharePrice

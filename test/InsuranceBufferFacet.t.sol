@@ -525,7 +525,6 @@ contract InsuranceBufferFacetTest is LocalDeployTestSetup {
         console.log("  Vault USX balance:", usx.balanceOf(address(susx)));
     }
 
-
     function test_slashBuffer_insufficient_buffer() public {
         // Setup: Create a scenario where the loss exceeds the buffer size
         uint256 largeLoss = 10000e6; // 10,000 USDC loss

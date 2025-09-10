@@ -58,7 +58,6 @@ contract sUSXTest is LocalDeployTestSetup {
         assertEq(susx.sharePrice(), 1e18);
     }
 
-
     function test_withdrawal_fee_calculation() public {
         uint256 amount = 1000e18; // 1000 USX
 
@@ -144,7 +143,6 @@ contract sUSXTest is LocalDeployTestSetup {
         vm.expectRevert(sUSX.ZeroAddress.selector);
         susx.setGovernance(address(0));
     }
-
 
     function test_profit_rollover_before_30_day_distribution() public {
         // This test verifies that profits roll over correctly when a new epoch starts
@@ -289,7 +287,6 @@ contract sUSXTest is LocalDeployTestSetup {
 
         assertTrue(true, "Multiple profit reports test completed successfully");
     }
-
 
     function test_withdraw_creates_request() public {
         // Setup: User deposits USX to get sUSX
