@@ -292,6 +292,10 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
         internal
         override
     {
+        if (caller != owner) {
+            _spendAllowance(owner, caller, shares);
+        }
+
         // Record withdrawal request
         SUSXStorage storage $ = _getStorage();
         $.withdrawalRequests[$.withdrawalIdCounter] =
