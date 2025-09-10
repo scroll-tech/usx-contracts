@@ -151,6 +151,9 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         uint256 USXAmount =
             Math.mulDiv($.withdrawalRequests[withdrawalId].amount, sharePrice(), 1e18, Math.Rounding.Floor);
 
+        // Burn sUSX shares equal to USX amount
+        _burn(msg.sender, USXAmount);
+
         // Distribute portion of USX to the Governance Warchest
         uint256 governanceWarchestPortion = withdrawalFee(USXAmount);
         bool success = $.USX.transfer($.treasury.governanceWarchest(), governanceWarchestPortion);
@@ -283,13 +286,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
         internal
         override
     {
-        // Note: ERC4626 withdraw() already checks balance via maxWithdraw()
-        // so this check is redundant and will never be reached
-        // if (balanceOf(owner) < shares) revert InsufficientBalance();
-
-        // Burn sUSX shares
-        _burn(owner, shares);
-
         // Record withdrawal request
         SUSXStorage storage $ = _getStorage();
         $.withdrawalRequests[$.withdrawalIdCounter] =
