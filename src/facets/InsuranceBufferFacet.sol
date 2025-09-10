@@ -20,18 +20,18 @@ contract InsuranceBufferFacet is TreasuryStorage {
 
     /*=========================== Governance Functions =========================*/
 
-    /// @notice Sets renewal fraction with precision to 0.001 percent (Minimal value & default is 10% fee == 100000)
+    /// @notice Sets renewal fraction with precision to 0.001 percent (Minimal value & default is 10% fee == 100000, max value is 100%)
     /// @param _bufferRenewalRate The new renewal fraction
     function setBufferRenewalRate(uint256 _bufferRenewalRate) external onlyGovernance {
-        if (_bufferRenewalRate < 100000) revert InvalidBufferRenewalRate();
+        if (_bufferRenewalRate < 100000 || _bufferRenewalRate > 1000000) revert InvalidBufferRenewalRate();
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         $.bufferRenewalFraction = _bufferRenewalRate;
     }
 
-    /// @notice Sets buffer target with precision to 0.001 percent (Minimum value & default is 5% == 50000)
+    /// @notice Sets buffer target with precision to 0.001 percent (Minimum value & default is 5% == 50000, max value is 100%)
     /// @param _bufferTargetFraction The new buffer target fraction
     function setBufferTargetFraction(uint256 _bufferTargetFraction) external onlyGovernance {
-        if (_bufferTargetFraction < 50000) revert InvalidBufferTargetFraction();
+        if (_bufferTargetFraction < 50000 || _bufferTargetFraction > 1000000) revert InvalidBufferTargetFraction();
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         $.bufferTargetFraction = _bufferTargetFraction;
     }
