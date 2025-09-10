@@ -399,6 +399,234 @@ contract USXTest is LocalDeployTestSetup {
         assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0");
     }
 
+    function test_claimUSDC_partial_claim_success() public {
+        // Test partial claim when contract has insufficient USDC for full request
+        vm.prank(user);
+        usx.deposit(100e6); // 100 USDC deposit
+
+        // Ensure contract has no USDC initially (creates withdrawal request)
+        uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
+        if (contractUSDCBalance > 0) {
+            vm.prank(address(usx));
+            usdc.transfer(address(treasury), contractUSDCBalance);
+        }
+
+        // Request USDC withdrawal (creates withdrawal request)
+        vm.prank(user);
+        usx.requestUSDC(100e18); // Request 100 USX (100 USDC)
+
+        // Verify withdrawal request was created
+        assertEq(usx.outstandingWithdrawalRequests(user), 100e6, "User should have 100 USDC withdrawal request");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 100e6, "Total outstanding should be 100 USDC");
+
+        // Give contract only 60 USDC (less than requested 100)
+        deal(address(usdc), address(usx), 60e6);
+
+        uint256 userUSDCBalanceBefore = usdc.balanceOf(user);
+
+        // Claim USDC (should claim partial amount)
+        vm.prank(user);
+        usx.claimUSDC();
+
+        // Verify partial claim was processed
+        assertEq(usx.outstandingWithdrawalRequests(user), 40e6, "User should have 40 USDC remaining request");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 40e6, "Total outstanding should be 40 USDC");
+        assertEq(usdc.balanceOf(address(usx)), 0, "Contract should have no USDC left");
+
+        // Verify user received partial USDC
+        uint256 userUSDCBalanceAfter = usdc.balanceOf(user);
+        assertEq(userUSDCBalanceAfter, userUSDCBalanceBefore + 60e6, "User should receive 60 USDC");
+    }
+
+    function test_claimUSDC_partial_claim_multiple_claims() public {
+        // Test multiple partial claims over time
+        vm.prank(user);
+        usx.deposit(100e6); // 100 USDC deposit
+
+        // Ensure contract has no USDC initially
+        uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
+        if (contractUSDCBalance > 0) {
+            vm.prank(address(usx));
+            usdc.transfer(address(treasury), contractUSDCBalance);
+        }
+
+        // Request USDC withdrawal
+        vm.prank(user);
+        usx.requestUSDC(100e18); // Request 100 USX (100 USDC)
+
+        uint256 userUSDCBalanceBefore = usdc.balanceOf(user);
+
+        // First partial claim - give contract 30 USDC
+        deal(address(usdc), address(usx), 30e6);
+        vm.prank(user);
+        usx.claimUSDC();
+
+        // Verify first partial claim
+        assertEq(usx.outstandingWithdrawalRequests(user), 70e6, "User should have 70 USDC remaining after first claim");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 70e6, "Total outstanding should be 70 USDC");
+        assertEq(usdc.balanceOf(address(usx)), 0, "Contract should have no USDC left");
+
+        // Second partial claim - give contract 50 USDC
+        deal(address(usdc), address(usx), 50e6);
+        vm.prank(user);
+        usx.claimUSDC();
+
+        // Verify second partial claim
+        assertEq(usx.outstandingWithdrawalRequests(user), 20e6, "User should have 20 USDC remaining after second claim");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 20e6, "Total outstanding should be 20 USDC");
+        assertEq(usdc.balanceOf(address(usx)), 0, "Contract should have no USDC left");
+
+        // Final claim - give contract 20 USDC
+        deal(address(usdc), address(usx), 20e6);
+        vm.prank(user);
+        usx.claimUSDC();
+
+        // Verify final claim
+        assertEq(
+            usx.outstandingWithdrawalRequests(user), 0, "User should have no outstanding requests after final claim"
+        );
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0");
+        assertEq(usdc.balanceOf(address(usx)), 0, "Contract should have no USDC left");
+
+        // Verify total USDC received
+        uint256 userUSDCBalanceAfter = usdc.balanceOf(user);
+        assertEq(
+            userUSDCBalanceAfter, userUSDCBalanceBefore + 100e6, "User should receive total 100 USDC across all claims"
+        );
+    }
+
+    function test_claimUSDC_revert_zero_contract_balance() public {
+        // Test that claiming with zero contract balance reverts
+        vm.prank(user);
+        usx.deposit(100e6); // 100 USDC deposit
+
+        // Ensure contract has no USDC initially
+        uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
+        if (contractUSDCBalance > 0) {
+            vm.prank(address(usx));
+            usdc.transfer(address(treasury), contractUSDCBalance);
+        }
+
+        // Request USDC withdrawal
+        vm.prank(user);
+        usx.requestUSDC(100e18); // Request 100 USX (100 USDC)
+
+        // Try to claim with zero contract balance - should revert
+        vm.prank(user);
+        vm.expectRevert(USX.InsufficientUSDC.selector);
+        usx.claimUSDC();
+
+        // Verify request remains unchanged
+        assertEq(usx.outstandingWithdrawalRequests(user), 100e6, "User should still have 100 USDC request");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 100e6, "Total outstanding should still be 100 USDC");
+        assertEq(usdc.balanceOf(address(usx)), 0, "Contract should have no USDC");
+    }
+
+    function test_claimUSDC_partial_claim_exact_balance() public {
+        // Test partial claim when contract has exactly the requested amount
+        vm.prank(user);
+        usx.deposit(100e6); // 100 USDC deposit
+
+        // Ensure contract has no USDC initially
+        uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
+        if (contractUSDCBalance > 0) {
+            vm.prank(address(usx));
+            usdc.transfer(address(treasury), contractUSDCBalance);
+        }
+
+        // Request USDC withdrawal
+        vm.prank(user);
+        usx.requestUSDC(100e18); // Request 100 USX (100 USDC)
+
+        // Give contract exactly 100 USDC
+        deal(address(usdc), address(usx), 100e6);
+
+        uint256 userUSDCBalanceBefore = usdc.balanceOf(user);
+
+        // Claim USDC (should claim full amount)
+        vm.prank(user);
+        usx.claimUSDC();
+
+        // Verify full claim was processed
+        assertEq(usx.outstandingWithdrawalRequests(user), 0, "User should have no outstanding requests");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0");
+        assertEq(usdc.balanceOf(address(usx)), 0, "Contract should have no USDC left");
+
+        // Verify user received full USDC
+        uint256 userUSDCBalanceAfter = usdc.balanceOf(user);
+        assertEq(userUSDCBalanceAfter, userUSDCBalanceBefore + 100e6, "User should receive 100 USDC");
+    }
+
+    function test_claimUSDC_partial_claim_multiple_users() public {
+        // Test partial claims with multiple users
+        address user2 = address(0x1234);
+
+        // Whitelist both users
+        vm.prank(admin);
+        usx.whitelistUser(user2, true);
+
+        // Give user2 USDC and approve USX contract
+        deal(address(usdc), user2, 1000e6);
+        vm.prank(user2);
+        usdc.approve(address(usx), 1000e6);
+
+        // Both users deposit
+        vm.prank(user);
+        usx.deposit(100e6); // 100 USDC deposit
+        vm.prank(user2);
+        usx.deposit(100e6); // 100 USDC deposit
+
+        // Ensure contract has no USDC initially
+        uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
+        if (contractUSDCBalance > 0) {
+            vm.prank(address(usx));
+            usdc.transfer(address(treasury), contractUSDCBalance);
+        }
+
+        // Both users request USDC withdrawal
+        vm.prank(user);
+        usx.requestUSDC(100e18); // Request 100 USX (100 USDC)
+        vm.prank(user2);
+        usx.requestUSDC(100e18); // Request 100 USX (100 USDC)
+
+        // Verify both requests were created
+        assertEq(usx.outstandingWithdrawalRequests(user), 100e6, "User 1 should have 100 USDC request");
+        assertEq(usx.outstandingWithdrawalRequests(user2), 100e6, "User 2 should have 100 USDC request");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 200e6, "Total outstanding should be 200 USDC");
+
+        // Give contract only 150 USDC (less than total requested 200)
+        deal(address(usdc), address(usx), 150e6);
+
+        uint256 user1USDCBalanceBefore = usdc.balanceOf(user);
+        uint256 user2USDCBalanceBefore = usdc.balanceOf(user2);
+
+        // User 1 claims first
+        vm.prank(user);
+        usx.claimUSDC();
+
+        // Verify user 1's partial claim
+        assertEq(usx.outstandingWithdrawalRequests(user), 0, "User 1 should have no outstanding requests");
+        assertEq(usx.outstandingWithdrawalRequests(user2), 100e6, "User 2 should still have 100 USDC request");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 100e6, "Total outstanding should be 100 USDC");
+        assertEq(usdc.balanceOf(address(usx)), 50e6, "Contract should have 50 USDC left");
+
+        // User 2 claims second
+        vm.prank(user2);
+        usx.claimUSDC();
+
+        // Verify user 2's partial claim
+        assertEq(usx.outstandingWithdrawalRequests(user), 0, "User 1 should have no outstanding requests");
+        assertEq(usx.outstandingWithdrawalRequests(user2), 50e6, "User 2 should have 50 USDC remaining");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 50e6, "Total outstanding should be 50 USDC");
+        assertEq(usdc.balanceOf(address(usx)), 0, "Contract should have no USDC left");
+
+        // Verify both users received partial USDC
+        uint256 user1USDCBalanceAfter = usdc.balanceOf(user);
+        uint256 user2USDCBalanceAfter = usdc.balanceOf(user2);
+        assertEq(user1USDCBalanceAfter, user1USDCBalanceBefore + 100e6, "User 1 should receive 100 USDC");
+        assertEq(user2USDCBalanceAfter, user2USDCBalanceBefore + 50e6, "User 2 should receive 50 USDC");
+    }
+
     /*=========================== Access Control Tests =========================*/
 
     function test_mintUSX_success() public {
@@ -657,8 +885,9 @@ contract USXTest is LocalDeployTestSetup {
         usx.claimUSDC();
     }
 
-    function test_claimUSDC_revert_insufficient_usdc_balance() public {
+    function test_claimUSDC_partial_claim_insufficient_usdc_balance() public {
         // Setup: User has outstanding request but contract has insufficient USDC
+        // With partial claims, this should now claim what's available instead of reverting
         uint256 requestAmount = 1000e18; // 1,000 USX (not USDC)
 
         // First, give user some USX to request USDC
@@ -676,10 +905,27 @@ contract USXTest is LocalDeployTestSetup {
             usdc.transfer(address(treasury), usxUSDCBalance);
         }
 
-        // Try to claim USDC
+        // Give contract only 100 USDC (less than requested 1000)
+        deal(address(usdc), address(usx), 100e6);
+
+        // Verify partial USDC available
+        assertEq(usdc.balanceOf(address(usx)), 100e6, "Contract should have 100 USDC");
+        assertEq(usx.outstandingWithdrawalRequests(user), 1000e6, "User should have 1000 USDC request");
+
+        uint256 userUSDCBalanceBefore = usdc.balanceOf(user);
+
+        // Try to claim USDC (should claim partial amount)
         vm.prank(user);
-        vm.expectRevert(USX.InsufficientUSDC.selector);
         usx.claimUSDC();
+
+        // Verify partial claim was processed
+        assertEq(usx.outstandingWithdrawalRequests(user), 900e6, "User should have 900 USDC remaining request");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 900e6, "Total outstanding should be 900 USDC");
+        assertEq(usdc.balanceOf(address(usx)), 0, "Contract should have no USDC left");
+
+        // Verify user received partial USDC
+        uint256 userUSDCBalanceAfter = usdc.balanceOf(user);
+        assertEq(userUSDCBalanceAfter, userUSDCBalanceBefore + 100e6, "User should receive 100 USDC");
     }
 
     function test_claimUSDC_revert_failed_usdc_transfer() public {

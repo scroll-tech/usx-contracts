@@ -167,24 +167,29 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         }
     }
 
-    // TODO: Consider allowing partial claims as well
     /// @notice Claim USDC (fulfill withdrawal request)
+    /// @dev Allows partial claims if there is some USDC available for users total claim
     function claimUSDC() public {
         USXStorage storage $ = _getStorage();
 
         // Check if user has outstanding withdrawal requests
         if ($.outstandingWithdrawalRequests[msg.sender] == 0) revert NoOutstandingWithdrawalRequests();
 
-        // Check if the treasury has enough USDC to fulfill the request
-        if ($.USDC.balanceOf(address(this)) < $.outstandingWithdrawalRequests[msg.sender]) revert InsufficientUSDC();
+        // Revert if contract has no USDC available
+        uint256 contractUSDCBalance = $.USDC.balanceOf(address(this));
+        if (contractUSDCBalance == 0) revert InsufficientUSDC();
 
-        // Fulfill the withdrawal request
-        uint256 usdcAmount = $.outstandingWithdrawalRequests[msg.sender];
-        $.outstandingWithdrawalRequests[msg.sender] = 0;
-        $.totalOutstandingWithdrawalAmount -= usdcAmount;
+        uint256 userRequestAmount = $.outstandingWithdrawalRequests[msg.sender];
 
-        // Send the USDC to the user
-        $.USDC.safeTransfer(msg.sender, usdcAmount);
+        // Determine how much can be claimed (minimum of request amount and available balance)
+        uint256 claimableAmount = Math.min(userRequestAmount, contractUSDCBalance);
+
+        // Update user's outstanding request
+        $.outstandingWithdrawalRequests[msg.sender] -= claimableAmount;
+        $.totalOutstandingWithdrawalAmount -= claimableAmount;
+
+        // Send the claimable USDC to the user
+        $.USDC.safeTransfer(msg.sender, claimableAmount);
     }
 
     /*=========================== Governance Functions =========================*/
