@@ -147,12 +147,12 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
         // Distribute portion of USX to the Governance Warchest
         uint256 governanceWarchestPortion = withdrawalFee(USXAmount);
-        bool success = $.USX.transferFrom(address(this), $.treasury.governanceWarchest(), governanceWarchestPortion);
+        bool success = $.USX.transfer($.treasury.governanceWarchest(), governanceWarchestPortion);  
         if (!success) revert USXTransferFailed();
 
         // Send the remaining USX to the user
         uint256 userPortion = USXAmount - governanceWarchestPortion;
-        success = $.USX.transferFrom(address(this), $.withdrawalRequests[withdrawalId].user, userPortion);
+        success = $.USX.transfer($.withdrawalRequests[withdrawalId].user, userPortion);
         if (!success) revert USXTransferFailed();
 
         // Mark the withdrawal as claimed
