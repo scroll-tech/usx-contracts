@@ -135,7 +135,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         }
 
         // User receives USX
-        _mint(msg.sender, Math.mulDiv(_amount, 1e12, 1, Math.Rounding.Floor)); // Scale USDC (6 decimals) to USX (18 decimals)
+        _mint(msg.sender, Math.mulDiv(_amount, $.usxPrice, 1e18, Math.Rounding.Floor) * 1e12);
     }
 
     /// @notice Redeem USX to get USDC (automatically send if available, otherwise create withdrawal request)
@@ -147,10 +147,9 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         if ($.frozen) revert Frozen();
 
         // Check the USX price to determine how much USDC the user will receive
-        // For 1:1 exchange rate: 1 USX = 1 USDC
         // Since USX has 18 decimals and USDC has 6 decimals,
         // we need to scale down by 10^12 to convert from USX to USDC
-        uint256 usdcAmount = _USXredeemed / 1e12;
+        uint256 usdcAmount = _USXredeemed * $.usxPrice / 1e18 / 1e12;
 
         // Burn the USX
         _burn(msg.sender, _USXredeemed);
