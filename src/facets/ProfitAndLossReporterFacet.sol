@@ -85,7 +85,8 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
                 if (scaledNetDeposits > totalSupply) {
                     _distributeProfits(scaledNetDeposits - totalSupply);
                 }
-                // Update peg after all USX minting is complete
+
+                // Update peg to account for peg recovery (and after minting of new USX if profits beyond peg recovery)
                 _updatePeg();
             } else {
                 // Distribute profits to the stakers, with a portion going to the Insurance Buffer and Governance Warchest
