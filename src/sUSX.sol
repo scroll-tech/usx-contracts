@@ -154,8 +154,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
         if ($.withdrawalRequests[withdrawalId].withdrawalBlock > $.lastEpochBlock) revert NextEpochNotStarted();
 
         // Get the total USX amount for the amount of sUSX being redeemed
-        uint256 USXAmount =
-            Math.mulDiv($.withdrawalRequests[withdrawalId].amount, sharePrice(), 1e18, Math.Rounding.Floor);
+        uint256 USXAmount = _convertToAssets($.withdrawalRequests[withdrawalId].amount, Math.Rounding.Floor);
 
         // Burn sUSX shares
         _burn(msg.sender, $.withdrawalRequests[withdrawalId].amount);
