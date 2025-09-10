@@ -520,7 +520,7 @@ contract RoundingAnalysis is Test {
             console.log("   Protocol Favored Events:", protocolFavoredCount);
             console.log("   User Favored Events:", roundingEvents.length - protocolFavoredCount);
             console.log("   Average Rounding per Event:", totalRoundingAmount / roundingEvents.length, "wei");
-            
+
             console.log("");
             console.log("COMPREHENSIVE ROUNDING ANALYSIS:");
             console.log("   Based on extensive testing with 10,000+ scenarios:");
