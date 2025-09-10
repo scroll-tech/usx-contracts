@@ -3,12 +3,15 @@ pragma solidity 0.8.30;
 
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ITreasury} from "./interfaces/ITreasury.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract USX is ERC20Upgradeable, UUPSUpgradeable {
+    using SafeERC20 for IERC20;
+
     /*=========================== Errors =========================*/
 
     error ZeroAddress();
@@ -21,7 +24,6 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     error NoOutstandingWithdrawalRequests();
     error InsufficientUSDC();
     error TreasuryAlreadySet();
-    error USDCTransferFailed();
 
     /*=========================== Events =========================*/
 
@@ -124,14 +126,12 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
 
         // Transfer USDC to contract (if needed for withdrawal requests)
         if (usdcForContract > 0) {
-            bool success = $.USDC.transferFrom(msg.sender, address(this), usdcForContract);
-            if (!success) revert USDCTransferFailed();
+            $.USDC.safeTransferFrom(msg.sender, address(this), usdcForContract);
         }
 
         // Transfer excess USDC to treasury
         if (usdcForTreasury > 0) {
-            bool success = $.USDC.transferFrom(msg.sender, address($.treasury), usdcForTreasury);
-            if (!success) revert USDCTransferFailed();
+            $.USDC.safeTransferFrom(msg.sender, address($.treasury), usdcForTreasury);
         }
 
         // User receives USX
@@ -160,7 +160,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
 
         if (contractUSDCBalance >= usdcAmount) {
             // Automatically send USDC to user if available
-            $.USDC.transfer(msg.sender, usdcAmount);
+            $.USDC.safeTransfer(msg.sender, usdcAmount);
         } else {
             // Record the outstanding withdrawal request if insufficient USDC
             $.totalOutstandingWithdrawalAmount += usdcAmount;
@@ -185,7 +185,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         $.totalOutstandingWithdrawalAmount -= usdcAmount;
 
         // Send the USDC to the user
-        $.USDC.transfer(msg.sender, usdcAmount);
+        $.USDC.safeTransfer(msg.sender, usdcAmount);
     }
 
     /*=========================== Governance Functions =========================*/
