@@ -78,11 +78,12 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
             // If peg is broken, recover it and distribute the remaining profits
             if (pegBroken) {
                 // Calculate the profits available after peg recovery
-                uint256 profitsRemaining = (currentNetDeposits * DECIMAL_SCALE_FACTOR) - $.USX.totalSupply();
+                uint256 scaledNetDeposits = currentNetDeposits * DECIMAL_SCALE_FACTOR;
+                uint256 totalSupply = $.USX.totalSupply();
 
-                // Distribute any remaining profits
-                if (profitsRemaining > 0) {
-                    _distributeProfits(profitsRemaining);
+                // Safe subtraction: only distribute if we have sufficient backing
+                if (scaledNetDeposits > totalSupply) {
+                    _distributeProfits(scaledNetDeposits - totalSupply);
                 }
                 // Update peg after all USX minting is complete
                 _updatePeg();

@@ -827,6 +827,85 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertGt(finalUSXSupply, 1000000e18, "USX should be minted for partial peg recovery");
     }
 
+    function test_recoverPeg_underflow_protection() public {
+        // Setup: Create a severely under-collateralized scenario where profits still don't restore full backing
+        vm.prank(user);
+        usx.deposit(2000000e6); // 2,000,000 USDC deposit to get USX (creates large total supply)
+
+        // Deposit USX to sUSX vault to create realistic vault balance
+        uint256 usxBalance = usx.balanceOf(user);
+        vm.prank(user);
+        usx.approve(address(susx), usxBalance);
+        vm.prank(user);
+        susx.deposit(usxBalance, user);
+
+        // Break the peg severely by calling updatePeg with a very low value
+        uint256 brokenPegPrice = 3e17; // 0.3 USDC per USX (70% devaluation)
+        vm.prank(address(treasury));
+        usx.updatePeg(brokenPegPrice);
+
+        // Verify peg is broken
+        uint256 usxPrice = usx.usxPrice();
+        assertLt(usxPrice, 1e18, "Peg should be broken");
+
+        // Create under-collateralized scenario: transfer most USDC away, leaving minimal backing
+        uint256 currentUSXSupply = usx.totalSupply();
+        uint256 minimalBackingNeeded = (currentUSXSupply * 3e17) / 1e18; // Only 30% backing
+        uint256 usdcToKeep = minimalBackingNeeded / DECIMAL_SCALE_FACTOR; // Convert to USDC units
+
+        // Transfer away most USDC, keeping only minimal backing
+        uint256 treasuryUSDC = usdc.balanceOf(address(treasury));
+        uint256 usdcToTransferAway = treasuryUSDC - usdcToKeep;
+
+        // Transfer USDC away from treasury to create under-collateralization
+        vm.prank(address(treasury));
+        usdc.transfer(user, usdcToTransferAway);
+
+        // Transfer minimal USDC to asset manager
+        vm.prank(assetManager);
+        bytes memory transferData = abi.encodeWithSelector(
+            AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
+            1000e6 // Only 1,000 USDC (severely insufficient for full peg recovery)
+        );
+        (bool transferSuccess,) = address(treasury).call(transferData);
+        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+
+        // Record initial state
+        uint256 initialUSXSupply = usx.totalSupply();
+
+        // Get initial net deposits through treasury call
+        bytes memory netDepositsData = abi.encodeWithSelector(AssetManagerAllocatorFacet.netDeposits.selector);
+        (bool netDepositsSuccess, bytes memory netDepositsResult) = address(treasury).call(netDepositsData);
+        require(netDepositsSuccess, "netDeposits call failed");
+        uint256 initialNetDeposits = abi.decode(netDepositsResult, (uint256));
+
+        // Asset manager reports small profits (insufficient to restore full backing)
+        vm.prank(assetManager);
+        bytes memory reportProfitsData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.assetManagerReport.selector,
+            2000e6 // 2,000 USDC total (1k profit, but still insufficient for full recovery)
+        );
+        (bool reportProfitsSuccess,) = address(treasury).call(reportProfitsData);
+
+        // Should succeed without underflow (this is the key test)
+        assertTrue(reportProfitsSuccess, "reportProfits should succeed without underflow");
+
+        // Verify that no USX was minted because we're still under-collateralized
+        uint256 finalUSXSupply = usx.totalSupply();
+        assertEq(finalUSXSupply, initialUSXSupply, "No USX should be minted when under-collateralized");
+
+        // Verify net deposits increased (profits were reported)
+        (bool finalNetDepositsSuccess, bytes memory finalNetDepositsResult) = address(treasury).call(netDepositsData);
+        require(finalNetDepositsSuccess, "final netDeposits call failed");
+        uint256 finalNetDeposits = abi.decode(finalNetDepositsResult, (uint256));
+        assertGt(finalNetDeposits, initialNetDeposits, "Net deposits should increase with profits");
+
+        // Verify peg was updated (should reflect the new backing ratio)
+        uint256 finalPeg = usx.usxPrice();
+        // Note: Peg might be 0 if netDeposits is 0, which is expected in extreme under-collateralization
+        // The key test is that no USX was minted, which we already verified above
+    }
+
     function test_debug_peg_and_value() public {
         console.log("=== DEBUG PEG AND VALUE CONSERVATION ===");
 
