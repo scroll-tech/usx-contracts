@@ -56,7 +56,9 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
     function setAssetManager(address _assetManager) external onlyGovernance {
         if (_assetManager == address(0)) revert ZeroAddress();
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        address oldAssetManager = $.assetManager;
         $.assetManager = _assetManager;
+        emit AssetManagerUpdated(oldAssetManager, _assetManager);
     }
 
     /// @notice Sets the max leverage fraction for the protocol
@@ -65,7 +67,9 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
     function setMaxLeverageFraction(uint256 _maxLeverageFraction) external onlyGovernance {
         if (_maxLeverageFraction > 100000) revert InvalidMaxLeverageFraction();
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        uint256 oldFraction = $.maxLeverageFraction;
         $.maxLeverageFraction = _maxLeverageFraction;
+        emit MaxLeverageUpdated(oldFraction, _maxLeverageFraction);
     }
 
     /*=========================== Asset Manager Functions =========================*/
@@ -80,6 +84,7 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
 
         $.assetManagerUSDC += _amount;
         IAssetManager($.assetManager).deposit(_amount);
+        emit USDCAllocated(_amount, $.assetManagerUSDC);
     }
 
     /// @notice Transfers USDC from the Asset Manager to the treasury
@@ -88,5 +93,6 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         $.assetManagerUSDC -= _amount;
         IAssetManager($.assetManager).withdraw(_amount);
+        emit USDCDeallocated(_amount, $.assetManagerUSDC);
     }
 }

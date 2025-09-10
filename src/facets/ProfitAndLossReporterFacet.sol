@@ -72,6 +72,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         if (currentNetDeposits >= previousNetDeposits) {
             // Handle profits
             uint256 grossProfit = currentNetDeposits - previousNetDeposits;
+            emit ReportSubmitted(totalBalance, grossProfit, true);
 
             // If peg is broken, recover it and distribute the remaining profits
             if (pegBroken) {
@@ -91,6 +92,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         } else {
             // Handle losses
             uint256 grossLoss = previousNetDeposits - currentNetDeposits;
+            emit ReportSubmitted(totalBalance, grossLoss, false);
 
             // 1. Subtract loss from the Insurance Buffer module
             uint256 remainingLossesAfterInsuranceBuffer = InsuranceBufferFacet(address(this)).slashBuffer(grossLoss);
@@ -106,6 +108,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
                 if (remainingLossesAfterVault > 0) {
                     _updatePeg();
                     $.USX.freeze();
+                    emit ProtocolFrozen("Losses exceed buffer and vault capacity");
                 }
             }
         }
@@ -121,7 +124,9 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
     function setSuccessFeeFraction(uint256 _successFeeFraction) external onlyGovernance {
         if (_successFeeFraction > 100000) revert InvalidSuccessFeeFraction();
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        uint256 oldFraction = $.successFeeFraction;
         $.successFeeFraction = _successFeeFraction;
+        emit SuccessFeeUpdated(oldFraction, _successFeeFraction);
     }
 
     /*=========================== Internal Functions =========================*/
@@ -133,7 +138,9 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         uint256 totalUSDCoutstanding = AssetManagerAllocatorFacet(address(this)).netDeposits();
         uint256 scaledUSDC = totalUSDCoutstanding * DECIMAL_SCALE_FACTOR;
         uint256 updatedPeg = scaledUSDC / $.USX.totalSupply();
+        uint256 oldPeg = $.USX.usxPrice();
         $.USX.updatePeg(updatedPeg);
+        emit PegUpdated(oldPeg, updatedPeg);
     }
 
     /// @notice Distributes profits to the Insurance Buffer and Governance Warchest, and sUSX contract (USX stakers)
@@ -159,6 +166,8 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
 
         // Update netEpochProfits to include both new profits and carryover from previous epoch
         $.netEpochProfits = stakerProfits + undistributedFromPreviousEpoch;
+
+        emit ProfitsDistributed(profits, stakerProfits, insuranceBufferProfits, governanceWarchestProfits);
     }
 
     /// @notice Distributes losses to the sUSX contract (USX stakers)
@@ -180,5 +189,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
             // Convert remaining USX back to USDC: remaining USX / DECIMAL_SCALE_FACTOR
             remainingLosses = (lossesUSX - vaultUSXBalance) / DECIMAL_SCALE_FACTOR;
         }
+
+        emit LossesDistributed(losses, 0, lossesUSX / DECIMAL_SCALE_FACTOR, remainingLosses);
     }
 }

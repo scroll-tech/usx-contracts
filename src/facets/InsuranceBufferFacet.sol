@@ -25,7 +25,9 @@ contract InsuranceBufferFacet is TreasuryStorage {
     function setBufferRenewalRate(uint256 _bufferRenewalRate) external onlyGovernance {
         if (_bufferRenewalRate < 100000 || _bufferRenewalRate > 1000000) revert InvalidBufferRenewalRate();
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        uint256 oldRate = $.bufferRenewalFraction;
         $.bufferRenewalFraction = _bufferRenewalRate;
+        emit BufferRenewalRateUpdated(oldRate, _bufferRenewalRate);
     }
 
     /// @notice Sets buffer target with precision to 0.001 percent (Minimum value & default is 5% == 50000, max value is 100%)
@@ -33,7 +35,9 @@ contract InsuranceBufferFacet is TreasuryStorage {
     function setBufferTargetFraction(uint256 _bufferTargetFraction) external onlyGovernance {
         if (_bufferTargetFraction < 50000 || _bufferTargetFraction > 1000000) revert InvalidBufferTargetFraction();
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        uint256 oldFraction = $.bufferTargetFraction;
         $.bufferTargetFraction = _bufferTargetFraction;
+        emit BufferTargetUpdated(oldFraction, _bufferTargetFraction);
     }
 
     /*=========================== Treasury Functions =========================*/
@@ -57,6 +61,7 @@ contract InsuranceBufferFacet is TreasuryStorage {
             $.USX.mintUSX(address(this), insuranceBufferAccrualUSDC * DECIMAL_SCALE_FACTOR);
 
             insuranceBufferAccrual = insuranceBufferAccrualUSDC;
+            emit BufferReplenished(insuranceBufferAccrualUSDC * DECIMAL_SCALE_FACTOR, $.USX.balanceOf(address(this)));
         } else {
             insuranceBufferAccrual = 0;
         }
@@ -75,12 +80,14 @@ contract InsuranceBufferFacet is TreasuryStorage {
         if (amountUSX <= bufferSize) {
             $.USX.burnUSX(address(this), amountUSX);
             remainingLosses = 0;
+            emit BufferDepleted(amountUSX, 0);
             // Insurance Buffer is not sufficient to absorb the loss
         } else {
             // If the amount is greater than the buffer size, burn the buffer and return the remaining losses
             $.USX.burnUSX(address(this), bufferSize);
             // Convert remaining USX back to USDC: remaining USX / DECIMAL_SCALE_FACTOR
             remainingLosses = (amountUSX - bufferSize) / DECIMAL_SCALE_FACTOR;
+            emit BufferDepleted(bufferSize, remainingLosses);
         }
     }
 }

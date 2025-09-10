@@ -29,6 +29,12 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
 
     event TreasurySet(address indexed treasury);
     event GovernanceTransferred(address indexed oldGovernance, address indexed newGovernance);
+    event Deposit(address indexed user, uint256 usdcAmount, uint256 usxMinted);
+    event Redeem(address indexed user, uint256 usxAmount, uint256 usdcAmount);
+    event Claim(address indexed user, uint256 amount);
+    event PegUpdated(uint256 oldPeg, uint256 newPeg);
+    event FrozenChanged(bool frozen);
+    event WhitelistUpdated(address indexed user, bool whitelisted);
 
     /*=========================== Modifiers =========================*/
 
@@ -135,7 +141,10 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         }
 
         // User receives USX
-        _mint(msg.sender, Math.mulDiv(_amount, $.usxPrice, 1e18, Math.Rounding.Floor) * 1e12);
+        uint256 usxMinted = Math.mulDiv(_amount, $.usxPrice, 1e18, Math.Rounding.Floor) * 1e12;
+        _mint(msg.sender, usxMinted);
+
+        emit Deposit(msg.sender, _amount, usxMinted);
     }
 
     /// @notice Redeem USX to get USDC (automatically send if available, otherwise create withdrawal request)
@@ -160,10 +169,12 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         if (contractUSDCBalance >= usdcAmount) {
             // Automatically send USDC to user if available
             $.USDC.safeTransfer(msg.sender, usdcAmount);
+            emit Redeem(msg.sender, _USXredeemed, usdcAmount);
         } else {
             // Record the outstanding withdrawal request if insufficient USDC
             $.totalOutstandingWithdrawalAmount += usdcAmount;
             $.outstandingWithdrawalRequests[msg.sender] += usdcAmount;
+            emit Redeem(msg.sender, _USXredeemed, usdcAmount);
         }
     }
 
@@ -190,6 +201,8 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
 
         // Send the claimable USDC to the user
         $.USDC.safeTransfer(msg.sender, claimableAmount);
+
+        emit Claim(msg.sender, claimableAmount);
     }
 
     /*=========================== Governance Functions =========================*/
@@ -198,6 +211,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     function unfreeze() public onlyGovernance {
         USXStorage storage $ = _getStorage();
         $.frozen = false;
+        emit FrozenChanged(false);
     }
 
     /// @notice Set new governance address
@@ -221,6 +235,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
         if (_user == address(0)) revert ZeroAddress();
         USXStorage storage $ = _getStorage();
         $.whitelistedUsers[_user] = _isWhitelisted;
+        emit WhitelistUpdated(_user, _isWhitelisted);
     }
 
     /*=========================== Treasury Functions =========================*/
@@ -246,7 +261,9 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     /// @dev Used by Treasury to update the USX:USDC price
     function updatePeg(uint256 newPeg) public onlyTreasury {
         USXStorage storage $ = _getStorage();
+        uint256 oldPeg = $.usxPrice;
         $.usxPrice = newPeg;
+        emit PegUpdated(oldPeg, newPeg);
     }
 
     /// @notice Freeze deposits and withdrawals, preventing users from depositing and redeeming USX
@@ -254,6 +271,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
     function freeze() public onlyTreasury {
         USXStorage storage $ = _getStorage();
         $.frozen = true;
+        emit FrozenChanged(true);
     }
 
     /*=========================== UUPS Functions =========================*/

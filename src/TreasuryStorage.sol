@@ -42,6 +42,28 @@ contract TreasuryStorage {
 
     event GovernanceTransferred(address indexed oldGovernance, address indexed newGovernance);
 
+    // Asset Manager Allocator Facet Events
+    event AssetManagerUpdated(address indexed oldAssetManager, address indexed newAssetManager);
+    event MaxLeverageUpdated(uint256 oldFraction, uint256 newFraction);
+    event USDCAllocated(uint256 amount, uint256 newAllocation);
+    event USDCDeallocated(uint256 amount, uint256 newAllocation);
+
+    // Insurance Buffer Facet Events
+    event BufferRenewalRateUpdated(uint256 oldRate, uint256 newRate);
+    event BufferTargetUpdated(uint256 oldFraction, uint256 newFraction);
+    event BufferReplenished(uint256 amountUSX, uint256 bufferBalance);
+    event BufferDepleted(uint256 amountUSX, uint256 remainingLosses);
+
+    // Profit and Loss Reporter Facet Events
+    event SuccessFeeUpdated(uint256 oldFraction, uint256 newFraction);
+    event ReportSubmitted(uint256 totalBalance, uint256 profitLoss, bool isProfit);
+    event ProfitsDistributed(
+        uint256 totalProfits, uint256 stakerProfits, uint256 bufferProfits, uint256 governanceProfits
+    );
+    event LossesDistributed(uint256 totalLosses, uint256 bufferLosses, uint256 vaultLosses, uint256 remainingLosses);
+    event PegUpdated(uint256 oldPeg, uint256 newPeg);
+    event ProtocolFrozen(string reason);
+
     /*=========================== Modifiers =========================*/
 
     // Modifier to restrict access to governance functions
