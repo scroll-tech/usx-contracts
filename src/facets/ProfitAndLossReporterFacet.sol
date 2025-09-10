@@ -39,6 +39,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
 
     /// @notice Calculates the cumulative profits for previous epoch that needs to be still distributed
     /// @dev Determines what is the USX balance removed in calculating sharePrice() calculated as profitPerBlock(current_block - lastEpochBlock)
+    /// @return profitToSubtract The cumulative profits for previous epoch that needs to be still distributed in USDC
     function substractProfitLatestEpoch() public view returns (uint256 profitToSubtract) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
 
