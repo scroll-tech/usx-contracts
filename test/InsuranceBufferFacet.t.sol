@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Test, console} from "forge-std/Test.sol";
+import {console} from "forge-std/Test.sol";
 import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
 import {InsuranceBufferFacet} from "../src/facets/InsuranceBufferFacet.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
@@ -578,7 +578,6 @@ contract InsuranceBufferFacetTest is LocalDeployTestSetup {
 
     function test_slashBuffer_exact_buffer_size() public {
         // Setup: Create a scenario where the loss exactly equals the buffer size
-        uint256 bufferUSX = 1000e18; // 1,000 USX in buffer
         uint256 lossInUSDC = 1000e6; // 1,000 USDC
         uint256 lossInUSX = lossInUSDC * DECIMAL_SCALE_FACTOR; // 1,000 USDC * 10^12 = 10^15 USX
 

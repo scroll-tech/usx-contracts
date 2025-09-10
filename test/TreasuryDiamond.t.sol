@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Test, console} from "forge-std/Test.sol";
 import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
 import {TreasuryDiamond} from "../src/TreasuryDiamond.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
@@ -107,7 +106,7 @@ contract TreasuryDiamondTest is LocalDeployTestSetup {
 
         // Test a function that should work
         bytes memory data = abi.encodeWithSelector(AssetManagerAllocatorFacet.maxLeverage.selector);
-        (bool success, bytes memory result) = address(treasury).call(data);
+        (bool success, /* bytes memory result */ ) = address(treasury).call(data);
 
         assertTrue(success, "Diamond fallback should delegate maxLeverage call");
 

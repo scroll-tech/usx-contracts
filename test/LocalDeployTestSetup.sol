@@ -97,7 +97,7 @@ contract LocalDeployTestSetup is Test {
         } catch Error(string memory reason) {
             console.log("Treasury deployment failed with reason:", reason);
             revert();
-        } catch (bytes memory lowLevelData) {
+        } catch (bytes memory) /* lowLevelData */ {
             console.log("Treasury deployment failed with low level error");
             revert();
         }

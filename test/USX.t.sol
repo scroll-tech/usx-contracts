@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Test, console} from "forge-std/Test.sol";
+import {console} from "forge-std/Test.sol";
 import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
 import {USX} from "../src/USX.sol";
 
@@ -136,7 +136,8 @@ contract USXTest is LocalDeployTestSetup {
         if (contractUSDCBalance > 0) {
             // Transfer any existing USDC to treasury to simulate insufficient balance
             vm.prank(address(usx));
-            usdc.transfer(address(treasury), contractUSDCBalance);
+            bool transferSuccess = usdc.transfer(address(treasury), contractUSDCBalance);
+            require(transferSuccess, "USDC transfer failed");
         }
 
         // Request USDC withdrawal - should create withdrawal request
@@ -177,7 +178,8 @@ contract USXTest is LocalDeployTestSetup {
         uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
         if (contractUSDCBalance > 0) {
             vm.prank(address(usx));
-            usdc.transfer(address(treasury), contractUSDCBalance);
+            bool transferSuccess = usdc.transfer(address(treasury), contractUSDCBalance);
+            require(transferSuccess, "USDC transfer failed");
         }
 
         // Second request - should create withdrawal request
@@ -215,7 +217,8 @@ contract USXTest is LocalDeployTestSetup {
         uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
         if (contractUSDCBalance > 0) {
             vm.prank(address(usx));
-            usdc.transfer(address(treasury), contractUSDCBalance);
+            bool transferSuccess = usdc.transfer(address(treasury), contractUSDCBalance);
+            require(transferSuccess, "USDC transfer failed");
         }
 
         // Request large amount withdrawal
@@ -235,7 +238,8 @@ contract USXTest is LocalDeployTestSetup {
         uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
         if (contractUSDCBalance > 0) {
             vm.prank(address(usx));
-            usdc.transfer(address(treasury), contractUSDCBalance);
+            bool transferSuccess = usdc.transfer(address(treasury), contractUSDCBalance);
+            require(transferSuccess, "USDC transfer failed");
         }
 
         // Make multiple requests and verify tracking
@@ -289,7 +293,8 @@ contract USXTest is LocalDeployTestSetup {
         uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
         if (contractUSDCBalance > 0) {
             vm.prank(address(usx));
-            usdc.transfer(address(treasury), contractUSDCBalance);
+            bool transferSuccess = usdc.transfer(address(treasury), contractUSDCBalance);
+            require(transferSuccess, "USDC transfer failed");
         }
 
         // Verify USX was minted
@@ -340,7 +345,8 @@ contract USXTest is LocalDeployTestSetup {
         uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
         if (contractUSDCBalance > 0) {
             vm.prank(address(usx));
-            usdc.transfer(address(treasury), contractUSDCBalance);
+            bool transferSuccess = usdc.transfer(address(treasury), contractUSDCBalance);
+            require(transferSuccess, "USDC transfer failed");
         }
 
         // Make multiple withdrawal requests
@@ -374,7 +380,8 @@ contract USXTest is LocalDeployTestSetup {
         uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
         if (contractUSDCBalance > 0) {
             vm.prank(address(usx));
-            usdc.transfer(address(treasury), contractUSDCBalance);
+            bool transferSuccess = usdc.transfer(address(treasury), contractUSDCBalance);
+            require(transferSuccess, "USDC transfer failed");
         }
 
         vm.prank(user);
@@ -404,7 +411,8 @@ contract USXTest is LocalDeployTestSetup {
         uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
         if (contractUSDCBalance > 0) {
             vm.prank(address(usx));
-            usdc.transfer(address(treasury), contractUSDCBalance);
+            bool transferSuccess = usdc.transfer(address(treasury), contractUSDCBalance);
+            require(transferSuccess, "USDC transfer failed");
         }
 
         // Request USDC withdrawal (creates withdrawal request)
@@ -443,7 +451,8 @@ contract USXTest is LocalDeployTestSetup {
         uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
         if (contractUSDCBalance > 0) {
             vm.prank(address(usx));
-            usdc.transfer(address(treasury), contractUSDCBalance);
+            bool transferSuccess = usdc.transfer(address(treasury), contractUSDCBalance);
+            require(transferSuccess, "USDC transfer failed");
         }
 
         // Request USDC withdrawal
@@ -500,7 +509,8 @@ contract USXTest is LocalDeployTestSetup {
         uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
         if (contractUSDCBalance > 0) {
             vm.prank(address(usx));
-            usdc.transfer(address(treasury), contractUSDCBalance);
+            bool transferSuccess = usdc.transfer(address(treasury), contractUSDCBalance);
+            require(transferSuccess, "USDC transfer failed");
         }
 
         // Request USDC withdrawal
@@ -527,7 +537,8 @@ contract USXTest is LocalDeployTestSetup {
         uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
         if (contractUSDCBalance > 0) {
             vm.prank(address(usx));
-            usdc.transfer(address(treasury), contractUSDCBalance);
+            bool transferSuccess = usdc.transfer(address(treasury), contractUSDCBalance);
+            require(transferSuccess, "USDC transfer failed");
         }
 
         // Request USDC withdrawal
@@ -576,7 +587,8 @@ contract USXTest is LocalDeployTestSetup {
         uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
         if (contractUSDCBalance > 0) {
             vm.prank(address(usx));
-            usdc.transfer(address(treasury), contractUSDCBalance);
+            bool transferSuccess = usdc.transfer(address(treasury), contractUSDCBalance);
+            require(transferSuccess, "USDC transfer failed");
         }
 
         // Both users request USDC withdrawal
@@ -623,7 +635,7 @@ contract USXTest is LocalDeployTestSetup {
         assertEq(user2USDCBalanceAfter, user2USDCBalanceBefore + 50e6, "User 2 should receive 50 USDC");
     }
 
-    function test_view_functions_return_correct_values() public {
+    function test_view_functions_return_correct_values() public view {
         assertEq(address(usx.USDC()), address(usdc));
         assertEq(address(usx.treasury()), address(treasury));
         assertEq(usx.governanceWarchest(), governanceWarchest);
@@ -690,7 +702,6 @@ contract USXTest is LocalDeployTestSetup {
         // Since updatePeg is onlyTreasury, we need to impersonate the treasury
 
         uint256 newPeg = 2e18; // 2 USDC per USX
-        uint256 initialPeg = usx.usxPrice();
 
         // Impersonate the treasury to call updatePeg
         vm.prank(address(treasury));
@@ -894,7 +905,8 @@ contract USXTest is LocalDeployTestSetup {
         uint256 usxUSDCBalance = usdc.balanceOf(address(usx));
         if (usxUSDCBalance > 0) {
             vm.prank(address(usx));
-            usdc.transfer(address(treasury), usxUSDCBalance);
+            bool transferSuccess = usdc.transfer(address(treasury), usxUSDCBalance);
+            require(transferSuccess, "USDC transfer failed");
         }
 
         // Give contract only 100 USDC (less than requested 1000)
@@ -1092,7 +1104,8 @@ contract USXTest is LocalDeployTestSetup {
         uint256 contractUSDCBalance = usdc.balanceOf(address(usx));
         if (contractUSDCBalance > 0) {
             vm.prank(address(usx));
-            usdc.transfer(address(treasury), contractUSDCBalance);
+            bool transferSuccess = usdc.transfer(address(treasury), contractUSDCBalance);
+            require(transferSuccess, "USDC transfer failed");
         }
 
         // Request USDC withdrawal

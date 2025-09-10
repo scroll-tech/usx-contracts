@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Test, console} from "forge-std/Test.sol";
 import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
     function setUp() public override {
@@ -596,7 +594,7 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
             abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, transferAmount);
 
         vm.prank(newAssetManager);
-        (bool transferSuccess,) = address(treasury).call(transferData);
+        address(treasury).call(transferData);
 
         // Note: This may fail due to complex internal logic requirements
         // We're testing the basic workflow structure

@@ -2,11 +2,9 @@
 pragma solidity 0.8.30;
 
 import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ITreasury} from "./interfaces/ITreasury.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -311,12 +309,22 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
     }
 
     /// @dev Override default ERC4626 to use sharePrice
-    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns (uint256 shares) {
+    function _convertToShares(uint256 assets, Math.Rounding /* rounding */ )
+        internal
+        view
+        override
+        returns (uint256 shares)
+    {
         return Math.mulDiv(assets, 1e18, sharePrice(), Math.Rounding.Floor);
     }
 
     /// @dev Override default ERC4626 to use sharePrice
-    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256 assets) {
+    function _convertToAssets(uint256 shares, Math.Rounding /* rounding */ )
+        internal
+        view
+        override
+        returns (uint256 assets)
+    {
         return Math.mulDiv(shares, sharePrice(), 1e18, Math.Rounding.Floor);
     }
 

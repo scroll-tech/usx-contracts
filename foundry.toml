@@ -23,6 +23,10 @@ scroll_sepolia = "${SCROLL_SEPOLIA_RPC}"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
+# Linter configuration - ignore mixed-case rules to keep USDC/USX/SUSX naming
+[lint]
+exclude_lints = ["mixed-case-function", "mixed-case-variable", "pascal-case-struct", "unchecked-call"]
+
 # Invariant testing configuration
 [invariant]
 runs = 1000

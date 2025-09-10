@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Test, console} from "forge-std/Test.sol";
+import {console} from "forge-std/Test.sol";
 import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
 import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
 import {InsuranceBufferFacet} from "../src/facets/InsuranceBufferFacet.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // TODO: Test profit/loss report with 0 value
 
@@ -190,8 +189,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
             AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
             1000e6 // 1000 USDC transferred to asset manager
         );
-        (bool transferSuccess,) = address(treasury).call(transferData);
-        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        (bool callSuccess,) = address(treasury).call(transferData);
+        require(callSuccess, "transferUSDCtoAssetManager should succeed");
 
         // Now report a lower balance (900 USDC) which represents a 100 USDC loss
         uint256 newTotalBalance = 900e6; // 900 USDC (100 USDC loss from 1000 USDC)
@@ -225,8 +224,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
             AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
             1000e6 // 1000 USDC transferred to asset manager
         );
-        (bool transferSuccess,) = address(treasury).call(transferData);
-        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        (bool callSuccess,) = address(treasury).call(transferData);
+        require(callSuccess, "transferUSDCtoAssetManager should succeed");
 
         // Now report the same balance (1000 USDC) which represents no change
         uint256 newTotalBalance = 1000e6; // Same balance as initial
@@ -316,8 +315,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         vm.prank(address(mockAssetManager));
         bytes memory transferData =
             abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, initialBalance);
-        (bool transferSuccess,) = address(treasury).call(transferData);
-        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        (bool callSuccess,) = address(treasury).call(transferData);
+        require(callSuccess, "transferUSDCtoAssetManager should succeed");
 
         // Give sUSX vault some USX to burn
         uint256 vaultUSX = 2000e18; // 2,000 USX in vault (more than enough)
@@ -369,8 +368,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         vm.prank(address(mockAssetManager));
         bytes memory transferData =
             abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, initialBalance);
-        (bool transferSuccess,) = address(treasury).call(transferData);
-        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        (bool callSuccess,) = address(treasury).call(transferData);
+        require(callSuccess, "transferUSDCtoAssetManager should succeed");
 
         // Give sUSX vault some USX to burn (but not all)
         uint256 vaultUSX = 1500e18; // 1,500 USX in vault
@@ -432,8 +431,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         vm.prank(address(mockAssetManager));
         bytes memory transferData =
             abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, initialBalance);
-        (bool transferSuccess,) = address(treasury).call(transferData);
-        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        (bool callSuccess,) = address(treasury).call(transferData);
+        require(callSuccess, "transferUSDCtoAssetManager should succeed");
 
         // Give insurance buffer enough USX to cover losses
         uint256 bufferUSX = 1000e18; // Large buffer
@@ -476,8 +475,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         vm.prank(address(mockAssetManager));
         bytes memory transferData =
             abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, initialBalance);
-        (bool transferSuccess,) = address(treasury).call(transferData);
-        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        (bool callSuccess,) = address(treasury).call(transferData);
+        require(callSuccess, "transferUSDCtoAssetManager should succeed");
 
         // Verify initial state
         assertFalse(susx.depositsFrozen(), "sUSX deposits should not be frozen initially");
@@ -689,8 +688,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
             AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
             1000e6 // 1,000 USDC transferred to asset manager
         );
-        (bool transferSuccess,) = address(treasury).call(transferData);
-        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        (bool callSuccess,) = address(treasury).call(transferData);
+        require(callSuccess, "transferUSDCtoAssetManager should succeed");
 
         // Asset manager reports a loss (900 USDC, which is 100 USDC less than the 1000 USDC baseline)
         vm.prank(assetManager);
@@ -714,7 +713,6 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
 
     function test_assetManagerReport_losses_profits_detected_revert() public {
         // Setup: Asset manager reports a balance higher than current assetManagerUSDC
-        uint256 currentBalance = 1000e6; // Current balance
         uint256 reportedBalance = 1500e6; // Higher reported balance (profit)
 
         // Asset manager reports profits instead of losses
@@ -745,8 +743,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
             AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
             2000e6 // 2,000 USDC transferred to asset manager
         );
-        (bool transferSuccess,) = address(treasury).call(transferData);
-        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        (bool callSuccess,) = address(treasury).call(transferData);
+        require(callSuccess, "transferUSDCtoAssetManager should succeed");
 
         // Asset manager reports a loss (1000 USDC, which is 1000 USDC less than the 2000 USDC baseline)
         vm.prank(assetManager);
@@ -796,8 +794,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
             AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
             50000e6 // 50,000 USDC (insufficient for full peg recovery)
         );
-        (bool transferSuccess,) = address(treasury).call(transferData);
-        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        (bool callSuccess,) = address(treasury).call(transferData);
+        require(callSuccess, "transferUSDCtoAssetManager should succeed");
 
         // Asset manager reports profits (insufficient for full peg recovery)
         vm.prank(assetManager);
@@ -847,7 +845,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
 
         // Transfer USDC away from treasury to create under-collateralization
         vm.prank(address(treasury));
-        usdc.transfer(user, usdcToTransferAway);
+        bool transferSuccess = usdc.transfer(user, usdcToTransferAway);
+        require(transferSuccess, "USDC transfer failed");
 
         // Transfer minimal USDC to asset manager
         vm.prank(assetManager);
@@ -855,8 +854,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
             AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector,
             1000e6 // Only 1,000 USDC (severely insufficient for full peg recovery)
         );
-        (bool transferSuccess,) = address(treasury).call(transferData);
-        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        (bool callSuccess,) = address(treasury).call(transferData);
+        require(callSuccess, "transferUSDCtoAssetManager should succeed");
 
         // Record initial state
         uint256 initialUSXSupply = usx.totalSupply();
@@ -889,12 +888,11 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertGt(finalNetDeposits, initialNetDeposits, "Net deposits should increase with profits");
 
         // Verify peg was updated (should reflect the new backing ratio)
-        uint256 finalPeg = usx.usxPrice();
         // Note: Peg might be 0 if netDeposits is 0, which is expected in extreme under-collateralization
         // The key test is that no USX was minted, which we already verified above
     }
 
-    function test_debug_peg_and_value() public {
+    function test_debug_peg_and_value() public view {
         console.log("=== DEBUG PEG AND VALUE CONSERVATION ===");
 
         // Check if USX supply is 0 to avoid division by zero
@@ -949,8 +947,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         vm.prank(assetManager);
         bytes memory transferData =
             abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, 1000e6);
-        (bool transferSuccess,) = address(treasury).call(transferData);
-        require(transferSuccess, "transferUSDCtoAssetManager should succeed");
+        (bool callSuccess,) = address(treasury).call(transferData);
+        require(callSuccess, "transferUSDCtoAssetManager should succeed");
 
         console.log("\n=== EPOCH 1: First Profit Report ===");
         vm.prank(assetManager);

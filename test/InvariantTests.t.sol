@@ -1,18 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Test, console} from "forge-std/Test.sol";
 import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
-import {USX} from "../src/USX.sol";
-import {TreasuryDiamond} from "../src/TreasuryDiamond.sol";
 import {sUSX} from "../src/sUSX.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
 import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
 import {InsuranceBufferFacet} from "../src/facets/InsuranceBufferFacet.sol";
-import {MockAssetManager} from "../src/mocks/MockAssetManager.sol";
-import {MockUSDC} from "./mocks/MockUSDC.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title InvariantTests
 /// @notice These are Foundry invariant tests that run with fuzzing, without forking
@@ -515,7 +508,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
         // Get multiple random users for concurrent operations
         address user1 = getRandomUser();
-        address user2 = getRandomUser();
+        // address user2 = getRandomUser();
 
         // Perform rapid operations in sequence to stress the system
         for (uint256 i = 0; i < 5; i++) {
@@ -536,12 +529,10 @@ contract InvariantTests is LocalDeployTestSetup {
                 vm.prank(address(mockAssetManager));
                 bytes memory data =
                     abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 10000e6);
-                (bool success,) = address(treasury).call(data);
-                if (success) {
-                    vm.prank(address(mockAssetManager));
-                    data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 5000e6);
-                    (success,) = address(treasury).call(data);
-                }
+                address(treasury).call(data);
+                vm.prank(address(mockAssetManager));
+                data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 5000e6);
+                address(treasury).call(data);
             } else if (operationType == 3) {
                 // Rapid sUSX operations
                 if (usx.balanceOf(user1) >= 1000e18) {
@@ -556,12 +547,10 @@ contract InvariantTests is LocalDeployTestSetup {
                 // Rapid governance changes
                 vm.prank(governance);
                 bytes memory data = abi.encodeWithSelector(InsuranceBufferFacet.setBufferTargetFraction.selector, 5000);
-                (bool success,) = address(treasury).call(data);
-                if (success) {
-                    vm.prank(governance);
-                    data = abi.encodeWithSelector(InsuranceBufferFacet.setBufferRenewalRate.selector, 1000);
-                    (success,) = address(treasury).call(data);
-                }
+                address(treasury).call(data);
+                vm.prank(governance);
+                data = abi.encodeWithSelector(InsuranceBufferFacet.setBufferRenewalRate.selector, 1000);
+                address(treasury).call(data);
             }
         }
     }
@@ -799,14 +788,9 @@ contract InvariantTests is LocalDeployTestSetup {
     function getMaxLeverage() public returns (uint256) {
         // Call maxLeverage through the diamond proxy
         bytes memory data = abi.encodeWithSelector(AssetManagerAllocatorFacet.maxLeverage.selector);
-        (bool success, bytes memory result) = address(treasury).call(data);
+        (, bytes memory result) = address(treasury).call(data);
 
-        if (success) {
-            return abi.decode(result, (uint256));
-        } else {
-            // If maxLeverage function doesn't exist, return a reasonable default
-            return 1000000e6; // 1M USDC default max leverage
-        }
+        return abi.decode(result, (uint256));
     }
 
     /*=========================== Attack Helper Functions =========================*/
@@ -872,7 +856,6 @@ contract InvariantTests is LocalDeployTestSetup {
     /// @notice Attempt to deplete buffer without crisis
     function _attemptBufferDepletion() internal {
         // Try to drain the insurance buffer without triggering crisis conditions
-        address user = getRandomUser();
 
         // First, ensure buffer has funds
         if (usdc.balanceOf(address(treasury)) > 0) {
@@ -881,16 +864,14 @@ contract InvariantTests is LocalDeployTestSetup {
             vm.prank(address(mockAssetManager));
             bytes memory data =
                 abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, treasuryBalance);
-            (bool success,) = address(treasury).call(data);
+            address(treasury).call(data);
 
-            if (success) {
-                // Report losses to try to deplete buffer
-                vm.prank(address(mockAssetManager));
-                data = abi.encodeWithSelector(
-                    ProfitAndLossReporterFacet.assetManagerReport.selector, treasury.assetManagerUSDC()
-                );
-                (success,) = address(treasury).call(data);
-            }
+            // Report losses to try to deplete buffer
+            vm.prank(address(mockAssetManager));
+            data = abi.encodeWithSelector(
+                ProfitAndLossReporterFacet.assetManagerReport.selector, treasury.assetManagerUSDC()
+            );
+            address(treasury).call(data);
         }
     }
 
@@ -898,11 +879,6 @@ contract InvariantTests is LocalDeployTestSetup {
     function _attemptAccountingInconsistency() internal {
         // Try to create accounting discrepancies
         address user = getRandomUser();
-
-        // Record initial balances
-        uint256 initialTreasuryUSDC = usdc.balanceOf(address(treasury));
-        uint256 initialAssetManagerUSDC = treasury.assetManagerUSDC();
-        uint256 initialUSXSupply = usx.totalSupply();
 
         // Perform operations that might create inconsistencies
         if (usdc.balanceOf(user) >= 1000e6) {
@@ -914,7 +890,7 @@ contract InvariantTests is LocalDeployTestSetup {
                 vm.prank(address(mockAssetManager));
                 bytes memory data =
                     abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector, 100e6);
-                (bool success,) = address(treasury).call(data);
+                address(treasury).call(data);
             }
         }
 
@@ -941,7 +917,8 @@ contract InvariantTests is LocalDeployTestSetup {
         if (usdc.balanceOf(user) >= 1000e6) {
             // Transfer USDC to treasury directly
             vm.prank(user);
-            usdc.transfer(address(treasury), 1000e6);
+            bool transferSuccess = usdc.transfer(address(treasury), 1000e6);
+            require(transferSuccess, "USDC transfer failed");
 
             // Then try to deposit the same amount
             vm.prank(user);
@@ -954,9 +931,6 @@ contract InvariantTests is LocalDeployTestSetup {
         // Try to manipulate sUSX share prices
         address user = getRandomUser();
 
-        // Record initial share price
-        uint256 initialSharePrice = susx.sharePrice();
-
         // Perform operations that might affect share price
         if (usx.balanceOf(user) >= 1000e18) {
             vm.prank(user);
@@ -965,14 +939,12 @@ contract InvariantTests is LocalDeployTestSetup {
             // Immediately report profits to try to manipulate share price
             vm.prank(address(mockAssetManager));
             bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 10000e6);
-            (bool success,) = address(treasury).call(data);
+            address(treasury).call(data);
 
-            if (success) {
-                // Try to withdraw immediately to see if share price was manipulated
-                if (susx.balanceOf(user) >= 1000e18) {
-                    vm.prank(user);
-                    susx.withdraw(1000e18, user, user);
-                }
+            // Try to withdraw immediately to see if share price was manipulated
+            if (susx.balanceOf(user) >= 1000e18) {
+                vm.prank(user);
+                susx.withdraw(1000e18, user, user);
             }
         }
     }
@@ -985,14 +957,12 @@ contract InvariantTests is LocalDeployTestSetup {
         // Set extreme buffer target fraction
         bytes memory data =
             abi.encodeWithSelector(InsuranceBufferFacet.setBufferTargetFraction.selector, type(uint256).max);
-        (bool success,) = address(treasury).call(data);
+        address(treasury).call(data);
 
-        if (success) {
-            // Set extreme buffer renewal rate
-            vm.prank(governance);
-            data = abi.encodeWithSelector(InsuranceBufferFacet.setBufferRenewalRate.selector, type(uint256).max);
-            (success,) = address(treasury).call(data);
-        }
+        // Set extreme buffer renewal rate
+        vm.prank(governance);
+        data = abi.encodeWithSelector(InsuranceBufferFacet.setBufferRenewalRate.selector, type(uint256).max);
+        address(treasury).call(data);
     }
 
     /// @notice Attempt flash loan price manipulation
@@ -1012,7 +982,7 @@ contract InvariantTests is LocalDeployTestSetup {
         vm.prank(address(mockAssetManager));
         bytes memory data =
             abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, flashLoanAmount / 2);
-        (bool success,) = address(treasury).call(data);
+        address(treasury).call(data);
 
         // "Repay" flash loan
         if (usx.balanceOf(user) >= 1000e18) {
@@ -1037,7 +1007,7 @@ contract InvariantTests is LocalDeployTestSetup {
         // Report profits to manipulate share price
         vm.prank(address(mockAssetManager));
         bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 100000e6);
-        (bool success,) = address(treasury).call(data);
+        address(treasury).call(data);
 
         // "Repay" flash loan
         if (susx.balanceOf(user) >= 1000e18) {
@@ -1063,7 +1033,7 @@ contract InvariantTests is LocalDeployTestSetup {
         vm.prank(address(mockAssetManager));
         bytes memory data =
             abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, flashLoanAmount);
-        (bool success,) = address(treasury).call(data);
+        address(treasury).call(data);
 
         // Try to withdraw everything
         if (usx.balanceOf(user) >= 1000e18 && !usx.frozen()) {
@@ -1184,7 +1154,7 @@ contract InvariantTests is LocalDeployTestSetup {
         // Profit report
         vm.prank(address(mockAssetManager));
         bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 10000e6);
-        (bool success,) = address(treasury).call(data);
+        address(treasury).call(data);
 
         // Back-run: Attacker withdraws to capture profits
         if (susx.balanceOf(attacker) >= 1000e18) {
@@ -1254,24 +1224,15 @@ contract InvariantTests is LocalDeployTestSetup {
         address user = getRandomUser();
 
         if (usdc.balanceOf(user) >= 1000e6) {
-            // Record initial state
-            uint256 initialUSXBalance = usdc.balanceOf(address(usx));
-            uint256 initialUserUSX = usx.balanceOf(user);
-
             // Send USDC directly to USX contract
             vm.prank(user);
-            usdc.transfer(address(usx), 1000e6);
+            bool transferSuccess = usdc.transfer(address(usx), 1000e6);
+            require(transferSuccess, "USDC transfer failed");
 
             // Try to withdraw USX immediately to see if we can exploit the balance
             if (usx.balanceOf(user) >= 1000e18 && !usx.frozen()) {
                 vm.prank(user);
                 usx.requestUSDC(1000e18);
-            }
-
-            // Check if the direct transfer created any accounting inconsistencies
-            uint256 finalUSXBalance = usdc.balanceOf(address(usx));
-            if (finalUSXBalance > initialUSXBalance) {
-                // Direct transfer to USX contract detected - this is expected behavior
             }
         }
     }
@@ -1282,33 +1243,22 @@ contract InvariantTests is LocalDeployTestSetup {
         address user = getRandomUser();
 
         if (usdc.balanceOf(user) >= 1000e6) {
-            // Record initial state
-            uint256 initialTreasuryBalance = usdc.balanceOf(address(treasury));
-            uint256 initialAssetManagerBalance = treasury.assetManagerUSDC();
-
             // Send USDC directly to Treasury contract
             vm.prank(user);
-            usdc.transfer(address(treasury), 1000e6);
+            bool transferSuccess = usdc.transfer(address(treasury), 1000e6);
+            require(transferSuccess, "USDC transfer failed");
 
             // Try to manipulate asset manager balance
             if (treasury.assetManagerUSDC() > 0) {
                 vm.prank(address(mockAssetManager));
                 bytes memory data =
                     abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector, 500e6);
-                (bool success,) = address(treasury).call(data);
+                address(treasury).call(data);
 
-                if (success) {
-                    // Try to report losses to see if we can exploit the manipulated balance
-                    vm.prank(address(mockAssetManager));
-                    data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 500e6);
-                    (success,) = address(treasury).call(data);
-                }
-            }
-
-            // Check if the direct transfer created any accounting inconsistencies
-            uint256 finalTreasuryBalance = usdc.balanceOf(address(treasury));
-            if (finalTreasuryBalance > initialTreasuryBalance) {
-                // Attack attempt detected (but not necessarily successful)
+                // Try to report losses to see if we can exploit the manipulated balance
+                vm.prank(address(mockAssetManager));
+                data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 500e6);
+                address(treasury).call(data);
             }
         }
     }
@@ -1319,13 +1269,12 @@ contract InvariantTests is LocalDeployTestSetup {
         address user = getRandomUser();
 
         if (usx.balanceOf(user) >= 1000e18) {
-            // Record initial state
-            uint256 initialSUSXBalance = usx.balanceOf(address(susx));
-            uint256 initialSharePrice = susx.sharePrice();
+            // Record initial state for potential manipulation detection
 
             // Send USX directly to sUSX contract
             vm.prank(user);
-            usx.transfer(address(susx), 1000e18);
+            bool transferSuccess = usx.transfer(address(susx), 1000e18);
+            require(transferSuccess, "USX transfer failed");
 
             // Try to withdraw from sUSX to see if we can exploit the balance
             if (susx.balanceOf(user) >= 1000e18) {
@@ -1335,9 +1284,8 @@ contract InvariantTests is LocalDeployTestSetup {
 
             // Check if the direct transfer affected share price calculation
             uint256 finalSharePrice = susx.sharePrice();
-            if (finalSharePrice != initialSharePrice) {
-                // Attack attempt detected (but not necessarily successful)
-            }
+            // Share price may have changed due to direct transfer
+            if (finalSharePrice > 0) {}
         }
     }
 
@@ -1348,21 +1296,15 @@ contract InvariantTests is LocalDeployTestSetup {
 
         if (usx.balanceOf(user) >= 1000e18) {
             // Record initial state
-            uint256 initialTreasuryUSX = usx.balanceOf(address(treasury));
-            uint256 initialUSXSupply = usx.totalSupply();
+            // Record initial state for potential manipulation detection
 
             // Send USX directly to Treasury contract
             vm.prank(user);
-            usx.transfer(address(treasury), 1000e18);
+            bool transferSuccess = usx.transfer(address(treasury), 1000e18);
+            require(transferSuccess, "USX transfer failed");
 
             // Try to manipulate the treasury's USX balance
             // This could affect calculations that depend on treasury USX holdings
-
-            // Check if the direct transfer created any accounting inconsistencies
-            uint256 finalTreasuryUSX = usx.balanceOf(address(treasury));
-            if (finalTreasuryUSX > initialTreasuryUSX) {
-                // Attack attempt detected (but not necessarily successful)
-            }
         }
     }
 
@@ -1373,21 +1315,15 @@ contract InvariantTests is LocalDeployTestSetup {
 
         if (susx.balanceOf(user) >= 1000e18) {
             // Record initial state
-            uint256 initialTreasurySUSX = susx.balanceOf(address(treasury));
-            uint256 initialSUSXSupply = susx.totalSupply();
+            // Record initial state for potential manipulation detection
 
             // Send sUSX directly to Treasury contract
             vm.prank(user);
-            susx.transfer(address(treasury), 1000e18);
+            bool transferSuccess = susx.transfer(address(treasury), 1000e18);
+            require(transferSuccess, "sUSX transfer failed");
 
             // Try to manipulate the treasury's sUSX balance
             // This could affect calculations that depend on treasury sUSX holdings
-
-            // Check if the direct transfer created any accounting inconsistencies
-            uint256 finalTreasurySUSX = susx.balanceOf(address(treasury));
-            if (finalTreasurySUSX > initialTreasurySUSX) {
-                // Attack attempt detected (but not necessarily successful)
-            }
         }
     }
 
@@ -1397,31 +1333,21 @@ contract InvariantTests is LocalDeployTestSetup {
         address user = getRandomUser();
 
         if (usdc.balanceOf(user) >= 1000e6) {
-            // Record initial state
-            uint256 initialAssetManagerBalance = treasury.assetManagerUSDC();
-
             // Send USDC directly to MockAssetManager
             vm.prank(user);
-            usdc.transfer(address(mockAssetManager), 1000e6);
+            bool transferSuccess = usdc.transfer(address(mockAssetManager), 1000e6);
+            require(transferSuccess, "USDC transfer failed");
 
             // Try to manipulate the asset manager's balance through treasury calls
             vm.prank(address(mockAssetManager));
             bytes memory data =
                 abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, 500e6);
-            (bool success,) = address(treasury).call(data);
+            address(treasury).call(data);
 
-            if (success) {
-                // Try to report profits/losses to see if we can exploit the manipulated balance
-                vm.prank(address(mockAssetManager));
-                data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 1000e6);
-                (success,) = address(treasury).call(data);
-            }
-
-            // Check if the direct transfer created any accounting inconsistencies
-            uint256 finalAssetManagerBalance = treasury.assetManagerUSDC();
-            if (finalAssetManagerBalance != initialAssetManagerBalance) {
-                // Attack attempt detected (but not necessarily successful)
-            }
+            // Try to report profits/losses to see if we can exploit the manipulated balance
+            vm.prank(address(mockAssetManager));
+            data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 1000e6);
+            address(treasury).call(data);
         }
     }
 
@@ -1432,7 +1358,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
         if (usx.balanceOf(user) >= 1000e18) {
             // Record initial state
-            uint256 initialSupply = usx.totalSupply();
+            // Record initial state for potential manipulation detection
 
             // Send USX to various contracts to see if it affects total supply calculation
             address[] memory targets = new address[](3);
@@ -1443,14 +1369,9 @@ contract InvariantTests is LocalDeployTestSetup {
             for (uint256 i = 0; i < targets.length; i++) {
                 if (usx.balanceOf(user) >= 300e18) {
                     vm.prank(user);
-                    usx.transfer(targets[i], 300e18);
+                    bool transferSuccess = usx.transfer(targets[i], 300e18);
+                    require(transferSuccess, "USX transfer failed");
                 }
-            }
-
-            // Check if total supply was affected by direct transfers
-            uint256 finalSupply = usx.totalSupply();
-            if (finalSupply != initialSupply) {
-                // Attack attempt detected (but not necessarily successful)
             }
         }
     }
@@ -1462,7 +1383,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
         if (susx.balanceOf(user) >= 1000e18) {
             // Record initial state
-            uint256 initialSupply = susx.totalSupply();
+            // Record initial state for potential manipulation detection
 
             // Send sUSX to various contracts to see if it affects total supply calculation
             address[] memory targets = new address[](2);
@@ -1472,14 +1393,9 @@ contract InvariantTests is LocalDeployTestSetup {
             for (uint256 i = 0; i < targets.length; i++) {
                 if (susx.balanceOf(user) >= 500e18) {
                     vm.prank(user);
-                    susx.transfer(targets[i], 500e18);
+                    bool transferSuccess = susx.transfer(targets[i], 500e18);
+                    require(transferSuccess, "sUSX transfer failed");
                 }
-            }
-
-            // Check if total supply was affected by direct transfers
-            uint256 finalSupply = susx.totalSupply();
-            if (finalSupply != initialSupply) {
-                // Attack attempt detected (but not necessarily successful)
             }
         }
     }
@@ -1490,13 +1406,10 @@ contract InvariantTests is LocalDeployTestSetup {
         address user = getRandomUser();
 
         if (usdc.balanceOf(user) >= 1000e6) {
-            // Record initial state
-            uint256 initialTreasuryBalance = usdc.balanceOf(address(treasury));
-            uint256 initialAssetManagerBalance = treasury.assetManagerUSDC();
-
             // Send USDC directly to treasury
             vm.prank(user);
-            usdc.transfer(address(treasury), 1000e6);
+            bool transferSuccess = usdc.transfer(address(treasury), 1000e6);
+            require(transferSuccess, "USDC transfer failed");
 
             // Try to exploit the manipulated balance
             if (usdc.balanceOf(address(treasury)) > 0) {
@@ -1504,20 +1417,12 @@ contract InvariantTests is LocalDeployTestSetup {
                 vm.prank(address(mockAssetManager));
                 bytes memory data =
                     abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, 500e6);
-                (bool success,) = address(treasury).call(data);
+                address(treasury).call(data);
 
-                if (success) {
-                    // Try to report losses to drain the manipulated balance
-                    vm.prank(address(mockAssetManager));
-                    data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 500e6);
-                    (success,) = address(treasury).call(data);
-                }
-            }
-
-            // Check if the manipulation was successful
-            uint256 finalTreasuryBalance = usdc.balanceOf(address(treasury));
-            if (finalTreasuryBalance > initialTreasuryBalance) {
-                // Attack attempt detected (but not necessarily successful)
+                // Try to report losses to drain the manipulated balance
+                vm.prank(address(mockAssetManager));
+                data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 500e6);
+                address(treasury).call(data);
             }
         }
     }
@@ -1528,31 +1433,21 @@ contract InvariantTests is LocalDeployTestSetup {
         address user = getRandomUser();
 
         if (usdc.balanceOf(user) >= 1000e6) {
-            // Record initial state
-            uint256 initialAssetManagerBalance = treasury.assetManagerUSDC();
-
             // Send USDC directly to MockAssetManager
             vm.prank(user);
-            usdc.transfer(address(mockAssetManager), 1000e6);
+            bool transferSuccess = usdc.transfer(address(mockAssetManager), 1000e6);
+            require(transferSuccess, "USDC transfer failed");
 
             // Try to exploit the manipulated balance through treasury calls
             vm.prank(address(mockAssetManager));
             bytes memory data =
                 abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, 500e6);
-            (bool success,) = address(treasury).call(data);
+            address(treasury).call(data);
 
-            if (success) {
-                // Try to report massive profits to exploit the manipulated balance
-                vm.prank(address(mockAssetManager));
-                data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 1000e6);
-                (success,) = address(treasury).call(data);
-            }
-
-            // Check if the manipulation was successful
-            uint256 finalAssetManagerBalance = treasury.assetManagerUSDC();
-            if (finalAssetManagerBalance != initialAssetManagerBalance) {
-                // Attack attempt detected (but not necessarily successful)
-            }
+            // Try to report massive profits to exploit the manipulated balance
+            vm.prank(address(mockAssetManager));
+            data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 1000e6);
+            address(treasury).call(data);
         }
     }
 
@@ -1563,23 +1458,17 @@ contract InvariantTests is LocalDeployTestSetup {
 
         if (usx.balanceOf(user) >= 1000e18) {
             // Record initial state
-            uint256 initialSharePrice = susx.sharePrice();
-            uint256 initialSUSXBalance = usx.balanceOf(address(susx));
+            // Record initial state for potential manipulation detection
 
             // Send USX directly to sUSX contract to manipulate share price calculation
             vm.prank(user);
-            usx.transfer(address(susx), 1000e18);
+            bool transferSuccess = usx.transfer(address(susx), 1000e18);
+            require(transferSuccess, "USX transfer failed");
 
             // Try to deposit to sUSX to see if share price is manipulated
             if (usx.balanceOf(user) >= 500e18) {
                 vm.prank(user);
                 susx.deposit(500e18, user);
-            }
-
-            // Check if share price was affected by direct transfer
-            uint256 finalSharePrice = susx.sharePrice();
-            if (finalSharePrice != initialSharePrice) {
-                // Attack attempt detected (but not necessarily successful)
             }
         }
     }
@@ -1591,23 +1480,17 @@ contract InvariantTests is LocalDeployTestSetup {
 
         if (usdc.balanceOf(user) >= 1000e6) {
             // Record initial state
-            uint256 initialPeg = usx.usxPrice();
-            uint256 initialUSXBalance = usdc.balanceOf(address(usx));
+            // Record initial state for potential manipulation detection
 
             // Send USDC directly to USX contract to manipulate peg calculation
             vm.prank(user);
-            usdc.transfer(address(usx), 1000e6);
+            bool transferSuccess = usdc.transfer(address(usx), 1000e6);
+            require(transferSuccess, "USDC transfer failed");
 
             // Try to withdraw USX to see if peg is manipulated
             if (usx.balanceOf(user) >= 500e18 && !usx.frozen()) {
                 vm.prank(user);
                 usx.requestUSDC(500e18);
-            }
-
-            // Check if peg was affected by direct transfer
-            uint256 finalPeg = usx.usxPrice();
-            if (finalPeg != initialPeg) {
-                // Attack attempt detected (but not necessarily successful)
             }
         }
     }
@@ -1618,23 +1501,15 @@ contract InvariantTests is LocalDeployTestSetup {
         address user = getRandomUser();
 
         if (usdc.balanceOf(user) >= 1000e6) {
-            // Record initial state
-            uint256 initialTreasuryBalance = usdc.balanceOf(address(treasury));
-
             // Send USDC directly to treasury to manipulate buffer calculation
             vm.prank(user);
-            usdc.transfer(address(treasury), 1000e6);
+            bool transferSuccess = usdc.transfer(address(treasury), 1000e6);
+            require(transferSuccess, "USDC transfer failed");
 
             // Try to report losses to see if buffer calculation is affected
             vm.prank(address(mockAssetManager));
             bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, 500e6);
-            (bool success,) = address(treasury).call(data);
-
-            // Check if buffer calculation was affected by direct transfer
-            uint256 finalTreasuryBalance = usdc.balanceOf(address(treasury));
-            if (finalTreasuryBalance > initialTreasuryBalance) {
-                // Attack attempt detected (but not necessarily successful)
-            }
+            address(treasury).call(data);
         }
     }
 
@@ -1644,24 +1519,16 @@ contract InvariantTests is LocalDeployTestSetup {
         address user = getRandomUser();
 
         if (usdc.balanceOf(user) >= 1000e6) {
-            // Record initial state
-            uint256 initialAssetManagerBalance = treasury.assetManagerUSDC();
-
             // Send USDC directly to MockAssetManager to manipulate leverage calculation
             vm.prank(user);
-            usdc.transfer(address(mockAssetManager), 1000e6);
+            bool transferSuccess = usdc.transfer(address(mockAssetManager), 1000e6);
+            require(transferSuccess, "USDC transfer failed");
 
             // Try to transfer to asset manager to see if leverage calculation is affected
             vm.prank(address(mockAssetManager));
             bytes memory data =
                 abi.encodeWithSelector(AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector, 500e6);
-            (bool success,) = address(treasury).call(data);
-
-            // Check if leverage calculation was affected by direct transfer
-            uint256 finalAssetManagerBalance = treasury.assetManagerUSDC();
-            if (finalAssetManagerBalance != initialAssetManagerBalance) {
-                // Attack attempt detected (but not necessarily successful)
-            }
+            address(treasury).call(data);
         }
     }
 }
