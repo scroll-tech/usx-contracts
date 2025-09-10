@@ -157,7 +157,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable {
 
         // Check if contract has enough USDC to fulfill the request immediately
         uint256 contractUSDCBalance = $.USDC.balanceOf(address(this));
-        
+
         if (contractUSDCBalance >= usdcAmount) {
             // Automatically send USDC to user if available
             $.USDC.transfer(msg.sender, usdcAmount);
