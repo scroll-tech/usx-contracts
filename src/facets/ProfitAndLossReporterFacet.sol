@@ -53,9 +53,9 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
 
     /*=========================== Asset Manager Functions =========================*/
 
-    /// @notice Asset Manager reports total balance of USDC they hold, profits calculated from this value
+    /// @notice Asset Manager reports total balance of USDC they hold, profits or losses calculated from this value
     /// @param totalBalance The total balance of USDC held by the Asset Manager
-    function reportProfits(uint256 totalBalance) public onlyAssetManager {
+    function assetManagerReport(uint256 totalBalance) public onlyAssetManager {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         // Check if the peg is broken
         bool pegBroken = $.USX.usxPrice() < 1e18;
@@ -67,56 +67,45 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
         $.assetManagerUSDC = totalBalance;
         uint256 currentNetDeposits = AssetManagerAllocatorFacet(address(this)).netDeposits();
 
-        // Gets the total profits since the last report
-        if (currentNetDeposits < previousNetDeposits) revert LossesDetectedUseReportLossesFunction();
-        uint256 grossProfit = currentNetDeposits - previousNetDeposits;
+        // Gets the total profits or losses since the last report
+        if (currentNetDeposits >= previousNetDeposits) {
+            // Handle profits
+            uint256 grossProfit = currentNetDeposits - previousNetDeposits;
 
-        // If peg is broken, recover it and distribute the remaining profits
-        if (pegBroken) {
-            // Calculate the profits available after peg recovery
-            uint256 profitsRemaining = (currentNetDeposits * DECIMAL_SCALE_FACTOR) - $.USX.totalSupply();
+            // If peg is broken, recover it and distribute the remaining profits
+            if (pegBroken) {
+                // Calculate the profits available after peg recovery
+                uint256 profitsRemaining = (currentNetDeposits * DECIMAL_SCALE_FACTOR) - $.USX.totalSupply();
 
-            // Distribute any remaining profits
-            if (profitsRemaining > 0) {
-                _distributeProfits(profitsRemaining);
-            }
-            // Update peg after all USX minting is complete
-            _updatePeg();
-        } else {
-            // Distribute profits to the stakers, with a portion going to the Insurance Buffer and Governance Warchest
-            _distributeProfits(grossProfit);
-        }
-
-        // Next epoch is started
-        $.sUSX.updateLastEpochBlock();
-    }
-
-    /// @notice Asset Manager reports total balance of USDC they hold, losses calculated from this value
-    /// @param totalBalance The total balance of USDC held by the Asset Manager
-    function reportLosses(uint256 totalBalance) public onlyAssetManager {
-        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-
-        // Update to use reportProfits logic
-        if (totalBalance > $.assetManagerUSDC) revert ProfitsDetectedUseReportProfitsFunction();
-        uint256 grossLoss = $.assetManagerUSDC - totalBalance;
-
-        // Update the assetManagerUSDC to the new balance
-        $.assetManagerUSDC = totalBalance;
-
-        // 1. Subtract loss from the Insurance Buffer module
-        uint256 remainingLossesAfterInsuranceBuffer = InsuranceBufferFacet(address(this)).slashBuffer(grossLoss);
-
-        // 2. Then if losses remain, burn USX held in sUSX contract to cover loss
-        if (remainingLossesAfterInsuranceBuffer > 0) {
-            uint256 remainingLossesAfterVault = _distributeLosses(remainingLossesAfterInsuranceBuffer);
-
-            // Freeze sUSX vault deposits when vault USX is burned
-            $.sUSX.freezeDeposits();
-
-            // 3. Finally if neither of these cover the losses, update the peg to adjust the USX:USDC ratio and freeze both deposits and withdrawals
-            if (remainingLossesAfterVault > 0) {
+                // Distribute any remaining profits
+                if (profitsRemaining > 0) {
+                    _distributeProfits(profitsRemaining);
+                }
+                // Update peg after all USX minting is complete
                 _updatePeg();
-                $.USX.freeze();
+            } else {
+                // Distribute profits to the stakers, with a portion going to the Insurance Buffer and Governance Warchest
+                _distributeProfits(grossProfit);
+            }
+        } else {
+            // Handle losses
+            uint256 grossLoss = previousNetDeposits - currentNetDeposits;
+
+            // 1. Subtract loss from the Insurance Buffer module
+            uint256 remainingLossesAfterInsuranceBuffer = InsuranceBufferFacet(address(this)).slashBuffer(grossLoss);
+
+            // 2. Then if losses remain, burn USX held in sUSX contract to cover loss
+            if (remainingLossesAfterInsuranceBuffer > 0) {
+                uint256 remainingLossesAfterVault = _distributeLosses(remainingLossesAfterInsuranceBuffer);
+
+                // Freeze sUSX vault deposits when vault USX is burned
+                $.sUSX.freezeDeposits();
+
+                // 3. Finally if neither of these cover the losses, update the peg to adjust the USX:USDC ratio and freeze both deposits and withdrawals
+                if (remainingLossesAfterVault > 0) {
+                    _updatePeg();
+                    $.USX.freeze();
+                }
             }
         }
 

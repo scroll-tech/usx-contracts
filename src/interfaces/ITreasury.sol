@@ -22,7 +22,6 @@ interface ITreasury {
     function profitLatestEpoch() external view returns (uint256);
     function profitPerBlock() external view returns (uint256);
     function substractProfitLatestEpoch() external view returns (uint256);
-    function reportProfits(uint256 totalBalance) external;
-    function reportLosses(uint256 totalBalance) external;
+    function assetManagerReport(uint256 totalBalance) external;
     function setSuccessFeeFraction(uint256 _successFeeFraction) external;
 }
