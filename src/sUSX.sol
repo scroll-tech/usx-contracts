@@ -40,6 +40,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
     event WithdrawalPeriodSet(uint256 oldPeriod, uint256 newPeriod);
     event WithdrawalFeeFractionSet(uint256 oldFraction, uint256 newFraction);
     event EpochDurationSet(uint256 oldDuration, uint256 newDuration);
+    event NotWithdrawalRequester();
 
     /*=========================== Modifiers =========================*/
 
@@ -137,6 +138,9 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
     /// @param withdrawalId The id of the withdrawal to claim
     function claimWithdraw(uint256 withdrawalId) public nonReentrant {
         SUSXStorage storage $ = _getStorage();
+
+        // Check that the caller is the user who made the withdrawal request
+        if ($.withdrawalRequests[withdrawalId].user != msg.sender) revert NotWithdrawalRequester();
 
         // Check if the withdrawal request is unclaimed
         if ($.withdrawalRequests[withdrawalId].claimed) revert WithdrawalAlreadyClaimed();
