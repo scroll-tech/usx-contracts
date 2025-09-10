@@ -28,6 +28,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
     error TreasuryAlreadySet();
     error USXTransferFailed();
     error DepositsFrozen();
+    error NotWithdrawalRequester();
 
     /*=========================== Events =========================*/
 
@@ -40,7 +41,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
     event WithdrawalPeriodSet(uint256 oldPeriod, uint256 newPeriod);
     event WithdrawalFeeFractionSet(uint256 oldFraction, uint256 newFraction);
     event EpochDurationSet(uint256 oldDuration, uint256 newDuration);
-    event NotWithdrawalRequester();
 
     /*=========================== Modifiers =========================*/
 
