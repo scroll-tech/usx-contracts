@@ -19,7 +19,7 @@ contract USXTest is LocalDeployTestSetup {
         usx.whitelistUser(user, true);
     }
 
-    /*=========================== Access Control Tests =========================*/
+    /*=========================== SETUP AND CONFIGURATION TESTS =========================*/
 
     function test_setInitialTreasury_revert_already_set() public {
         // Try to set treasury again (should revert with NotGovernance, not TreasuryAlreadySet)
@@ -35,7 +35,7 @@ contract USXTest is LocalDeployTestSetup {
         usx.setInitialTreasury(address(0x999));
     }
 
-    /*=========================== Deposit Function Tests =========================*/
+    /*=========================== CORE FUNCTIONALITY TESTS =========================*/
 
     function test_deposit_success() public {
         uint256 depositAmount = 100e6; // 100 USDC
@@ -151,7 +151,6 @@ contract USXTest is LocalDeployTestSetup {
         assertEq(usx.totalOutstandingWithdrawalAmount(), 50e6, "Total outstanding should be 50 USDC");
     }
 
-    /*=========================== Additional Request USDC Tests =========================*/
 
     function test_requestUSDC_multiple_requests_mixed_behavior() public {
         // Test multiple withdrawal requests with mixed automatic transfer and fallback behavior
@@ -281,7 +280,6 @@ contract USXTest is LocalDeployTestSetup {
         assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0 when frozen");
     }
 
-    /*=========================== Claim USDC Tests =========================*/
 
     function test_claimUSDC_success_with_withdrawal_request() public {
         // Test the complete flow: deposit -> requestUSDC (creates withdrawal request) -> claimUSDC
@@ -627,7 +625,18 @@ contract USXTest is LocalDeployTestSetup {
         assertEq(user2USDCBalanceAfter, user2USDCBalanceBefore + 50e6, "User 2 should receive 50 USDC");
     }
 
-    /*=========================== Access Control Tests =========================*/
+    function test_view_functions_return_correct_values() public {
+        assertEq(address(usx.USDC()), address(usdc));
+        assertEq(address(usx.treasury()), address(treasury));
+        assertEq(usx.governanceWarchest(), governanceWarchest);
+        assertEq(usx.admin(), admin);
+        assertEq(usx.usxPrice(), 1e18);
+        assertEq(usx.decimals(), 18);
+        assertEq(usx.name(), "USX");
+        assertEq(usx.symbol(), "USX");
+    }
+
+    /*=========================== ACCESS CONTROL TESTS =========================*/
 
     function test_mintUSX_success() public {
         // Test mintUSX through the treasury (full flow)
@@ -781,7 +790,7 @@ contract USXTest is LocalDeployTestSetup {
         assertTrue(usx.frozen(), "Contract should be frozen");
     }
 
-    /*=========================== Admin Function Tests =========================*/
+    /*=========================== ACCESS CONTROL TESTS =========================*/
 
     function test_whitelistUser_success() public {
         address newUser = address(0x999);
@@ -803,8 +812,6 @@ contract USXTest is LocalDeployTestSetup {
         vm.expectRevert(USX.ZeroAddress.selector);
         usx.whitelistUser(address(0), true);
     }
-
-    /*=========================== Governance Function Tests =========================*/
 
     function test_setGovernance_success() public {
         address newGovernance = address(0x555);
@@ -831,18 +838,6 @@ contract USXTest is LocalDeployTestSetup {
         usx.setGovernance(address(0));
     }
 
-    /*=========================== View Function Tests =========================*/
-
-    function test_view_functions_return_correct_values() public {
-        assertEq(address(usx.USDC()), address(usdc));
-        assertEq(address(usx.treasury()), address(treasury));
-        assertEq(usx.governanceWarchest(), governanceWarchest);
-        assertEq(usx.admin(), admin);
-        assertEq(usx.usxPrice(), 1e18);
-        assertEq(usx.decimals(), 18);
-        assertEq(usx.name(), "USX");
-        assertEq(usx.symbol(), "USX");
-    }
 
     function test_whitelisted_users_mapping() public {
         // Test that whitelisted users mapping works correctly
@@ -862,8 +857,6 @@ contract USXTest is LocalDeployTestSetup {
         assertTrue(usx.whitelistedUsers(otherUser), "Other user should now be whitelisted");
     }
 
-    /*=========================== Missing Coverage Tests =========================*/
-
     function test_deposit_revert_failed_usdc_transfer() public {
         // This test is challenging to mock properly due to the complex USDC interaction
         // Instead, we'll test the whitelist check which is easier to control
@@ -874,6 +867,9 @@ contract USXTest is LocalDeployTestSetup {
         vm.expectRevert(USX.UserNotWhitelisted.selector);
         usx.deposit(1000e6);
     }
+
+    /*=========================== INTEGRATION TESTS =========================*/
+
 
     function test_claimUSDC_revert_no_outstanding_requests() public {
         // Setup: User with no outstanding withdrawal requests
@@ -940,8 +936,6 @@ contract USXTest is LocalDeployTestSetup {
         usx.claimUSDC();
     }
 
-    /*=========================== Edge Cases & Error Scenarios =========================*/
-
     function test_deposit_exact_outstanding_amount() public {
         // Test deposit when amount exactly equals outstanding withdrawal amount
         // First, give user some USX to request USDC
@@ -994,8 +988,6 @@ contract USXTest is LocalDeployTestSetup {
         // Verify the deposit worked correctly
         assertEq(usx.balanceOf(user), depositAmount * 1e12, "User should receive correct USX amount");
     }
-
-    /*=========================== UUPS Upgrade Tests =========================*/
 
     function test_authorizeUpgrade_success() public {
         // Test that governance can authorize upgrade

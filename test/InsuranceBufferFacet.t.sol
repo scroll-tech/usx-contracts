@@ -12,7 +12,7 @@ contract InsuranceBufferFacetTest is LocalDeployTestSetup {
         super.setUp(); // Runs the deployment script and sets up contracts
     }
 
-    /*=========================== Basic Functionality Tests =========================*/
+    /*=========================== CORE FUNCTIONALITY TESTS =========================*/
 
     function test_bufferTarget_default_value() public {
         // Test bufferTarget with realistic USX balances created through deposits
@@ -227,7 +227,7 @@ contract InsuranceBufferFacetTest is LocalDeployTestSetup {
         assertFalse(setRenewalRateSuccess, "setBufferRenewalRate should fail for invalid rate");
     }
 
-    /*=========================== topUpBuffer Integration Tests =========================*/
+    /*=========================== ACCESS CONTROL TESTS =========================*/
 
     function test_topUpBuffer_through_assetManagerReport_success() public {
         // Test topUpBuffer functionality through REAL profit reporting flow
@@ -487,7 +487,7 @@ contract InsuranceBufferFacetTest is LocalDeployTestSetup {
         assertEq(finalBufferSize, initialBufferSize, "Buffer size should remain the same with zero profit");
     }
 
-    /*=========================== View Function Tests =========================*/
+    /*=========================== INTEGRATION TESTS =========================*/
 
     function test_view_functions_return_correct_values() public {
         // Test that all view functions return correct values with realistic USX balances
@@ -525,7 +525,6 @@ contract InsuranceBufferFacetTest is LocalDeployTestSetup {
         console.log("  Vault USX balance:", usx.balanceOf(address(susx)));
     }
 
-    /*=========================== Missing Coverage Tests =========================*/
 
     function test_slashBuffer_insufficient_buffer() public {
         // Setup: Create a scenario where the loss exceeds the buffer size

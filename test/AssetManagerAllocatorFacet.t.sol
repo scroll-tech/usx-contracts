@@ -18,7 +18,7 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         usdc.approve(address(mockAssetManager), type(uint256).max);
     }
 
-    /*=========================== maxLeverage Function Tests =========================*/
+    /*=========================== CORE FUNCTIONALITY TESTS =========================*/
 
     function test_maxLeverage_with_seeded_vault() public {
         // In deployment-based testing, the vault is pre-seeded with USX for leverage testing
@@ -146,7 +146,6 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         assertEq(maxLeverage, expectedMaxLeverage);
     }
 
-    /*=========================== checkMaxLeverage Function Tests =========================*/
 
     function test_checkMaxLeverage_within_limit() public {
         // First, seed the vault with USX so we have leverage to work with
@@ -256,7 +255,6 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         assertFalse(allowed);
     }
 
-    /*=========================== netDeposits Function Tests =========================*/
 
     function test_netDeposits_empty_treasury() public {
         // Ensure treasury has no USDC by transferring it all out
@@ -325,7 +323,7 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         assertEq(netDeposits, treasuryUSDC);
     }
 
-    /*=========================== Governance Function Tests =========================*/
+    /*=========================== ACCESS CONTROL TESTS =========================*/
 
     function test_setMaxLeverageFraction_success() public {
         uint256 newFraction = 80000; // 8%
@@ -434,7 +432,6 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         assertFalse(success);
     }
 
-    /*=========================== Asset Manager Function Tests =========================*/
 
     function test_transferUSDCtoAssetManager_success() public {
         // First, seed the vault with USX so we have leverage to work with
@@ -561,7 +558,7 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         assertTrue(success);
     }
 
-    /*=========================== Integration Tests =========================*/
+    /*=========================== INTEGRATION TESTS =========================*/
 
     function test_complete_asset_manager_workflow() public {
         // 1. Set max leverage fraction

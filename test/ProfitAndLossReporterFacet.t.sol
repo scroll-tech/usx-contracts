@@ -21,7 +21,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         deal(address(usdc), address(treasury), 10000e6); // 10,000 USDC
     }
 
-    /*=========================== successFee Function Tests =========================*/
+    /*=========================== CORE FUNCTIONALITY TESTS =========================*/
 
     function test_successFee_default_value() public {
         uint256 profitAmount = 100e6; // 100 USDC
@@ -86,7 +86,6 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertEq(successFeeAmount, expectedFee);
     }
 
-    /*=========================== Profit Latest Epoch Function Tests =========================*/
 
     function test_profitLatestEpoch_default_value() public {
         // Call through Treasury
@@ -117,8 +116,6 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertEq(profit, 0);
     }
 
-    /*=========================== Profit Per Block Function Tests =========================*/
-
     function test_profitPerBlock_default_value() public {
         // Call through Treasury
         bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.profitPerBlock.selector);
@@ -148,7 +145,6 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertEq(profitPerBlock, 0);
     }
 
-    /*=========================== Report Profits Function Tests =========================*/
 
     function test_assetManagerReport_profits_success() public {
         uint256 newTotalBalance = 1100e6; // 1100 USDC (100 USDC profit)
@@ -248,7 +244,6 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertTrue(success);
     }
 
-    /*=========================== Report Losses Function Tests =========================*/
 
     function test_assetManagerReport_losses_success() public {
         uint256 newTotalBalance = 900e6; // 900 USDC (100 USDC loss)
@@ -503,7 +498,27 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertFalse(usx.frozen(), "USX should not be frozen with zero losses");
     }
 
-    /*=========================== Governance Function Tests =========================*/
+    function test_view_functions_return_correct_values() public {
+        // Test successFee
+        bytes memory successFeeData = abi.encodeWithSelector(
+            ProfitAndLossReporterFacet.successFee.selector,
+            100e6 // 100 USDC profit
+        );
+
+        (bool successFeeSuccess, bytes memory successFeeResult) = address(treasury).call(successFeeData);
+
+        require(successFeeSuccess, "successFee call failed");
+        uint256 successFeeAmount = abi.decode(successFeeResult, (uint256));
+
+        // Should return 5% of profit (default successFeeFraction is 50000)
+        uint256 expectedFee = (100e6 * 50000) / 1000000;
+        assertEq(successFeeAmount, expectedFee);
+
+        // All epoch-related functions are now working correctly with the real sUSX contract
+        // The real contract provides all necessary epoch functionality
+    }
+
+    /*=========================== ACCESS CONTROL TESTS =========================*/
 
     function test_setSuccessFeeFraction_success() public {
         uint256 newFeeFraction = 100000; // 10%
@@ -589,29 +604,8 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertTrue(success);
     }
 
-    /*=========================== View Function Tests =========================*/
 
-    function test_view_functions_return_correct_values() public {
-        // Test successFee
-        bytes memory successFeeData = abi.encodeWithSelector(
-            ProfitAndLossReporterFacet.successFee.selector,
-            100e6 // 100 USDC profit
-        );
-
-        (bool successFeeSuccess, bytes memory successFeeResult) = address(treasury).call(successFeeData);
-
-        require(successFeeSuccess, "successFee call failed");
-        uint256 successFeeAmount = abi.decode(successFeeResult, (uint256));
-
-        // Should return 5% of profit (default successFeeFraction is 50000)
-        uint256 expectedFee = (100e6 * 50000) / 1000000;
-        assertEq(successFeeAmount, expectedFee);
-
-        // All epoch-related functions are now working correctly with the real sUSX contract
-        // The real contract provides all necessary epoch functionality
-    }
-
-    /*=========================== Additional Edge Case Tests =========================*/
+    /*=========================== INTEGRATION TESTS =========================*/
 
     function test_successFee_edge_cases() public {
         // Test with very small profit
@@ -673,8 +667,6 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 expectedFee = (100e6 * exactFraction) / 1000000;
         assertEq(successFeeAmount, expectedFee);
     }
-
-    /*=========================== Missing Coverage Tests =========================*/
 
     function test_assetManagerReport_losses_small_loss_fully_covered_by_buffer() public {
         // Setup: Create a small loss that can be fully covered by the insurance buffer
@@ -946,7 +938,6 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         console.log("=== END DEBUG ===");
     }
 
-    /*=========================== Carryover Logic Tests =========================*/
 
     function test_undistributed_profits_carryover() public {
         console.log("=== TESTING UNDISTRIBUTED PROFITS CARRYOVER ===");
@@ -1042,6 +1033,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         );
         console.log("Linear distribution is working correctly!");
     }
+
 
     function test_simple_profit_reporting() public {
         console.log("\n=== SIMPLE PROFIT REPORTING TEST ===");

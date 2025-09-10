@@ -21,7 +21,7 @@ contract sUSXTest is LocalDeployTestSetup {
         super.setUp(); // Runs the deployment script and sets up contracts
     }
 
-    /*=========================== Access Control Tests =========================*/
+    /*=========================== SETUP AND CONFIGURATION TESTS =========================*/
 
     function test_setInitialTreasury_revert_already_set() public {
         // Treasury is already set in setUp
@@ -36,7 +36,7 @@ contract sUSXTest is LocalDeployTestSetup {
         susx.setInitialTreasury(address(0x999));
     }
 
-    /*=========================== Share Price Calculation Tests =========================*/
+    /*=========================== CORE FUNCTIONALITY TESTS =========================*/
 
     function test_sharePrice_first_deposit() public {
         // In local deployment, we need to seed the vault with USX first
@@ -58,7 +58,6 @@ contract sUSXTest is LocalDeployTestSetup {
         assertEq(susx.sharePrice(), 1e18);
     }
 
-    /*=========================== Withdrawal Fee Tests =========================*/
 
     function test_withdrawal_fee_calculation() public {
         uint256 amount = 1000e18; // 1000 USX
@@ -70,7 +69,7 @@ contract sUSXTest is LocalDeployTestSetup {
         assertEq(fee, expectedFee);
     }
 
-    /*=========================== Governance Function Tests =========================*/
+    /*=========================== ACCESS CONTROL TESTS =========================*/
 
     function test_setMinWithdrawalPeriod_success() public {
         uint256 newPeriod = 150000; // 15 days + some extra
@@ -146,7 +145,6 @@ contract sUSXTest is LocalDeployTestSetup {
         susx.setGovernance(address(0));
     }
 
-    /*=========================== Profit Rollover Tests =========================*/
 
     function test_profit_rollover_before_30_day_distribution() public {
         // This test verifies that profits roll over correctly when a new epoch starts
@@ -292,7 +290,6 @@ contract sUSXTest is LocalDeployTestSetup {
         assertTrue(true, "Multiple profit reports test completed successfully");
     }
 
-    /*=========================== Withdrawal Flow Tests =========================*/
 
     function test_withdraw_creates_request() public {
         // Setup: User deposits USX to get sUSX
@@ -667,7 +664,7 @@ contract sUSXTest is LocalDeployTestSetup {
         assertGt(request0.amount, request1.amount, "Request amounts should be different");
     }
 
-    /*=========================== Edge Cases & Unused Parameters =========================*/
+    /*=========================== INTEGRATION TESTS =========================*/
 
     function test_withdraw_with_different_caller_receiver() public {
         // Test _withdraw with different caller and receiver
@@ -733,8 +730,6 @@ contract sUSXTest is LocalDeployTestSetup {
 
         assertEq(assets, 0, "Should return 0 assets for zero withdrawal");
     }
-
-    /*=========================== Deposit Freezing Tests =========================*/
 
     function test_freezeDeposits_success() public {
         // Test freezeDeposits through treasury (full flow)
