@@ -172,8 +172,8 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
 
         SUSXStorage storage $ = _getStorage();
         uint256 base = $.USX.balanceOf(address(this));
-        uint256 undistributedRewards = $.treasury.substractProfitLatestEpoch();
-        uint256 totalUSX = base - undistributedRewards;
+        uint256 undistributedRewardsUSX = $.treasury.substractProfitLatestEpoch() * 1e12;
+        uint256 totalUSX = base - undistributedRewardsUSX;
 
         return Math.mulDiv(totalUSX, 1e18, supply, Math.Rounding.Floor);
     }
