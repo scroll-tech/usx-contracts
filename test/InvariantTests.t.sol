@@ -264,7 +264,7 @@ contract InvariantTests is LocalDeployTestSetup {
     /// @notice Check fee calculation rounding error
     function _checkFeeRoundingError() internal view {
         uint256 testAmount = 1000e18; // 1000 USX
-        uint256 expectedFee = testAmount * susx.withdrawalFeeFraction() / 100000;
+        uint256 expectedFee = testAmount * susx.withdrawalFeeFraction() / 1000000;
         uint256 actualFee = susx.withdrawalFee(testAmount);
         uint256 feeRoundingError = actualFee > expectedFee ? actualFee - expectedFee : expectedFee - actualFee;
 

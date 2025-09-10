@@ -35,7 +35,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 successFeeAmount = abi.decode(result, (uint256));
 
         // Should return 5% of profit (default successFeeFraction is 50000)
-        uint256 expectedFee = (profitAmount * 50000) / 100000;
+        uint256 expectedFee = (profitAmount * 50000) / 1000000;
         assertEq(successFeeAmount, expectedFee);
     }
 
@@ -66,7 +66,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 successFeeAmount = abi.decode(result, (uint256));
 
         // Should return 5% of large profit
-        uint256 expectedFee = (profitAmount * 50000) / 100000;
+        uint256 expectedFee = (profitAmount * 50000) / 1000000;
         assertEq(successFeeAmount, expectedFee);
     }
 
@@ -82,7 +82,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 successFeeAmount = abi.decode(result, (uint256));
 
         // Should return 5% of small profit
-        uint256 expectedFee = (profitAmount * 50000) / 100000;
+        uint256 expectedFee = (profitAmount * 50000) / 1000000;
         assertEq(successFeeAmount, expectedFee);
     }
 
@@ -529,7 +529,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 successFeeAmount = abi.decode(successFeeResult, (uint256));
 
         // Should now be 10% of profit
-        uint256 expectedFee = (100e6 * newFeeFraction) / 100000;
+        uint256 expectedFee = (100e6 * newFeeFraction) / 1000000;
         assertEq(successFeeAmount, expectedFee);
     }
 
@@ -604,7 +604,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 successFeeAmount = abi.decode(successFeeResult, (uint256));
 
         // Should return 5% of profit (default successFeeFraction is 50000)
-        uint256 expectedFee = (100e6 * 50000) / 100000;
+        uint256 expectedFee = (100e6 * 50000) / 1000000;
         assertEq(successFeeAmount, expectedFee);
 
         // All epoch-related functions are now working correctly with the real sUSX contract
@@ -625,7 +625,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 fee = abi.decode(result, (uint256));
 
         // Should return 5% of small profit
-        uint256 expectedFee = (smallProfit * 50000) / 100000;
+        uint256 expectedFee = (smallProfit * 50000) / 1000000;
         assertEq(fee, expectedFee);
     }
 
@@ -642,7 +642,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 fee = abi.decode(result, (uint256));
 
         // Should return 5% of large profit
-        uint256 expectedFee = (largeProfit * 50000) / 100000;
+        uint256 expectedFee = (largeProfit * 50000) / 1000000;
         assertEq(fee, expectedFee);
     }
 
@@ -670,7 +670,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         uint256 successFeeAmount = abi.decode(successFeeResult, (uint256));
 
         // Should now be 10% of profit
-        uint256 expectedFee = (100e6 * exactFraction) / 100000;
+        uint256 expectedFee = (100e6 * exactFraction) / 1000000;
         assertEq(successFeeAmount, expectedFee);
     }
 

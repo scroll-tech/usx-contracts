@@ -15,7 +15,7 @@ contract InsuranceBufferFacet is TreasuryStorage {
     /// @return The current buffer target
     function bufferTarget() public view returns (uint256) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        return Math.mulDiv($.USX.totalSupply(), $.bufferTargetFraction, 100000, Math.Rounding.Floor);
+        return Math.mulDiv($.USX.totalSupply(), $.bufferTargetFraction, 1000000, Math.Rounding.Floor);
     }
 
     /*=========================== Governance Functions =========================*/

@@ -184,7 +184,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable {
     /// @return The withdrawal fee for the specified withdrawal amount
     function withdrawalFee(uint256 withdrawalAmount) public view returns (uint256) {
         SUSXStorage storage $ = _getStorage();
-        return Math.mulDiv(withdrawalAmount, $.withdrawalFeeFraction, 100000, Math.Rounding.Floor);
+        return Math.mulDiv(withdrawalAmount, $.withdrawalFeeFraction, 1000000, Math.Rounding.Floor);
     }
 
     /*=========================== Governance Functions =========================*/

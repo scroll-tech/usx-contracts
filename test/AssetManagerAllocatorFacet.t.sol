@@ -31,7 +31,7 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
 
         // Should return the correct leverage based on seeded vault balance
         // Default maxLeverageFraction is 100000 (10%), so maxLeverage should be 10% of vault USX balance
-        uint256 expectedMaxLeverage = (100000 * usx.balanceOf(address(susx))) / 100000;
+        uint256 expectedMaxLeverage = (100000 * usx.balanceOf(address(susx))) / 1000000;
         assertEq(maxLeverage, expectedMaxLeverage);
     }
 
@@ -56,7 +56,7 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         uint256 maxLeverage = abi.decode(result, (uint256));
 
         // Should be 10% of vault USX balance (default maxLeverageFraction is 100000 = 10%)
-        uint256 expectedMaxLeverage = (100000 * usx.balanceOf(address(susx))) / 100000;
+        uint256 expectedMaxLeverage = (100000 * usx.balanceOf(address(susx))) / 1000000;
         assertEq(maxLeverage, expectedMaxLeverage);
 
         // Verify the vault has realistic USX balance
@@ -114,7 +114,7 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         uint256 maxLeverage = abi.decode(result, (uint256));
 
         // Should be 10% of large vault USX balance
-        uint256 expectedMaxLeverage = (100000 * usx.balanceOf(address(susx))) / 100000;
+        uint256 expectedMaxLeverage = (100000 * usx.balanceOf(address(susx))) / 1000000;
         assertEq(maxLeverage, expectedMaxLeverage);
 
         // Verify the vault has a large realistic USX balance
@@ -142,7 +142,7 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         uint256 maxLeverage = abi.decode(result, (uint256));
 
         // Should now be 8% of vault USX balance
-        uint256 expectedMaxLeverage = (80000 * usx.balanceOf(address(susx))) / 100000;
+        uint256 expectedMaxLeverage = (80000 * usx.balanceOf(address(susx))) / 1000000;
         assertEq(maxLeverage, expectedMaxLeverage);
     }
 
@@ -186,7 +186,7 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         susx.deposit(usxBalance, user);
 
         // Calculate the maximum allowed allocation based on vault balance
-        uint256 maxLeverage = (100000 * usx.balanceOf(address(susx))) / 100000;
+        uint256 maxLeverage = (100000 * usx.balanceOf(address(susx))) / 1000000;
         uint256 depositAmount = maxLeverage; // Exactly at the limit
 
         // Call through Treasury
@@ -347,7 +347,7 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         uint256 maxLeverage = abi.decode(maxLeverageResult, (uint256));
 
         // Should now be 8% of vault balance
-        uint256 expectedMaxLeverage = (newFraction * usx.totalSupply()) / 100000;
+        uint256 expectedMaxLeverage = (newFraction * usx.totalSupply()) / 1000000;
         assertEq(maxLeverage, expectedMaxLeverage);
     }
 
@@ -483,7 +483,7 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
 
     function test_transferUSDCtoAssetManager_revert_exceeds_leverage() public {
         // Calculate the maximum allowed allocation
-        uint256 maxLeverage = (100000 * usx.totalSupply()) / 100000;
+        uint256 maxLeverage = (100000 * usx.totalSupply()) / 1000000;
         uint256 transferAmount = maxLeverage + 1; // Exceeds the limit
 
         // Call through Treasury
@@ -592,7 +592,7 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         uint256 maxLeverage = abi.decode(maxLeverageResult, (uint256));
 
         // Should now be 20% of USX total supply
-        uint256 expectedMaxLeverage = (usx.totalSupply() * newLeverageFraction) / 100000;
+        uint256 expectedMaxLeverage = (usx.totalSupply() * newLeverageFraction) / 1000000;
         assertEq(maxLeverage, expectedMaxLeverage);
 
         // 4. Test transfer to asset manager (this will likely fail due to complex internal logic)

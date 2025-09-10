@@ -66,7 +66,7 @@ contract sUSXTest is LocalDeployTestSetup {
         uint256 fee = susx.withdrawalFee(amount);
 
         // 0.5% = 500 basis points
-        uint256 expectedFee = amount * 500 / 100000;
+        uint256 expectedFee = amount * 500 / 1000000;
         assertEq(fee, expectedFee);
     }
 

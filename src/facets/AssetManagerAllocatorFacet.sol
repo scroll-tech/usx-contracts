@@ -24,8 +24,8 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
         uint256 vaultValue = $.USX.balanceOf(address($.sUSX));
 
         // maxLeverageFraction is in basis points (e.g., 100000 = 10%)
-        // So maxAllocation = maxLeverageFraction * vaultValue / 100000
-        return Math.mulDiv($.maxLeverageFraction, vaultValue, 100000, Math.Rounding.Floor);
+        // So maxAllocation = maxLeverageFraction * vaultValue / 1000000
+        return Math.mulDiv($.maxLeverageFraction, vaultValue, 1000000, Math.Rounding.Floor);
     }
 
     /// @notice Checks if a deposit on the sUSX contract would exceed the max protocol leverage.
@@ -60,6 +60,7 @@ contract AssetManagerAllocatorFacet is TreasuryStorage {
     }
 
     /// @notice Sets the max leverage fraction for the protocol
+    /// @dev Maximum value allowed is 10% == 100000
     /// @param _maxLeverageFraction The new max leverage fraction
     function setMaxLeverageFraction(uint256 _maxLeverageFraction) external onlyGovernance {
         if (_maxLeverageFraction > 100000) revert InvalidMaxLeverageFraction();

@@ -286,7 +286,7 @@ contract RoundingAnalysis is Test {
         for (uint256 i = 0; i < testAmounts.length; i++) {
             uint256 testAmount = testAmounts[i];
             uint256 actualFee = susx.withdrawalFee(testAmount);
-            uint256 expectedFee = testAmount * feeFraction / 100000;
+            uint256 expectedFee = testAmount * feeFraction / 1000000;
             uint256 roundingAmount = actualFee > expectedFee ? actualFee - expectedFee : expectedFee - actualFee;
 
             if (roundingAmount > 0) {
@@ -314,7 +314,7 @@ contract RoundingAnalysis is Test {
         }
 
         if (usxTotalSupply > 0) {
-            uint256 expectedBuffer = usxTotalSupply * bufferTargetFraction / 100000;
+            uint256 expectedBuffer = usxTotalSupply * bufferTargetFraction / 1000000;
 
             bytes memory bufferTargetData = abi.encodeWithSelector(InsuranceBufferFacet.bufferTarget.selector);
             (success, result) = address(treasury).call(bufferTargetData);
@@ -351,7 +351,7 @@ contract RoundingAnalysis is Test {
         }
 
         if (vaultValue > 0) {
-            uint256 expectedLeverage = (vaultValue * maxLeverageFraction) / 100000;
+            uint256 expectedLeverage = (vaultValue * maxLeverageFraction) / 1000000;
 
             bytes memory maxLeverageData = abi.encodeWithSelector(AssetManagerAllocatorFacet.maxLeverage.selector);
             (success, result) = address(treasury).call(maxLeverageData);

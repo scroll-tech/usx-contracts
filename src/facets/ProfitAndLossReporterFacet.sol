@@ -18,7 +18,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
     /// @return The success fee for the Goverance Warchest
     function successFee(uint256 profitAmount) public view returns (uint256) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        return Math.mulDiv(profitAmount, $.successFeeFraction, 100000, Math.Rounding.Floor);
+        return Math.mulDiv(profitAmount, $.successFeeFraction, 1000000, Math.Rounding.Floor);
     }
 
     /// @notice Calculates cumulative profit for previous epoch
@@ -100,7 +100,7 @@ contract ProfitAndLossReporterFacet is TreasuryStorage {
                 uint256 remainingLossesAfterVault = _distributeLosses(remainingLossesAfterInsuranceBuffer);
 
                 // Freeze sUSX vault deposits when vault USX is burned
-                $.sUSX.freezeDeposits() ;
+                $.sUSX.freezeDeposits();
 
                 // 3. Finally if neither of these cover the losses, update the peg to adjust the USX:USDC ratio and freeze both deposits and withdrawals
                 if (remainingLossesAfterVault > 0) {
