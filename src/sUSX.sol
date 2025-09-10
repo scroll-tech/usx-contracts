@@ -103,7 +103,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
 
         // Initialize ERC4626, ERC20, and ReentrancyGuard
         __ERC4626_init(IERC20(_usx));
-        __ERC20_init("sUSX Token", "sUSX");
+        __ERC20_init("sUSX", "sUSX");
         __ReentrancyGuard_init();
 
         SUSXStorage storage $ = _getStorage();

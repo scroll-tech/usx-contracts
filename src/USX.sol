@@ -92,7 +92,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         if (_USDC == address(0) || _governanceWarchest == address(0) || _admin == address(0)) revert ZeroAddress();
 
         // Initialize ERC20 and ReentrancyGuard
-        __ERC20_init("USX Token", "USX");
+        __ERC20_init("USX", "USX");
         __ReentrancyGuard_init();
 
         USXStorage storage $ = _getStorage();

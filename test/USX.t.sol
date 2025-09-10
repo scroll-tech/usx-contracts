@@ -840,7 +840,7 @@ contract USXTest is LocalDeployTestSetup {
         assertEq(usx.admin(), admin);
         assertEq(usx.usxPrice(), 1e18);
         assertEq(usx.decimals(), 18);
-        assertEq(usx.name(), "USX Token");
+        assertEq(usx.name(), "USX");
         assertEq(usx.symbol(), "USX");
     }
 

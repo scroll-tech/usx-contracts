@@ -42,7 +42,7 @@ contract TreasuryDiamondTest is LocalDeployTestSetup {
 
     function test_usx_deployed_and_initialized() public {
         // Check that USX is deployed and initialized correctly
-        assertEq(usx.name(), "USX Token");
+        assertEq(usx.name(), "USX");
         assertEq(usx.symbol(), "USX");
         assertEq(usx.decimals(), 18);
         assertEq(usx.usxPrice(), 1e18);
@@ -51,7 +51,7 @@ contract TreasuryDiamondTest is LocalDeployTestSetup {
 
     function test_susx_deployed_and_initialized() public {
         // Check that sUSX is deployed and initialized correctly
-        assertEq(susx.name(), "sUSX Token");
+        assertEq(susx.name(), "sUSX");
         assertEq(susx.symbol(), "sUSX");
         assertEq(susx.decimals(), 18);
         assertEq(address(susx.treasury()), address(treasury));
