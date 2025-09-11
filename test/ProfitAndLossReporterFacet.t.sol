@@ -143,6 +143,128 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         assertEq(profitPerBlock, 0);
     }
 
+    function test_profitPerBlock_at_epoch_end() public {
+        // Test that profitPerBlock handles epoch end correctly
+        // Without the fix, this would cause division by zero when:
+        // blocksRemainingInEpoch = lastEpochBlock + epochDuration - block.number = 0
+        // return netEpochProfits / 0; // Division by zero!
+        // First, trigger a profit report to set netEpochProfits
+        uint256 initialBalance = 1000e6; // 1000 USDC
+        uint256 profitBalance = 1100e6; // 1100 USDC (100 USDC profit)
+
+        // Set initial balance
+        vm.prank(assetManager);
+        bytes memory initialData =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, initialBalance);
+        address(treasury).call(initialData);
+
+        // Report profits to set netEpochProfits (this advances the epoch)
+        vm.prank(assetManager);
+        bytes memory profitData =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, profitBalance);
+        address(treasury).call(profitData);
+
+        // Get epoch duration and current state after the second report
+        uint256 epochDuration = susx.epochDuration();
+        uint256 lastEpochBlock = susx.lastEpochBlock();
+
+        // Verify we have netEpochProfits > 0
+        assertTrue(treasury.netEpochProfits() > 0, "Should have netEpochProfits");
+
+        // Advance to exactly the end of the current epoch
+        vm.roll(lastEpochBlock + epochDuration);
+
+        // This should return 0 at epoch end (preventing division by zero)
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.profitPerBlock.selector);
+        (bool success, bytes memory result) = address(treasury).call(data);
+
+        // The call should succeed and return 0
+        require(success, "profitPerBlock call should succeed");
+        uint256 profitPerBlock = abi.decode(result, (uint256));
+        assertEq(profitPerBlock, 0, "Should return 0 at epoch end");
+    }
+
+    function test_profitPerBlock_past_epoch_end() public {
+        // Test that profitPerBlock handles being past epoch end correctly
+        // Without the fix, this would cause arithmetic underflow when:
+        // blocksRemainingInEpoch = lastEpochBlock + epochDuration - block.number
+        // If block.number > lastEpochBlock + epochDuration, this underflows to a very large number
+        // return netEpochProfits / very_large_number; // Incorrect result!
+        // First, trigger a profit report to set netEpochProfits
+        uint256 initialBalance = 1000e6; // 1000 USDC
+        uint256 profitBalance = 1100e6; // 1100 USDC (100 USDC profit)
+
+        // Set initial balance
+        vm.prank(assetManager);
+        bytes memory initialData =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, initialBalance);
+        address(treasury).call(initialData);
+
+        // Report profits to set netEpochProfits (this advances the epoch)
+        vm.prank(assetManager);
+        bytes memory profitData =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, profitBalance);
+        address(treasury).call(profitData);
+
+        // Get epoch duration and current state after the second report
+        uint256 epochDuration = susx.epochDuration();
+        uint256 lastEpochBlock = susx.lastEpochBlock();
+
+        // Verify we have netEpochProfits > 0
+        assertTrue(treasury.netEpochProfits() > 0, "Should have netEpochProfits");
+
+        // Advance past the end of the current epoch
+        vm.roll(lastEpochBlock + epochDuration + 100);
+
+        // This should return 0 past epoch end (preventing underflow)
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.profitPerBlock.selector);
+        (bool success, bytes memory result) = address(treasury).call(data);
+
+        // The call should succeed and return 0
+        require(success, "profitPerBlock call should succeed");
+        uint256 profitPerBlock = abi.decode(result, (uint256));
+        assertEq(profitPerBlock, 0, "Should return 0 past epoch end");
+    }
+
+    function test_profitPerBlock_with_profits_during_epoch() public {
+        // First, trigger a profit report to set netEpochProfits
+        uint256 initialBalance = 1000e6; // 1000 USDC
+        uint256 profitBalance = 1100e6; // 1100 USDC (100 USDC profit)
+
+        // Set initial balance
+        vm.prank(assetManager);
+        bytes memory initialData =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, initialBalance);
+        address(treasury).call(initialData);
+
+        // Report profits to set netEpochProfits
+        vm.prank(assetManager);
+        bytes memory profitData =
+            abi.encodeWithSelector(ProfitAndLossReporterFacet.assetManagerReport.selector, profitBalance);
+        address(treasury).call(profitData);
+
+        // Get epoch duration and current state
+        uint256 epochDuration = susx.epochDuration();
+        uint256 lastEpochBlock = susx.lastEpochBlock();
+
+        // Advance to halfway through the epoch
+        vm.roll(lastEpochBlock + epochDuration / 2);
+
+        // This should return a positive value
+        bytes memory data = abi.encodeWithSelector(ProfitAndLossReporterFacet.profitPerBlock.selector);
+        (bool success, bytes memory result) = address(treasury).call(data);
+
+        // The call should succeed and return a positive value
+        require(success, "profitPerBlock call should succeed");
+        uint256 profitPerBlock = abi.decode(result, (uint256));
+        assertTrue(profitPerBlock > 0, "Should return positive value during epoch");
+
+        // Verify the calculation is correct: netEpochProfits / blocksRemainingInEpoch
+        uint256 blocksRemaining = epochDuration / 2;
+        uint256 expectedProfitPerBlock = treasury.netEpochProfits() / blocksRemaining;
+        assertEq(profitPerBlock, expectedProfitPerBlock, "Should calculate correct profit per block");
+    }
+
     function test_assetManagerReport_profits_success() public {
         uint256 newTotalBalance = 1100e6; // 1100 USDC (100 USDC profit)
 

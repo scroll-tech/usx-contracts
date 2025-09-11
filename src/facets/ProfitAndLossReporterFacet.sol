@@ -34,8 +34,10 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
     /// @return The profit per block for the current epoch
     function profitPerBlock() public view returns (uint256) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        uint256 blocksRemainingInEpoch = $.sUSX.lastEpochBlock() + $.sUSX.epochDuration() - block.number;
-        return $.netEpochProfits / blocksRemainingInEpoch;
+        uint256 epochEnd = $.sUSX.lastEpochBlock() + $.sUSX.epochDuration();
+        if (block.number >= epochEnd) return 0;
+        uint256 blocksRemainingInEpoch = epochEnd - block.number;
+        return blocksRemainingInEpoch == 0 ? 0 : $.netEpochProfits / blocksRemainingInEpoch;
     }
 
     /// @notice Calculates the cumulative profits for previous epoch that needs to be still distributed
