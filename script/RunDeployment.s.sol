@@ -77,7 +77,7 @@ contract RunDeployment is Script {
         console.log("Deployment verification completed successfully");
     }
 
-    function testBasicFunctionality() internal {
+    function testBasicFunctionality() internal pure {
         console.log("STEP 3: Testing Basic Functionality");
         console.log("---------------------------------------");
 
@@ -85,7 +85,7 @@ contract RunDeployment is Script {
         console.log("Basic functionality testing completed successfully");
     }
 
-    function displayDeploymentSummary() internal {
+    function displayDeploymentSummary() internal view {
         console.log("DEPLOYMENT SUMMARY");
         console.log("=====================");
         console.log("Network: Scroll Mainnet Fork");
