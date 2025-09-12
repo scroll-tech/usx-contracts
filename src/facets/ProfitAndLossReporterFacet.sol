@@ -61,8 +61,6 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
     /// @param totalBalance The total balance of USDC held by the Asset Manager
     function assetManagerReport(uint256 totalBalance) public onlyAssetManager nonReentrant {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        // Check if the peg is broken
-        bool pegBroken = $.USX.usxPrice() < 1e18;
 
         // Get the previous net deposits
         uint256 previousNetDeposits = AssetManagerAllocatorFacet(address(this)).netDeposits();
@@ -77,45 +75,12 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
             uint256 grossProfit = currentNetDeposits - previousNetDeposits;
             emit ReportSubmitted(totalBalance, grossProfit, true);
 
-            // If peg is broken, recover it and distribute the remaining profits
-            if (pegBroken) {
-                // Calculate the profits available after peg recovery
-                uint256 scaledNetDeposits = currentNetDeposits * DECIMAL_SCALE_FACTOR;
-                uint256 totalSupply = $.USX.totalSupply();
-
-                // If we have profits beyond peg recovery, distribute them
-                if (scaledNetDeposits > totalSupply) {
-                    _distributeProfits(scaledNetDeposits - totalSupply);
-                }
-
-                // Update peg to account for peg recovery (and after minting of new USX if profits beyond peg recovery)
-                _updatePeg();
-            } else {
-                // Distribute profits to the stakers, with a portion going to the Insurance Buffer and Governance Warchest
-                _distributeProfits(grossProfit);
-            }
+            // Distribute profits to the stakers, with a portion going to the Insurance Buffer and Governance Warchest
+            _distributeProfits(grossProfit);
         } else {
-            // Handle losses
+            // we will always cover losses, do nothing here.
             uint256 grossLoss = previousNetDeposits - currentNetDeposits;
             emit ReportSubmitted(totalBalance, grossLoss, false);
-
-            // 1. Subtract loss from the Insurance Buffer module
-            uint256 remainingLossesAfterInsuranceBuffer = InsuranceBufferFacet(address(this)).slashBuffer(grossLoss);
-
-            // 2. Then if losses remain, burn USX held in sUSX contract to cover loss
-            if (remainingLossesAfterInsuranceBuffer > 0) {
-                uint256 remainingLossesAfterVault = _distributeLosses(remainingLossesAfterInsuranceBuffer);
-
-                // Freeze sUSX vault deposits when vault USX is burned
-                $.sUSX.freezeDeposits();
-
-                // 3. Finally if neither of these cover the losses, update the peg to adjust the USX:USDC ratio and freeze both deposits and withdrawals
-                if (remainingLossesAfterVault > 0) {
-                    _updatePeg();
-                    $.USX.freeze();
-                    emit ProtocolFrozen("Losses exceed buffer and vault capacity");
-                }
-            }
         }
 
         // Next epoch is started
@@ -135,18 +100,6 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
     }
 
     /*=========================== Internal Functions =========================*/
-
-    /// @notice Updates peg, by taking all outstanding USDC in the system (treasury & asset manager holdings) and dividing them by total supply of USX
-    /// @dev USDC has 6 decimals, USX has 18 decimals, so we need to scale USDC up by 10^12
-    function _updatePeg() internal {
-        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        uint256 totalUSDCoutstanding = AssetManagerAllocatorFacet(address(this)).netDeposits();
-        uint256 scaledUSDC = totalUSDCoutstanding * DECIMAL_SCALE_FACTOR;
-        uint256 updatedPeg = scaledUSDC / $.USX.totalSupply();
-        uint256 oldPeg = $.USX.usxPrice();
-        $.USX.updatePeg(updatedPeg);
-        emit PegUpdated(oldPeg, updatedPeg);
-    }
 
     /// @notice Distributes profits to the Insurance Buffer and Governance Warchest, and sUSX contract (USX stakers)
     /// @param profits The total amount of profits to distribute in USDC

@@ -3,6 +3,8 @@ pragma solidity 0.8.30;
 
 import {TreasuryStorage} from "../TreasuryStorage.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 // Standaradized interface for Asset Manager's contract
@@ -16,6 +18,8 @@ interface IAssetManager {
 /// @dev Facet for TreasuryDiamond contract
 
 contract AssetManagerAllocatorFacet is TreasuryStorage, ReentrancyGuardUpgradeable {
+    using SafeERC20 for IERC20;
+
     /*=========================== Public Functions =========================*/
 
     /// @notice Returns the maximum USDC allocation allowed based on current leverage settings
@@ -58,6 +62,14 @@ contract AssetManagerAllocatorFacet is TreasuryStorage, ReentrancyGuardUpgradeab
         if (_assetManager == address(0)) revert ZeroAddress();
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         address oldAssetManager = $.assetManager;
+        if (oldAssetManager != address(0)) {
+            // withdraw all USDC from old asset manager
+            IAssetManager(oldAssetManager).withdraw($.assetManagerUSDC);
+
+            // deposit all USDC to new asset manager
+            $.USDC.forceApprove(_assetManager, $.assetManagerUSDC);
+            IAssetManager(_assetManager).deposit($.assetManagerUSDC);
+        }
         $.assetManager = _assetManager;
         emit AssetManagerUpdated(oldAssetManager, _assetManager);
     }
@@ -84,6 +96,7 @@ contract AssetManagerAllocatorFacet is TreasuryStorage, ReentrancyGuardUpgradeab
         if (!checkMaxLeverage(_amount)) revert MaxLeverageExceeded();
 
         $.assetManagerUSDC += _amount;
+        $.USDC.forceApprove(address($.assetManager), _amount);
         IAssetManager($.assetManager).deposit(_amount);
         emit USDCAllocated(_amount, $.assetManagerUSDC);
     }
@@ -93,6 +106,7 @@ contract AssetManagerAllocatorFacet is TreasuryStorage, ReentrancyGuardUpgradeab
     function transferUSDCFromAssetManager(uint256 _amount) external onlyAssetManager nonReentrant {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         $.assetManagerUSDC -= _amount;
+        // @note assume asset manager will transfer all USDC back to treasury
         IAssetManager($.assetManager).withdraw(_amount);
         emit USDCDeallocated(_amount, $.assetManagerUSDC);
     }

@@ -24,6 +24,8 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     error NoOutstandingWithdrawalRequests();
     error InsufficientUSDC();
     error TreasuryAlreadySet();
+    error InvalidUSDCDepositAmount();
+    error InvalidUSXRedeemAmount();
 
     /*=========================== Events =========================*/
 
@@ -36,7 +38,21 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     event FrozenChanged(bool frozen);
     event WhitelistUpdated(address indexed user, bool whitelisted);
 
+    /*=========================== Constants =========================*/
+
+    uint256 private constant USDC_SCALAR = 1e12;
+
     /*=========================== Modifiers =========================*/
+
+    modifier onlyWhitelisted() {
+        if (!_getStorage().whitelistedUsers[msg.sender]) revert UserNotWhitelisted();
+        _;
+    }
+
+    modifier whenNotFrozen() {
+        if (_getStorage().frozen) revert Frozen();
+        _;
+    }
 
     modifier onlyGovernance() {
         if (msg.sender != _getStorage().governanceWarchest) revert NotGovernance();
@@ -63,7 +79,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         address governanceWarchest;
         address admin;
         uint256 totalOutstandingWithdrawalAmount;
-        uint256 usxPrice;
+        uint256 totalMatchedWithdrawalAmount;
         mapping(address => bool) whitelistedUsers;
         mapping(address => uint256) outstandingWithdrawalRequests;
     }
@@ -99,7 +115,6 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         $.treasury = ITreasury(_treasury);
         $.governanceWarchest = _governanceWarchest;
         $.admin = _admin;
-        $.usxPrice = 1e18;
     }
 
     /// @dev Set the initial Treasury address - can only be called once when treasury is address(0)
@@ -117,19 +132,20 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
     /// @notice Deposit USDC to get USX
     /// @param _amount The amount of USDC to deposit
-    function deposit(uint256 _amount) public {
+    function deposit(uint256 _amount) public nonReentrant onlyWhitelisted whenNotFrozen {
         USXStorage storage $ = _getStorage();
 
-        // Check if user is whitelisted
-        if (!$.whitelistedUsers[msg.sender]) revert UserNotWhitelisted();
+        // Check if the USDC amount is valid
+        if (_amount == 0) revert InvalidUSDCDepositAmount();
 
-        // Check if contract is frozen
-        if ($.frozen) revert Frozen();
+        // Update the total matched withdrawal amount based on the latest usdc balance
+        _updateTotalMatchedWithdrawalAmount();
 
         // Calculate USDC distribution: keep what's needed for withdrawal requests, send excess to treasury
-        uint256 usdcForContract =
-            _amount <= $.totalOutstandingWithdrawalAmount ? _amount : $.totalOutstandingWithdrawalAmount;
+        uint256 usdcShortfall = $.totalOutstandingWithdrawalAmount - $.totalMatchedWithdrawalAmount;
+        uint256 usdcForContract = Math.min(_amount, usdcShortfall);
         uint256 usdcForTreasury = _amount - usdcForContract;
+        $.totalMatchedWithdrawalAmount += usdcForContract;
 
         // Transfer USDC to contract (if needed for withdrawal requests)
         if (usdcForContract > 0) {
@@ -142,7 +158,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         }
 
         // User receives USX
-        uint256 usxMinted = Math.mulDiv(_amount, $.usxPrice, 1e18, Math.Rounding.Floor) * 1e12;
+        uint256 usxMinted = _amount * USDC_SCALAR;
         _mint(msg.sender, usxMinted);
 
         emit Deposit(msg.sender, _amount, usxMinted);
@@ -150,24 +166,30 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
     /// @notice Redeem USX to get USDC (automatically send if available, otherwise create withdrawal request)
     /// @param _USXredeemed The amount of USX to redeem
-    function requestUSDC(uint256 _USXredeemed) public nonReentrant {
+    function requestUSDC(uint256 _USXredeemed) public nonReentrant onlyWhitelisted whenNotFrozen {
         USXStorage storage $ = _getStorage();
 
-        // Check if withdrawals are frozen
-        if ($.frozen) revert Frozen();
+        // Check if the USX amount is a multiple of USDC_SCALAR
+        // We shall keep the total supple of USX as a multiple of USDC_SCALAR, in case somewhere is
+        // using USDC reserve and total supply to calculate the peg. This will always make the peg 1:1.
+        // Otherwise, 1 USX will a bit more than 1 USDC when someone redeemed non-multiple amount of USX.
+        if (_USXredeemed == 0 || _USXredeemed % USDC_SCALAR != 0) revert InvalidUSXRedeemAmount();
 
         // Check the USX price to determine how much USDC the user will receive
         // Since USX has 18 decimals and USDC has 6 decimals,
         // we need to scale down by 10^12 to convert from USX to USDC
-        uint256 usdcAmount = _USXredeemed * $.usxPrice / 1e18 / 1e12;
+        uint256 usdcAmount = _USXredeemed / USDC_SCALAR;
 
         // Burn the USX
         _burn(msg.sender, _USXredeemed);
 
+        // Update the total matched withdrawal amount based on the latest usdc balance
+        _updateTotalMatchedWithdrawalAmount();
+    
         // Check if contract has enough USDC to fulfill the request immediately
-        uint256 contractUSDCBalance = $.USDC.balanceOf(address(this));
+        uint256 availableUSDCForImmedateTransfer = $.USDC.balanceOf(address(this)) - $.totalMatchedWithdrawalAmount;
 
-        if (contractUSDCBalance >= usdcAmount) {
+        if (availableUSDCForImmedateTransfer >= usdcAmount) {
             // Automatically send USDC to user if available
             $.USDC.safeTransfer(msg.sender, usdcAmount);
             emit Redeem(msg.sender, _USXredeemed, usdcAmount);
@@ -187,18 +209,22 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         // Check if user has outstanding withdrawal requests
         if ($.outstandingWithdrawalRequests[msg.sender] == 0) revert NoOutstandingWithdrawalRequests();
 
+        // Update the total matched withdrawal amount based on the latest usdc balance
+        _updateTotalMatchedWithdrawalAmount();
+
         // Revert if contract has no USDC available
-        uint256 contractUSDCBalance = $.USDC.balanceOf(address(this));
-        if (contractUSDCBalance == 0) revert InsufficientUSDC();
+        uint256 usdcAvailableForClaim = $.totalMatchedWithdrawalAmount;
+        if (usdcAvailableForClaim == 0) revert InsufficientUSDC();
 
         uint256 userRequestAmount = $.outstandingWithdrawalRequests[msg.sender];
 
         // Determine how much can be claimed (minimum of request amount and available balance)
-        uint256 claimableAmount = Math.min(userRequestAmount, contractUSDCBalance);
+        uint256 claimableAmount = Math.min(userRequestAmount, usdcAvailableForClaim);
 
         // Update user's outstanding request
         $.outstandingWithdrawalRequests[msg.sender] -= claimableAmount;
         $.totalOutstandingWithdrawalAmount -= claimableAmount;
+        $.totalMatchedWithdrawalAmount -= claimableAmount;
 
         // Send the claimable USDC to the user
         $.USDC.safeTransfer(msg.sender, claimableAmount);
@@ -257,22 +283,29 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         _burn(_from, _amount);
     }
 
-    /// @notice Update the USX:USDC price
-    /// @param newPeg The new USX:USDC price
-    /// @dev Used by Treasury to update the USX:USDC price
-    function updatePeg(uint256 newPeg) public onlyTreasury {
-        USXStorage storage $ = _getStorage();
-        uint256 oldPeg = $.usxPrice;
-        $.usxPrice = newPeg;
-        emit PegUpdated(oldPeg, newPeg);
-    }
-
     /// @notice Freeze deposits and withdrawals, preventing users from depositing and redeeming USX
     /// @dev Used by Treasury to freeze operations when peg is broken
     function freeze() public onlyTreasury {
         USXStorage storage $ = _getStorage();
         $.frozen = true;
         emit FrozenChanged(true);
+    }
+
+    /*=========================== Internal Functions =========================*/
+
+    /// @notice Update the total matched withdrawal amount based on the latest USDC balance
+    /// @dev This is because someone may transfer more USDC to the contract than requested by users
+    function _updateTotalMatchedWithdrawalAmount() internal {
+        USXStorage storage $ = _getStorage();
+
+        uint256 usdcBalance = $.USDC.balanceOf(address(this));
+        if (usdcBalance > $.totalMatchedWithdrawalAmount) {
+            if (usdcBalance < $.totalOutstandingWithdrawalAmount) {
+                $.totalMatchedWithdrawalAmount = usdcBalance;
+            } else {
+                $.totalMatchedWithdrawalAmount = $.totalOutstandingWithdrawalAmount;
+            }
+        }
     }
 
     /*=========================== UUPS Functions =========================*/
@@ -305,10 +338,6 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
     function totalOutstandingWithdrawalAmount() public view returns (uint256) {
         return _getStorage().totalOutstandingWithdrawalAmount;
-    }
-
-    function usxPrice() public view returns (uint256) {
-        return _getStorage().usxPrice;
     }
 
     function whitelistedUsers(address user) public view returns (bool) {
