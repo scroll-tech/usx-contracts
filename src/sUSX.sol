@@ -26,7 +26,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
     error TreasuryAlreadySet();
     error USXTransferFailed();
     error DepositsFrozen();
-    error NotWithdrawalRequester();
 
     /*=========================== Events =========================*/
 
@@ -136,9 +135,6 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
     /// @param withdrawalId The id of the withdrawal to claim
     function claimWithdraw(uint256 withdrawalId) public nonReentrant {
         SUSXStorage storage $ = _getStorage();
-
-        // Check that the caller is the user who made the withdrawal request
-        if ($.withdrawalRequests[withdrawalId].user != msg.sender) revert NotWithdrawalRequester();
 
         // Check if the withdrawal request is unclaimed
         if ($.withdrawalRequests[withdrawalId].claimed) revert WithdrawalAlreadyClaimed();
