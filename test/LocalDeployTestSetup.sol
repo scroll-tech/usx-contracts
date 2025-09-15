@@ -214,8 +214,6 @@ contract LocalDeployTestSetup is Test {
         // Update lastEpochBlock to current block number after advancement
         console.log("  Updating lastEpochBlock to current block number...");
         vm.prank(address(treasury));
-        susx.updateLastEpochBlock();
-        console.log("  lastEpochBlock updated to:", susx.lastEpochBlock());
 
         console.log("  Initial state: USX supply =", usx.totalSupply(), ", sUSX supply =", susx.totalSupply());
     }

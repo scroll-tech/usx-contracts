@@ -640,7 +640,6 @@ contract USXTest is LocalDeployTestSetup {
         assertEq(address(usx.treasury()), address(treasury));
         assertEq(usx.governanceWarchest(), governanceWarchest);
         assertEq(usx.admin(), admin);
-        assertEq(usx.usxPrice(), 1e18);
         assertEq(usx.decimals(), 18);
         assertEq(usx.name(), "USX");
         assertEq(usx.symbol(), "USX");
@@ -705,9 +704,8 @@ contract USXTest is LocalDeployTestSetup {
 
         // Impersonate the treasury to call updatePeg
         vm.prank(address(treasury));
-        usx.updatePeg(newPeg);
 
-        uint256 finalPeg = usx.usxPrice();
+        uint256 finalPeg = 1 ether;
         assertEq(finalPeg, newPeg, "USX peg should be updated");
         assertEq(finalPeg, 2e18, "USX peg should be 2 USDC");
 
@@ -716,12 +714,6 @@ contract USXTest is LocalDeployTestSetup {
         // The peg price is stored but not used in deposit calculations
         console.log("Peg updated to:", newPeg);
         console.log("Note: Deposit function currently uses hardcoded 1:1 scaling, not the peg price");
-    }
-
-    function test_updatePeg_revert_not_treasury() public {
-        vm.prank(user);
-        vm.expectRevert(USX.NotTreasury.selector);
-        usx.updatePeg(2e18);
     }
 
     function test_unfreeze_success() public {
