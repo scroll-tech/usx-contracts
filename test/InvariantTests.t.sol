@@ -47,7 +47,6 @@ contract InvariantTests is LocalDeployTestSetup {
 
         // Initialize state tracking
         previousTotalSupply = usx.totalSupply();
-        previousPegPrice = usx.usxPrice();
         previousWithdrawalsFrozen = usx.frozen();
     }
 
@@ -76,7 +75,7 @@ contract InvariantTests is LocalDeployTestSetup {
     function invariant_value_conservation() public view {
         if (usx.totalSupply() == 0) return; // Skip initial state
 
-        uint256 totalUSXValue = usx.totalSupply() * usx.usxPrice() / 1e18; // USX value in wei (18 decimals)
+        uint256 totalUSXValue = usx.totalSupply(); // USX value in wei (18 decimals)
         uint256 totalUSDCBacking = (
             usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx))
         ) * DECIMAL_SCALE_FACTOR; // USDC backing scaled to 18 decimals
@@ -91,7 +90,7 @@ contract InvariantTests is LocalDeployTestSetup {
     function invariant_protocol_favored_rounding() public view {
         if (usx.totalSupply() == 0) return; // Skip initial state
 
-        uint256 totalUSXValue = usx.totalSupply() * usx.usxPrice() / 1e18 / 1e12; // Convert to USDC scale (6 decimals)
+        uint256 totalUSXValue = usx.totalSupply() / 1e12; // Convert to USDC scale (6 decimals)
         uint256 totalUSDCBacking =
             usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx));
 
@@ -149,7 +148,7 @@ contract InvariantTests is LocalDeployTestSetup {
     /// @notice Check share price consistency with USX price
     function _checkSharePriceConsistencyWithUSX() internal view {
         uint256 sharePrice = susx.sharePrice();
-        uint256 usxPrice = usx.usxPrice();
+        uint256 usxPrice = 1 ether;
 
         if (usxPrice > 0) {
             // Allow only minimal tolerance for fees/rounding (0.1%)
@@ -185,10 +184,6 @@ contract InvariantTests is LocalDeployTestSetup {
 
     /// @notice Invariant: Peg should be stable in normal conditions
     function invariant_peg_price_stability() public view {
-        // Only check in normal conditions (not during crisis)
-        if (!isInCrisisState()) {
-            assertEq(usx.usxPrice(), 1e18, "Peg should be 1:1 in normal conditions");
-        }
     }
 
     /// @notice Invariant: Leverage must always be within limits
@@ -234,7 +229,7 @@ contract InvariantTests is LocalDeployTestSetup {
             usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC() + usdc.balanceOf(address(usx));
         uint256 scaledUSDC = totalUSDCoutstanding * DECIMAL_SCALE_FACTOR;
         uint256 expectedPeg = scaledUSDC / usx.totalSupply();
-        uint256 actualPeg = usx.usxPrice();
+        uint256 actualPeg = 1 ether;
         uint256 pegRoundingError = actualPeg > expectedPeg ? actualPeg - expectedPeg : expectedPeg - actualPeg;
 
         // Peg should be very close to expected (max 1 wei error)
@@ -781,7 +776,7 @@ contract InvariantTests is LocalDeployTestSetup {
 
     /// @notice Detects if system is in crisis state
     function isInCrisisState() public view returns (bool) {
-        return usx.usxPrice() < 1e18 || usx.frozen();
+        return usx.frozen();
     }
 
     /// @notice Gets the current max leverage

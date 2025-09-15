@@ -21,8 +21,8 @@ interface IsUSX {
     function lastEpochBlock() external view returns (uint256);
     function epochDuration() external view returns (uint256);
 
-    // Epoch management
-    function updateLastEpochBlock() external;
+    // Rewards management
+    function notifyRewards(uint256 amount) external;
 
     // Deposit freezing functions
     function freezeDeposits() external;

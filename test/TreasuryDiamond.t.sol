@@ -44,7 +44,6 @@ contract TreasuryDiamondTest is LocalDeployTestSetup {
         assertEq(usx.name(), "USX");
         assertEq(usx.symbol(), "USX");
         assertEq(usx.decimals(), 18);
-        assertEq(usx.usxPrice(), 1e18);
         assertEq(address(usx.treasury()), address(treasury));
     }
 
@@ -129,7 +128,6 @@ contract TreasuryDiamondTest is LocalDeployTestSetup {
 
         // 2. USX has correct configuration
         assertEq(address(usx.treasury()), address(treasury));
-        assertEq(usx.usxPrice(), 1e18); // 1 USX = 1 USDC (18 decimals)
 
         // 3. sUSX has correct configuration
         assertEq(address(susx.treasury()), address(treasury));

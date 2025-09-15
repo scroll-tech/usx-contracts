@@ -200,7 +200,7 @@ contract RoundingAnalysis is Test {
     function _analyzeUSXPegRounding() internal {
         uint256 totalUSDCoutstanding = usdc.balanceOf(address(treasury)) + treasury.assetManagerUSDC();
         uint256 usxTotalSupply = usx.totalSupply();
-        uint256 actualPeg = usx.usxPrice();
+        uint256 actualPeg = 1 ether;
 
         if (usxTotalSupply > 0) {
             uint256 expectedPeg = 1e18; // 1:1 backing

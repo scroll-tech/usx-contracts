@@ -7,6 +7,8 @@ import {AssetManagerAllocatorFacet} from "./AssetManagerAllocatorFacet.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {IsUSX} from "../interfaces/IsUSX.sol";
+
 /// @title ProfitAndLossReporterFacet
 /// @notice Handles the reporting of profits and losses to the protocol by the Asset Manager
 /// @dev Facet for USX Protocol Treasury Diamond contract
@@ -82,9 +84,6 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
             uint256 grossLoss = previousNetDeposits - currentNetDeposits;
             emit ReportSubmitted(totalBalance, grossLoss, false);
         }
-
-        // Next epoch is started
-        $.sUSX.updateLastEpochBlock();
     }
 
     /*=========================== Governance Functions =========================*/
@@ -121,33 +120,11 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
         uint256 stakerProfits = profits - insuranceBufferProfits - governanceWarchestProfits;
         uint256 stakerProfitsUSX = stakerProfits * DECIMAL_SCALE_FACTOR;
         $.USX.mintUSX(address($.sUSX), stakerProfitsUSX);
+        IsUSX($.sUSX).notifyRewards(stakerProfitsUSX);
 
         // Update netEpochProfits to include both new profits and carryover from previous epoch
         $.netEpochProfits = stakerProfits + undistributedFromPreviousEpoch;
 
         emit ProfitsDistributed(profits, stakerProfits, insuranceBufferProfits, governanceWarchestProfits);
-    }
-
-    /// @notice Distributes losses to the sUSX contract (USX stakers)
-    /// @param losses The total amount of losses to distribute in USDC
-    /// @return remainingLosses The amount of USDC remaining after the losses are distributed
-    function _distributeLosses(uint256 losses) internal returns (uint256 remainingLosses) {
-        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        address vaultAddress = address($.sUSX);
-        uint256 vaultUSXBalance = $.USX.balanceOf(vaultAddress);
-
-        // Convert USDC losses to USX: losses (6 decimals) * DECIMAL_SCALE_FACTOR (10^12) = USX (18 decimals)
-        uint256 lossesUSX = losses * DECIMAL_SCALE_FACTOR;
-
-        if (vaultUSXBalance > lossesUSX) {
-            $.USX.burnUSX(vaultAddress, lossesUSX);
-            remainingLosses = 0;
-        } else {
-            $.USX.burnUSX(vaultAddress, vaultUSXBalance);
-            // Convert remaining USX back to USDC: remaining USX / DECIMAL_SCALE_FACTOR
-            remainingLosses = (lossesUSX - vaultUSXBalance) / DECIMAL_SCALE_FACTOR;
-        }
-
-        emit LossesDistributed(losses, 0, lossesUSX / DECIMAL_SCALE_FACTOR, remainingLosses);
     }
 }
