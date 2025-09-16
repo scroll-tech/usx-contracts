@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Test, console} from "forge-std/Test.sol";
 import {TreasuryDiamond} from "../src/TreasuryDiamond.sol";
 import {USX} from "../src/USX.sol";
-import {sUSX} from "../src/sUSX.sol";
+import {StakedUSX} from "../src/StakedUSX.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockAssetManager} from "../src/mocks/MockAssetManager.sol";
 import {MockUSDC} from "./mocks/MockUSDC.sol";
@@ -33,7 +33,7 @@ contract LocalDeployTestSetup is Test {
 
     // Contract interfaces
     USX public usx;
-    sUSX public susx;
+    StakedUSX public susx;
     TreasuryDiamond public treasury;
     IERC20 public usdc;
     MockAssetManager public mockAssetManager;
@@ -65,15 +65,15 @@ contract LocalDeployTestSetup is Test {
         usxProxy = address(usxProxyContract);
         console.log("USX proxy deployed at:", address(usx));
 
-        // Deploy sUSX implementation and proxy
-        sUSX susxImpl = new sUSX();
-        console.log("sUSX implementation deployed at:", address(susxImpl));
+        // Deploy StakedUSX implementation and proxy
+        StakedUSX susxImpl = new StakedUSX();
+        console.log("StakedUSX implementation deployed at:", address(susxImpl));
 
-        bytes memory susxData = abi.encodeWithSelector(sUSX.initialize.selector, address(usx), address(0), governance);
+        bytes memory susxData = abi.encodeWithSelector(StakedUSX.initialize.selector, address(usx), address(0), governance);
         ERC1967Proxy susxProxyContract = new ERC1967Proxy(address(susxImpl), susxData);
-        susx = sUSX(address(susxProxyContract));
+        susx = StakedUSX(address(susxProxyContract));
         susxProxy = address(susxProxyContract);
-        console.log("sUSX proxy deployed at:", address(susx));
+        console.log("StakedUSX proxy deployed at:", address(susx));
 
         // Deploy Treasury Diamond
         TreasuryDiamond treasuryImpl = new TreasuryDiamond();
@@ -114,9 +114,9 @@ contract LocalDeployTestSetup is Test {
 
         vm.prank(governance);
         try susx.setInitialTreasury(address(treasury)) {
-            console.log("sUSX treasury set successfully");
+            console.log("StakedUSX treasury set successfully");
         } catch {
-            console.log("sUSX treasury already set or failed");
+            console.log("StakedUSX treasury already set or failed");
         }
 
         console.log("Contracts linked successfully");
@@ -139,14 +139,12 @@ contract LocalDeployTestSetup is Test {
         ProfitAndLossReporterFacet profitLossFacet = new ProfitAndLossReporterFacet();
 
         // Define selectors for each facet (matching deployment script)
-        bytes4[] memory assetManagerSelectors = new bytes4[](7);
-        assetManagerSelectors[0] = AssetManagerAllocatorFacet.maxLeverage.selector;
-        assetManagerSelectors[1] = AssetManagerAllocatorFacet.checkMaxLeverage.selector;
-        assetManagerSelectors[2] = AssetManagerAllocatorFacet.netDeposits.selector;
-        assetManagerSelectors[3] = AssetManagerAllocatorFacet.setAssetManager.selector;
-        assetManagerSelectors[4] = AssetManagerAllocatorFacet.setMaxLeverageFraction.selector;
-        assetManagerSelectors[5] = AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector;
-        assetManagerSelectors[6] = AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector;
+        bytes4[] memory assetManagerSelectors = new bytes4[](5);
+        assetManagerSelectors[0] = AssetManagerAllocatorFacet.netDeposits.selector;
+        assetManagerSelectors[1] = AssetManagerAllocatorFacet.setAssetManager.selector;
+        assetManagerSelectors[2] = AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector;
+        assetManagerSelectors[3] = AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector;
+        assetManagerSelectors[4] = AssetManagerAllocatorFacet.transferUSDCForWithdrawal.selector;
 
         bytes4[] memory insuranceBufferSelectors = new bytes4[](5);
         insuranceBufferSelectors[0] = InsuranceBufferFacet.bufferTarget.selector;
@@ -155,13 +153,10 @@ contract LocalDeployTestSetup is Test {
         insuranceBufferSelectors[3] = InsuranceBufferFacet.setBufferTargetFraction.selector;
         insuranceBufferSelectors[4] = InsuranceBufferFacet.setBufferRenewalRate.selector;
 
-        bytes4[] memory profitLossSelectors = new bytes4[](6);
+        bytes4[] memory profitLossSelectors = new bytes4[](3);
         profitLossSelectors[0] = ProfitAndLossReporterFacet.successFee.selector;
-        profitLossSelectors[1] = ProfitAndLossReporterFacet.profitLatestEpoch.selector;
-        profitLossSelectors[2] = ProfitAndLossReporterFacet.profitPerBlock.selector;
-        profitLossSelectors[3] = ProfitAndLossReporterFacet.substractProfitLatestEpoch.selector;
-        profitLossSelectors[4] = ProfitAndLossReporterFacet.assetManagerReport.selector;
-        profitLossSelectors[5] = ProfitAndLossReporterFacet.setSuccessFeeFraction.selector;
+        profitLossSelectors[1] = ProfitAndLossReporterFacet.assetManagerReport.selector;
+        profitLossSelectors[2] = ProfitAndLossReporterFacet.setSuccessFeeFraction.selector;
 
         // Add facets to diamond
         vm.prank(governance);
@@ -215,6 +210,6 @@ contract LocalDeployTestSetup is Test {
         console.log("  Updating lastEpochBlock to current block number...");
         vm.prank(address(treasury));
 
-        console.log("  Initial state: USX supply =", usx.totalSupply(), ", sUSX supply =", susx.totalSupply());
+        console.log("  Initial state: USX supply =", usx.totalSupply(), ", StakedUSX supply =", susx.totalSupply());
     }
 }

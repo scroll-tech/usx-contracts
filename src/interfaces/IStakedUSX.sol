@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-/// @title IsUSX
+/// @title IStakedUSX
 /// @notice Interface for the sUSX contract
-interface IsUSX {
+interface IStakedUSX {
     // Core ERC20 functions
     function totalSupply() external view returns (uint256);
     function balanceOf(address account) external view returns (uint256);

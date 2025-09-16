@@ -10,11 +10,11 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-/// @title sUSX
+/// @title StakedUSX
 /// @notice The main contract for the sUSX token, allowing USX holders to stake to share in protocols profits
 /// @dev ERC4626 vault
 
-contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeCast for uint256;
     using SafeERC20 for IERC20;
 

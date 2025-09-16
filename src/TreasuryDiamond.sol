@@ -8,7 +8,7 @@ import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.s
 import {TreasuryStorage} from "./TreasuryStorage.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IUSX} from "./interfaces/IUSX.sol";
-import {IsUSX} from "./interfaces/IsUSX.sol";
+import {IStakedUSX} from "./interfaces/IStakedUSX.sol";
 
 /// @title TreasuryDiamond
 /// @notice The main contract for the USX Protocol Treasury
@@ -69,7 +69,7 @@ contract TreasuryDiamond is Initializable, UUPSUpgradeable, ReentrancyGuardUpgra
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         $.USDC = IERC20(_USDC);
         $.USX = IUSX(_USX);
-        $.sUSX = IsUSX(_sUSX);
+        $.sUSX = IStakedUSX(_sUSX);
         $.governance = _governance;
         $.governanceWarchest = _governanceWarchest;
         $.assetManager = _assetManager;

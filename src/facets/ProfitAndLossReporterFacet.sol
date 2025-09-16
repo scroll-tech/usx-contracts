@@ -7,7 +7,7 @@ import {AssetManagerAllocatorFacet} from "./AssetManagerAllocatorFacet.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {IsUSX} from "../interfaces/IsUSX.sol";
+import {IStakedUSX} from "../interfaces/IStakedUSX.sol";
 
 /// @title ProfitAndLossReporterFacet
 /// @notice Handles the reporting of profits and losses to the protocol by the Asset Manager
@@ -22,39 +22,6 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
     function successFee(uint256 profitAmount) public view returns (uint256) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         return Math.mulDiv(profitAmount, $.successFeeFraction, 1000000, Math.Rounding.Floor);
-    }
-
-    /// @notice Calculates cumulative profit for previous epoch
-    /// @return profit The cumulative profit for the previous epoch
-    function profitLatestEpoch() public view returns (uint256 profit) {
-        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        uint256 blocks = block.number - $.sUSX.lastEpochBlock();
-        return profitPerBlock() * blocks;
-    }
-
-    /// @notice Calculates the profit per block for the current epoch, to be added to USX balance over time in sharePrice() function
-    /// @return The profit per block for the current epoch
-    function profitPerBlock() public view returns (uint256) {
-        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-        uint256 epochEnd = $.sUSX.lastEpochBlock() + $.sUSX.epochDuration();
-        if (block.number >= epochEnd) return 0;
-        uint256 blocksRemainingInEpoch = epochEnd - block.number;
-        return blocksRemainingInEpoch == 0 ? 0 : $.netEpochProfits / blocksRemainingInEpoch;
-    }
-
-    /// @notice Calculates the cumulative profits for previous epoch that needs to be still distributed
-    /// @dev Determines what is the USX balance removed in calculating sharePrice() calculated as profitPerBlock(current_block - lastEpochBlock)
-    /// @return profitToSubtract The cumulative profits for previous epoch that needs to be still distributed in USDC
-    function substractProfitLatestEpoch() public view returns (uint256 profitToSubtract) {
-        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
-
-        uint256 finalBlock = $.sUSX.lastEpochBlock() + $.sUSX.epochDuration();
-        uint256 currentBlock = block.number;
-        if (currentBlock >= finalBlock || $.netEpochProfits == 0) {
-            return 0;
-        }
-        uint256 blocks = finalBlock - currentBlock; // should substract all profits at the beginning of a new epoch
-        profitToSubtract = profitPerBlock() * blocks; // all regular math checks required
     }
 
     /*=========================== Asset Manager Functions =========================*/
@@ -105,9 +72,6 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
     function _distributeProfits(uint256 profits) internal {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
 
-        // Calculate any undistributed profits from the previous epoch
-        uint256 undistributedFromPreviousEpoch = substractProfitLatestEpoch();
-
         // Portion of the profits are added to the Insurance Buffer
         uint256 insuranceBufferProfits = InsuranceBufferFacet(address(this)).topUpBuffer(profits);
 
@@ -120,10 +84,10 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
         uint256 stakerProfits = profits - insuranceBufferProfits - governanceWarchestProfits;
         uint256 stakerProfitsUSX = stakerProfits * DECIMAL_SCALE_FACTOR;
         $.USX.mintUSX(address($.sUSX), stakerProfitsUSX);
-        IsUSX($.sUSX).notifyRewards(stakerProfitsUSX);
+        IStakedUSX($.sUSX).notifyRewards(stakerProfitsUSX);
 
         // Update netEpochProfits to include both new profits and carryover from previous epoch
-        $.netEpochProfits = stakerProfits + undistributedFromPreviousEpoch;
+        $.netEpochProfits = stakerProfits;
 
         emit ProfitsDistributed(profits, stakerProfits, insuranceBufferProfits, governanceWarchestProfits);
     }

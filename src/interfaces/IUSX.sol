@@ -21,4 +21,7 @@ interface IUSX {
     // State getters
     function frozen() external view returns (bool);
     function governanceWarchest() external view returns (address);
+
+    function totalOutstandingWithdrawalAmount() external view returns (uint256);
+    function totalMatchedWithdrawalAmount() external view returns (uint256);
 }

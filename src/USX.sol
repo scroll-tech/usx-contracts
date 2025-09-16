@@ -34,12 +34,12 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     event Deposit(address indexed user, uint256 usdcAmount, uint256 usxMinted);
     event Redeem(address indexed user, uint256 usxAmount, uint256 usdcAmount);
     event Claim(address indexed user, uint256 amount);
-    event PegUpdated(uint256 oldPeg, uint256 newPeg);
     event FrozenChanged(bool frozen);
     event WhitelistUpdated(address indexed user, bool whitelisted);
 
     /*=========================== Constants =========================*/
 
+    /// @dev Scalar to scale USDC to 18 decimals
     uint256 private constant USDC_SCALAR = 1e12;
 
     /*=========================== Modifiers =========================*/
@@ -139,7 +139,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         if (_amount == 0) revert InvalidUSDCDepositAmount();
 
         // Update the total matched withdrawal amount based on the latest usdc balance
-        _updateTotalMatchedWithdrawalAmount();
+        _updateTotalMatchedWithdrawalAmount(true);
 
         // Calculate USDC distribution: keep what's needed for withdrawal requests, send excess to treasury
         uint256 usdcShortfall = $.totalOutstandingWithdrawalAmount - $.totalMatchedWithdrawalAmount;
@@ -184,7 +184,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         _burn(msg.sender, _USXredeemed);
 
         // Update the total matched withdrawal amount based on the latest usdc balance
-        _updateTotalMatchedWithdrawalAmount();
+        _updateTotalMatchedWithdrawalAmount(false);
     
         // Check if contract has enough USDC to fulfill the request immediately
         uint256 availableUSDCForImmedateTransfer = $.USDC.balanceOf(address(this)) - $.totalMatchedWithdrawalAmount;
@@ -206,11 +206,15 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     function claimUSDC() public nonReentrant {
         USXStorage storage $ = _getStorage();
 
+        // @note It is possible that users with smaller withdrawal request amount can frontrun the
+        // user with larger withdrawal request amount. But eventually, all users will be able to claim
+        // their USDC.
+
         // Check if user has outstanding withdrawal requests
         if ($.outstandingWithdrawalRequests[msg.sender] == 0) revert NoOutstandingWithdrawalRequests();
 
         // Update the total matched withdrawal amount based on the latest usdc balance
-        _updateTotalMatchedWithdrawalAmount();
+        _updateTotalMatchedWithdrawalAmount(true);
 
         // Revert if contract has no USDC available
         uint256 usdcAvailableForClaim = $.totalMatchedWithdrawalAmount;
@@ -295,15 +299,21 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
     /// @notice Update the total matched withdrawal amount based on the latest USDC balance
     /// @dev This is because someone may transfer more USDC to the contract than requested by users
-    function _updateTotalMatchedWithdrawalAmount() internal {
+    function _updateTotalMatchedWithdrawalAmount(bool transferExcessToTreasury) internal {
         USXStorage storage $ = _getStorage();
 
         uint256 usdcBalance = $.USDC.balanceOf(address(this));
         if (usdcBalance > $.totalMatchedWithdrawalAmount) {
-            if (usdcBalance < $.totalOutstandingWithdrawalAmount) {
+            if (usdcBalance <= $.totalOutstandingWithdrawalAmount) {
                 $.totalMatchedWithdrawalAmount = usdcBalance;
             } else {
                 $.totalMatchedWithdrawalAmount = $.totalOutstandingWithdrawalAmount;
+
+                // Transfer the remaining USDC to the treasury
+                if (transferExcessToTreasury) {
+                    uint256 remainingUSDC = usdcBalance - $.totalOutstandingWithdrawalAmount;
+                    $.USDC.safeTransfer(address($.treasury), remainingUSDC);
+                }
             }
         }
     }
@@ -338,6 +348,10 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
     function totalOutstandingWithdrawalAmount() public view returns (uint256) {
         return _getStorage().totalOutstandingWithdrawalAmount;
+    }
+
+    function totalMatchedWithdrawalAmount() public view returns (uint256) {
+        return _getStorage().totalMatchedWithdrawalAmount;
     }
 
     function whitelistedUsers(address user) public view returns (bool) {

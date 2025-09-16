@@ -3,7 +3,7 @@ pragma solidity 0.8.30;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IUSX} from "./interfaces/IUSX.sol";
-import {IsUSX} from "./interfaces/IsUSX.sol";
+import {IStakedUSX} from "./interfaces/IStakedUSX.sol";
 
 /// @title TreasuryStorage
 /// @notice Contains state for the USX Protocols Treasury contracts
@@ -20,8 +20,7 @@ contract TreasuryStorage {
     error ZeroAddress();
 
     // Asset Manager errors
-    error InvalidMaxLeverageFraction();
-    error MaxLeverageExceeded();
+    error USDCWithdrawalFailed();
 
     // Insurance Buffer errors
     error InvalidBufferRenewalRate();
@@ -44,9 +43,9 @@ contract TreasuryStorage {
 
     // Asset Manager Allocator Facet Events
     event AssetManagerUpdated(address indexed oldAssetManager, address indexed newAssetManager);
-    event MaxLeverageUpdated(uint256 oldFraction, uint256 newFraction);
     event USDCAllocated(uint256 amount, uint256 newAllocation);
     event USDCDeallocated(uint256 amount, uint256 newAllocation);
+    event USDCTransferredForWithdrawal(uint256 amount);
 
     // Insurance Buffer Facet Events
     event BufferRenewalRateUpdated(uint256 oldRate, uint256 newRate);
@@ -89,7 +88,7 @@ contract TreasuryStorage {
     /// @custom:storage-location erc7201:treasury.main
     struct TreasuryStorageStruct {
         IUSX USX; // USX token contract
-        IsUSX sUSX; // sUSX vault contract
+        IStakedUSX sUSX; // sUSX vault contract
         IERC20 USDC; // USDC token contract
         address governance; // Governance address
         address assetManager; // The current Asset Manager for the protocol
@@ -120,7 +119,7 @@ contract TreasuryStorage {
         return _getStorage().USX;
     }
 
-    function sUSX() public view returns (IsUSX) {
+    function sUSX() public view returns (IStakedUSX) {
         return _getStorage().sUSX;
     }
 
