@@ -8,7 +8,6 @@ import {USX} from "../src/USX.sol";
 import {StakedUSX} from "../src/StakedUSX.sol";
 import {TreasuryDiamond} from "../src/TreasuryDiamond.sol";
 import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
-import {InsuranceBufferFacet} from "../src/facets/InsuranceBufferFacet.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
 
 /**
@@ -24,6 +23,7 @@ contract DeployScroll is Script {
     address public usdcAddress;
     address public governance;
     address public governanceWarchest;
+    address public insuranceVault;
     address public assetManager;
     address public admin;
     string public deploymentTarget;
@@ -49,6 +49,7 @@ contract DeployScroll is Script {
         usdcAddress = vm.envAddress("USDC_ADDRESS");
         governance = vm.envAddress("GOVERNANCE_ADDRESS");
         governanceWarchest = vm.envAddress("GOVERNANCE_WARCHEST_ADDRESS");
+        insuranceVault = vm.envAddress("INSURANCE_VAULT_ADDRESS");
         assetManager = vm.envAddress("ASSET_MANAGER_ADDRESS");
         admin = vm.envAddress("ADMIN_ADDRESS");
         deploymentTarget = vm.envString("DEPLOYMENT_TARGET");
@@ -178,7 +179,7 @@ contract DeployScroll is Script {
         console.log("2.2. Deploying Treasury Proxy...");
         bytes memory treasuryInitData = abi.encodeCall(
             TreasuryDiamond.initialize,
-            (usdcAddress, address(usxProxy), address(susxProxy), governance, governanceWarchest, assetManager)
+            (usdcAddress, address(usxProxy), address(susxProxy), governance, governanceWarchest, assetManager, insuranceVault)
         );
 
         treasuryProxy = address(new ERC1967Proxy(address(treasuryImpl), treasuryInitData));
@@ -187,11 +188,9 @@ contract DeployScroll is Script {
         // Deploy Facets
         console.log("2.3. Deploying Facets...");
         profitLossFacet = address(new ProfitAndLossReporterFacet());
-        insuranceBufferFacet = address(new InsuranceBufferFacet());
         assetManagerFacet = address(new AssetManagerAllocatorFacet());
 
         console.log("Profit/Loss Facet:", profitLossFacet);
-        console.log("Insurance Buffer Facet:", insuranceBufferFacet);
         console.log("Asset Manager Facet:", assetManagerFacet);
 
         vm.stopBroadcast();
@@ -234,19 +233,6 @@ contract DeployScroll is Script {
         vm.prank(governance);
         treasury.addFacet(assetManagerFacet, assetManagerSelectors);
         console.log("AssetManagerAllocatorFacet added");
-
-        // Add InsuranceBufferFacet
-        console.log("3.3.2. Adding InsuranceBufferFacet...");
-        bytes4[] memory insuranceBufferSelectors = new bytes4[](5);
-        insuranceBufferSelectors[0] = InsuranceBufferFacet.bufferTarget.selector;
-        insuranceBufferSelectors[1] = InsuranceBufferFacet.topUpBuffer.selector;
-        insuranceBufferSelectors[2] = InsuranceBufferFacet.slashBuffer.selector;
-        insuranceBufferSelectors[3] = InsuranceBufferFacet.setBufferTargetFraction.selector;
-        insuranceBufferSelectors[4] = InsuranceBufferFacet.setBufferRenewalRate.selector;
-
-        vm.prank(governance);
-        treasury.addFacet(insuranceBufferFacet, insuranceBufferSelectors);
-        console.log("InsuranceBufferFacet added");
 
         // Add ProfitAndLossReporterFacet
         console.log("3.3.3. Adding ProfitAndLossReporterFacet...");
@@ -305,10 +291,7 @@ contract DeployScroll is Script {
         console.log("Treasury verification passed");
 
         // Verify Facet Accessibility
-        (bool success,) = treasuryProxy.call(abi.encodeWithSelector(InsuranceBufferFacet.bufferTarget.selector));
-        require(success, "InsuranceBufferFacet not accessible");
-
-        (success,) = treasuryProxy.call(abi.encodeWithSelector(ProfitAndLossReporterFacet.successFee.selector, 1000000));
+        (bool success,) = treasuryProxy.call(abi.encodeWithSelector(ProfitAndLossReporterFacet.successFee.selector, 1000000));
         require(success, "ProfitAndLossReporterFacet not accessible");
 
         console.log("Facet accessibility verification passed");
@@ -332,18 +315,12 @@ contract DeployScroll is Script {
         // Test Treasury basic functionality
         console.log("5.3. Testing Treasury basic functionality...");
         TreasuryDiamond treasury = TreasuryDiamond(payable(treasuryProxy));
-        require(treasury.maxLeverageFraction() == 100000, "Treasury maxLeverageFraction should be 100000");
         require(treasury.successFeeFraction() == 50000, "Treasury successFeeFraction should be 50000");
-        require(treasury.bufferTargetFraction() == 50000, "Treasury bufferTargetFraction should be 50000");
+        require(treasury.insuranceFundFraction() == 50000, "Treasury insuranceFundFraction should be 50000");
         console.log("Treasury basic functionality verified");
 
         // Test facet functionality through diamond
-        (bool success, bytes memory data) = treasuryProxy.call(abi.encodeWithSelector(InsuranceBufferFacet.bufferTarget.selector));
-        require(success, "bufferTarget call failed");
-        uint256 bufferTarget = abi.decode(data, (uint256));
-        require(bufferTarget == 0, "bufferTarget should be 0 for empty vault");
-
-        (success, data) =
+        (bool success, bytes memory data) =
             treasuryProxy.call(abi.encodeWithSelector(ProfitAndLossReporterFacet.successFee.selector, 1000000));
         require(success, "successFee call failed");
         uint256 successFee = abi.decode(data, (uint256));

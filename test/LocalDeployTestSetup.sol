@@ -10,7 +10,6 @@ import {MockAssetManager} from "../src/mocks/MockAssetManager.sol";
 import {MockUSDC} from "./mocks/MockUSDC.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
-import {InsuranceBufferFacet} from "../src/facets/InsuranceBufferFacet.sol";
 import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
 
 /**
@@ -24,6 +23,7 @@ contract LocalDeployTestSetup is Test {
     address public admin = 0x4000000000000000000000000000000000000004;
     address public assetManager;
     address public governanceWarchest = 0x2000000000000000000000000000000000000002;
+    address public insuranceVault = 0x3000000000000000000000000000000000000003;
     address public user = address(0x999); // Test user address
 
     // Deployed contract addresses
@@ -81,14 +81,15 @@ contract LocalDeployTestSetup is Test {
 
         try new ERC1967Proxy(
             address(treasuryImpl),
-            abi.encodeWithSelector(
-                TreasuryDiamond.initialize.selector,
-                address(usdc),
+            abi.encodeCall(
+                TreasuryDiamond.initialize,
+                (address(usdc),
                 address(usx),
                 address(susx),
                 governance,
                 governanceWarchest,
-                address(mockAssetManager)
+                address(mockAssetManager),
+                insuranceVault)
             )
         ) returns (ERC1967Proxy treasuryProxyContract) {
             treasury = TreasuryDiamond(payable(treasuryProxyContract));
@@ -135,7 +136,6 @@ contract LocalDeployTestSetup is Test {
 
         // Deploy facets
         AssetManagerAllocatorFacet assetManagerFacet = new AssetManagerAllocatorFacet();
-        InsuranceBufferFacet insuranceBufferFacet = new InsuranceBufferFacet();
         ProfitAndLossReporterFacet profitLossFacet = new ProfitAndLossReporterFacet();
 
         // Define selectors for each facet (matching deployment script)
@@ -146,13 +146,6 @@ contract LocalDeployTestSetup is Test {
         assetManagerSelectors[3] = AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector;
         assetManagerSelectors[4] = AssetManagerAllocatorFacet.transferUSDCForWithdrawal.selector;
 
-        bytes4[] memory insuranceBufferSelectors = new bytes4[](5);
-        insuranceBufferSelectors[0] = InsuranceBufferFacet.bufferTarget.selector;
-        insuranceBufferSelectors[1] = InsuranceBufferFacet.topUpBuffer.selector;
-        insuranceBufferSelectors[2] = InsuranceBufferFacet.slashBuffer.selector;
-        insuranceBufferSelectors[3] = InsuranceBufferFacet.setBufferTargetFraction.selector;
-        insuranceBufferSelectors[4] = InsuranceBufferFacet.setBufferRenewalRate.selector;
-
         bytes4[] memory profitLossSelectors = new bytes4[](3);
         profitLossSelectors[0] = ProfitAndLossReporterFacet.successFee.selector;
         profitLossSelectors[1] = ProfitAndLossReporterFacet.assetManagerReport.selector;
@@ -161,9 +154,6 @@ contract LocalDeployTestSetup is Test {
         // Add facets to diamond
         vm.prank(governance);
         treasury.addFacet(address(assetManagerFacet), assetManagerSelectors);
-
-        vm.prank(governance);
-        treasury.addFacet(address(insuranceBufferFacet), insuranceBufferSelectors);
 
         vm.prank(governance);
         treasury.addFacet(address(profitLossFacet), profitLossSelectors);

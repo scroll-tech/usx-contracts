@@ -54,7 +54,8 @@ contract TreasuryDiamond is Initializable, UUPSUpgradeable, ReentrancyGuardUpgra
         address _sUSX,
         address _governance,
         address _governanceWarchest,
-        address _assetManager
+        address _assetManager,
+        address _insuranceVault
     ) public initializer {
         if (
             _USDC == address(0) || _USX == address(0) || _sUSX == address(0) || _governance == address(0)
@@ -71,14 +72,13 @@ contract TreasuryDiamond is Initializable, UUPSUpgradeable, ReentrancyGuardUpgra
         $.USX = IUSX(_USX);
         $.sUSX = IStakedUSX(_sUSX);
         $.governance = _governance;
-        $.governanceWarchest = _governanceWarchest;
         $.assetManager = _assetManager;
+        $.governanceWarchest = _governanceWarchest;
+        $.insuranceVault = _insuranceVault;
 
         // Set default values
         $.successFeeFraction = 50000; // 5%
-        $.maxLeverageFraction = 100000; // 10%
-        $.bufferRenewalFraction = 100000; // 10%
-        $.bufferTargetFraction = 50000; // 5%
+        $.insuranceFundFraction = 50000; // 5%
 
         emit TreasuryInitialized(_USDC, _USX, _sUSX);
     }
@@ -176,6 +176,26 @@ contract TreasuryDiamond is Initializable, UUPSUpgradeable, ReentrancyGuardUpgra
         $.governance = newGovernance;
 
         emit GovernanceTransferred(oldGovernance, newGovernance);
+    }
+
+    /// @notice Set new governance warchest address
+    /// @param newGovernanceWarchest Address of new governance warchest
+    function setGovernanceWarchest(address newGovernanceWarchest) external onlyGovernance {
+        if (newGovernanceWarchest == address(0)) revert ZeroAddress();
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        address oldGovernanceWarchest = $.governanceWarchest;
+        $.governanceWarchest = newGovernanceWarchest;
+        emit GovernanceWarchestTransferred(oldGovernanceWarchest, newGovernanceWarchest);
+    }
+
+    /// @notice Set new insurance vault address
+    /// @param newInsuranceVault Address of new insurance vault
+    function setInsuranceVault(address newInsuranceVault) external onlyGovernance {
+        if (newInsuranceVault == address(0)) revert ZeroAddress();
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        address oldInsuranceVault = $.insuranceVault;
+        $.insuranceVault = newInsuranceVault;
+        emit InsuranceVaultTransferred(oldInsuranceVault, newInsuranceVault);
     }
 
     /*=========================== Fallback =========================*/

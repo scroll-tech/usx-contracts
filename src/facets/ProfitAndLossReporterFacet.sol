@@ -2,7 +2,6 @@
 pragma solidity 0.8.30;
 
 import {TreasuryStorage} from "../TreasuryStorage.sol";
-import {InsuranceBufferFacet} from "./InsuranceBufferFacet.sol";
 import {AssetManagerAllocatorFacet} from "./AssetManagerAllocatorFacet.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -22,6 +21,14 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
     function successFee(uint256 profitAmount) public view returns (uint256) {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         return Math.mulDiv(profitAmount, $.successFeeFraction, 1000000, Math.Rounding.Floor);
+    }
+
+    /// @notice Calculates the insurance fund for the Insurance Fund based on insuranceFundFraction
+    /// @param profitAmount The amount of profits to calculate the insurance fund for
+    /// @return The insurance fund for the Insurance Fund
+    function insuranceFund(uint256 profitAmount) public view returns (uint256) {
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        return Math.mulDiv(profitAmount, $.insuranceFundFraction, 1000000, Math.Rounding.Floor);
     }
 
     /*=========================== Asset Manager Functions =========================*/
@@ -65,6 +72,16 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
         emit SuccessFeeUpdated(oldFraction, _successFeeFraction);
     }
 
+    /// @notice Sets the insurance fund fraction determining the insurance fund, (default 5% == 50000) with precision to 0.001 percent
+    /// @param _insuranceFundFraction The new insurance fund fraction
+    function setInsuranceFundFraction(uint256 _insuranceFundFraction) external onlyGovernance {
+        if (_insuranceFundFraction > 100000) revert InvalidInsuranceFundFraction();
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        uint256 oldFraction = $.insuranceFundFraction;
+        $.insuranceFundFraction = _insuranceFundFraction;
+        emit InsuranceFundFractionUpdated(oldFraction, _insuranceFundFraction);
+    }
+
     /*=========================== Internal Functions =========================*/
 
     /// @notice Distributes profits to the Insurance Buffer and Governance Warchest, and sUSX contract (USX stakers)
@@ -73,7 +90,9 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
 
         // Portion of the profits are added to the Insurance Buffer
-        uint256 insuranceBufferProfits = InsuranceBufferFacet(address(this)).topUpBuffer(profits);
+        uint256 insuranceBufferProfits = insuranceFund(profits);
+        uint256 insuranceBufferUSX = insuranceBufferProfits * DECIMAL_SCALE_FACTOR;
+        $.USX.mintUSX($.insuranceVault, insuranceBufferUSX);
 
         // Portion of the profits are added to the Governance Warchest
         uint256 governanceWarchestProfits = successFee(profits);
