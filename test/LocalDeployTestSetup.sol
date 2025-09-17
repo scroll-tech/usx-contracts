@@ -2,15 +2,18 @@
 pragma solidity ^0.8.0;
 
 import {Test, console} from "forge-std/Test.sol";
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+
+import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
+import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
 import {TreasuryDiamond} from "../src/TreasuryDiamond.sol";
 import {USX} from "../src/USX.sol";
 import {StakedUSX} from "../src/StakedUSX.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import {MockAssetManager} from "../src/mocks/MockAssetManager.sol";
 import {MockUSDC} from "./mocks/MockUSDC.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
-import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
 
 /**
  * @title LocalDeployTestSetup
@@ -139,17 +142,21 @@ contract LocalDeployTestSetup is Test {
         ProfitAndLossReporterFacet profitLossFacet = new ProfitAndLossReporterFacet();
 
         // Define selectors for each facet (matching deployment script)
-        bytes4[] memory assetManagerSelectors = new bytes4[](5);
+        bytes4[] memory assetManagerSelectors = new bytes4[](6);
         assetManagerSelectors[0] = AssetManagerAllocatorFacet.netDeposits.selector;
         assetManagerSelectors[1] = AssetManagerAllocatorFacet.setAssetManager.selector;
-        assetManagerSelectors[2] = AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector;
-        assetManagerSelectors[3] = AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector;
-        assetManagerSelectors[4] = AssetManagerAllocatorFacet.transferUSDCForWithdrawal.selector;
+        assetManagerSelectors[2] = AssetManagerAllocatorFacet.setAllocator.selector;
+        assetManagerSelectors[3] = AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector;
+        assetManagerSelectors[4] = AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector;
+        assetManagerSelectors[5] = AssetManagerAllocatorFacet.transferUSDCForWithdrawal.selector;
 
-        bytes4[] memory profitLossSelectors = new bytes4[](3);
+        bytes4[] memory profitLossSelectors = new bytes4[](6);
         profitLossSelectors[0] = ProfitAndLossReporterFacet.successFee.selector;
-        profitLossSelectors[1] = ProfitAndLossReporterFacet.assetManagerReport.selector;
-        profitLossSelectors[2] = ProfitAndLossReporterFacet.setSuccessFeeFraction.selector;
+        profitLossSelectors[1] = ProfitAndLossReporterFacet.insuranceFund.selector;
+        profitLossSelectors[2] = ProfitAndLossReporterFacet.assetManagerReport.selector;
+        profitLossSelectors[3] = ProfitAndLossReporterFacet.setSuccessFeeFraction.selector;
+        profitLossSelectors[4] = ProfitAndLossReporterFacet.setInsuranceFundFraction.selector;
+        profitLossSelectors[5] = ProfitAndLossReporterFacet.setReporter.selector;
 
         // Add facets to diamond
         vm.prank(governance);

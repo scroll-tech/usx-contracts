@@ -54,11 +54,21 @@ contract AssetManagerAllocatorFacet is
         emit AssetManagerUpdated(oldAssetManager, _assetManager);
     }
 
+    /// @notice Sets the current Allocator for the protocol
+    /// @param _allocator The address of the new Allocator
+    function setAllocator(address _allocator) external onlyGovernance {
+        if (_allocator == address(0)) revert ZeroAddress();
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        address oldAllocator = $.allocator;
+        $.allocator = _allocator;
+        emit AllocatorUpdated(oldAllocator, _allocator);
+    }
+
     /*=========================== Asset Manager Functions =========================*/
 
     /// @notice Transfers USDC from the treasury to the Asset Manager
     /// @param _amount The amount of USDC to transfer
-    function transferUSDCtoAssetManager(uint256 _amount) external onlyAssetManager nonReentrant {
+    function transferUSDCtoAssetManager(uint256 _amount) external onlyAllocator nonReentrant {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
 
         $.assetManagerUSDC += _amount;
@@ -69,7 +79,7 @@ contract AssetManagerAllocatorFacet is
 
     /// @notice Transfers USDC from the Asset Manager to the treasury
     /// @param _amount The amount of USDC to transfer
-    function transferUSDCFromAssetManager(uint256 _amount) external onlyAssetManager nonReentrant {
+    function transferUSDCFromAssetManager(uint256 _amount) external onlyAllocator nonReentrant {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         $.assetManagerUSDC -= _amount;
 
@@ -85,7 +95,7 @@ contract AssetManagerAllocatorFacet is
     }
 
     /// @notice Transfers USDC from treasury to USX contract for withdrawal
-    function transferUSDCForWithdrawal() external onlyAssetManager nonReentrant {
+    function transferUSDCForWithdrawal() external onlyAllocator nonReentrant {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
 
         uint256 totalOutstandingWithdrawalAmount = $.USX.totalOutstandingWithdrawalAmount();

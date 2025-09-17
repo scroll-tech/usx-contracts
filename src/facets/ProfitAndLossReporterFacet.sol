@@ -33,30 +33,24 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
 
     /*=========================== Asset Manager Functions =========================*/
 
-    /// @notice Asset Manager reports total balance of USDC they hold, profits or losses calculated from this value
-    /// @param totalBalance The total balance of USDC held by the Asset Manager
-    function assetManagerReport(uint256 totalBalance) public onlyAssetManager nonReentrant {
+    /// @notice Asset Manager reports profits or losses
+    /// @param profitLoss The profits or losses of the Asset Manager
+    function assetManagerReport(int256 profitLoss) public onlyReporter nonReentrant {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
 
-        // Get the previous net deposits
-        uint256 previousNetDeposits = AssetManagerAllocatorFacet(address(this)).netDeposits();
-
-        // Updates assetManagerUSDC to the new balance, which updates the netDeposits
-        $.assetManagerUSDC = totalBalance;
-        uint256 currentNetDeposits = AssetManagerAllocatorFacet(address(this)).netDeposits();
-
         // Gets the total profits or losses since the last report
-        if (currentNetDeposits >= previousNetDeposits) {
+        if (profitLoss > 0) {
             // Handle profits
-            uint256 grossProfit = currentNetDeposits - previousNetDeposits;
-            emit ReportSubmitted(totalBalance, grossProfit, true);
+            emit ReportSubmitted(uint256(profitLoss), true);
 
             // Distribute profits to the stakers, with a portion going to the Insurance Buffer and Governance Warchest
-            _distributeProfits(grossProfit);
+            _distributeProfits(uint256(profitLoss));
         } else {
+            // Update netEpochProfits to include all profits in all epochs
+            $.netEpochProfits = $.netEpochProfits + profitLoss;
+
             // we will always cover losses, do nothing here.
-            uint256 grossLoss = previousNetDeposits - currentNetDeposits;
-            emit ReportSubmitted(totalBalance, grossLoss, false);
+            emit ReportSubmitted(uint256(-profitLoss), false);
         }
     }
 
@@ -82,6 +76,16 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
         emit InsuranceFundFractionUpdated(oldFraction, _insuranceFundFraction);
     }
 
+    /// @notice Sets the current Reporter for the protocol
+    /// @param _reporter The address of the new Reporter
+    function setReporter(address _reporter) external onlyGovernance {
+        if (_reporter == address(0)) revert ZeroAddress();
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        address oldReporter = $.reporter;
+        $.reporter = _reporter;
+        emit ReporterUpdated(oldReporter, _reporter);
+    }
+
     /*=========================== Internal Functions =========================*/
 
     /// @notice Distributes profits to the Insurance Buffer and Governance Warchest, and sUSX contract (USX stakers)
@@ -105,8 +109,8 @@ contract ProfitAndLossReporterFacet is TreasuryStorage, ReentrancyGuardUpgradeab
         $.USX.mintUSX(address($.sUSX), stakerProfitsUSX);
         IStakedUSX($.sUSX).notifyRewards(stakerProfitsUSX);
 
-        // Update netEpochProfits to include both new profits and carryover from previous epoch
-        $.netEpochProfits = stakerProfits;
+        // Update netEpochProfits to include all profits in all epochs
+        $.netEpochProfits = $.netEpochProfits + int256(stakerProfits);
 
         emit ProfitsDistributed(profits, stakerProfits, insuranceBufferProfits, governanceWarchestProfits);
     }

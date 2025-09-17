@@ -2,8 +2,10 @@
 pragma solidity 0.8.30;
 
 import {console} from "forge-std/Test.sol";
-import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
+
 import {USX} from "../src/USX.sol";
+
+import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
 
 contract USXTest is LocalDeployTestSetup {
     uint256 public constant INITIAL_BALANCE = 1000e6; // 1000 USDC

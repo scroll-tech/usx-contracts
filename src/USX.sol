@@ -185,7 +185,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
         // Update the total matched withdrawal amount based on the latest usdc balance
         _updateTotalMatchedWithdrawalAmount(false);
-    
+
         // Check if contract has enough USDC to fulfill the request immediately
         uint256 availableUSDCForImmedateTransfer = $.USDC.balanceOf(address(this)) - $.totalMatchedWithdrawalAmount;
 
@@ -298,7 +298,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     /*=========================== Internal Functions =========================*/
 
     /// @notice Update the total matched withdrawal amount based on the latest USDC balance
-    /// @dev This is because someone may transfer more USDC to the contract than requested by users
+    /// @dev This is because someone may transfer USDC directly to this contract.
     function _updateTotalMatchedWithdrawalAmount(bool transferExcessToTreasury) internal {
         USXStorage storage $ = _getStorage();
 

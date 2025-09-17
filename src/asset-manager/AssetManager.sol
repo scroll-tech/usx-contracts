@@ -88,7 +88,52 @@ contract AssetManager is
         _disableInitializers();
     }
 
+    /// @notice Initialize the asset manager
+    /// @param _admin The address of the admin
+    function initialize(address _admin, address _governance) external initializer {
+        __AccessControl_init();
+        __UUPSUpgradeable_init();
+
+        _grantRole(DEFAULT_ADMIN_ROLE, _admin);
+        _grantRole(GOVERNANCE_ROLE, _governance);
+    }
+
     /*=========================== Public Functions =========================*/
+
+    /// @notice Get the total weight of the asset manager
+    /// @return The total weight of the asset manager
+    function getTotalWeight() external view returns (uint256) {
+        AssetManagerStorage storage $ = _getStorage();
+        return $.totalWeight;
+    }
+
+    /// @notice Get the weight of an account
+    /// @param account The account to get the weight of
+    /// @return The weight of the account
+    function getWeight(address account) external view returns (uint256) {
+        AssetManagerStorage storage $ = _getStorage();
+        (bool exists, uint256 weight) = $.weights.tryGet(account);
+        if (!exists) {
+            return 0;
+        }
+        return weight;
+    }
+
+    /// @notice Get the weights of all accounts
+    /// @return The weights of all accounts
+    function getWeights() external view returns (address[] memory, uint256[] memory) {
+        AssetManagerStorage storage $ = _getStorage();
+        address[] memory accounts = $.weights.keys();
+        uint256[] memory weights = new uint256[](accounts.length);
+        for (uint256 i = 0; i < accounts.length; i++) {
+            (bool exists, uint256 weight) = $.weights.tryGet(accounts[i]);
+            if (!exists) {
+                weight = 0;
+            }
+            weights[i] = weight;
+        }
+        return (accounts, weights);
+    }
 
     /// @notice Deposit USDC to the asset manager
     /// @param _usdcAmount The amount of USDC to deposit
@@ -124,7 +169,10 @@ contract AssetManager is
         uint256 newWeight
     ) external onlyRole(GOVERNANCE_ROLE) {
         AssetManagerStorage storage $ = _getStorage();
-        uint256 oldWeight = $.weights.get(account);
+        (bool exists, uint256 oldWeight) = $.weights.tryGet(account);
+        if (!exists) {
+            oldWeight = 0;
+        }
         if (newWeight == 0) {
             $.weights.remove(account);
         } else {

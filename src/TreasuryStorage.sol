@@ -23,16 +23,14 @@ contract TreasuryStorage {
     error USDCWithdrawalFailed();
 
     // Profit/Loss Reporter errors
-    error ZeroValueChange();
     error InvalidSuccessFeeFraction();
     error InvalidInsuranceFundFraction();
-    error ProfitsDetectedUseReportProfitsFunction();
-    error LossesDetectedUseReportLossesFunction();
 
     // Access control errors
     error NotGovernance();
-    error NotAssetManager();
+    error NotAllocator();
     error NotTreasury();
+    error NotReporter();
 
     /*=========================== Events =========================*/
 
@@ -42,6 +40,7 @@ contract TreasuryStorage {
 
     // Asset Manager Allocator Facet Events
     event AssetManagerUpdated(address indexed oldAssetManager, address indexed newAssetManager);
+    event AllocatorUpdated(address indexed oldAllocator, address indexed newAllocator);
     event USDCAllocated(uint256 amount, uint256 newAllocation);
     event USDCDeallocated(uint256 amount, uint256 newAllocation);
     event USDCTransferredForWithdrawal(uint256 amount);
@@ -49,7 +48,8 @@ contract TreasuryStorage {
     // Profit and Loss Reporter Facet Events
     event SuccessFeeUpdated(uint256 oldFraction, uint256 newFraction);
     event InsuranceFundFractionUpdated(uint256 oldFraction, uint256 newFraction);
-    event ReportSubmitted(uint256 totalBalance, uint256 profitLoss, bool isProfit);
+    event ReporterUpdated(address indexed oldReporter, address indexed newReporter);
+    event ReportSubmitted(uint256 profitLoss, bool isProfit);
     event ProfitsDistributed(
         uint256 totalProfits, uint256 stakerProfits, uint256 bufferProfits, uint256 governanceProfits
     );
@@ -64,8 +64,14 @@ contract TreasuryStorage {
     }
 
     // Modifier to restrict access to asset manager functions
-    modifier onlyAssetManager() {
-        if (msg.sender != _getStorage().assetManager) revert NotAssetManager();
+    modifier onlyAllocator() {
+        if (msg.sender != _getStorage().allocator) revert NotAllocator();
+        _;
+    }
+
+    // Modifier to restrict access to reporter functions
+    modifier onlyReporter() {
+        if (msg.sender != _getStorage().reporter) revert NotReporter();
         _;
     }
 
@@ -83,13 +89,15 @@ contract TreasuryStorage {
         IStakedUSX sUSX; // sUSX vault contract
         IERC20 USDC; // USDC token contract
         address governance; // Governance address
+        address reporter; // Reporter address
+        address allocator; // Allocator address
         address assetManager; // The current Asset Manager for the protocol
         address insuranceVault; // Insurance vault address
         address governanceWarchest; // Governance warchest address
         uint256 successFeeFraction; // Success fee fraction (default 5% == 50000)
         uint256 insuranceFundFraction; // Insurance fund fraction (default 5% == 50000)
         uint256 assetManagerUSDC; // USDC allocated to Asset Manager
-        uint256 netEpochProfits; // total profits reported for all epoches, after deducting Insurance Buffer and Governance Warchest fees
+        int256 netEpochProfits; // total profits reported for all epoches, after deducting Insurance Buffer and Governance Warchest fees
     }
 
     uint256 public constant DECIMAL_SCALE_FACTOR = 10 ** 12; // Decimal scaling: 10^12. USDC is 6 decimals, USX is 18 decimals (18 - 6 = 12)
@@ -142,7 +150,7 @@ contract TreasuryStorage {
         return _getStorage().assetManagerUSDC;
     }
 
-    function netEpochProfits() public view returns (uint256) {
+    function netEpochProfits() public view returns (int256) {
         return _getStorage().netEpochProfits;
     }
 }

@@ -49,7 +49,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     /*=========================== Constants =========================*/
 
     /// @dev Minimum withdrawal period in seconds
-    uint256 private constant MIN_WITHDRAWAL_PERIOD = 15 days;
+    uint256 private constant MIN_WITHDRAWAL_PERIOD = 1 days;
 
     /// @dev Minimum epoch duration in seconds
     uint256 private constant MIN_EPOCH_DURATION = 1 days;
@@ -277,7 +277,9 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         SUSXStorage storage $ = _getStorage();
 
         // update rewards
-        _increaseRewards($.rewardData, $.epochDuration, amount);
+        RewardData memory data = $.rewardData;
+        _increaseRewards(data, $.epochDuration, amount);
+        $.rewardData = data;
 
         emit RewardsReceived(amount);
     }
@@ -345,6 +347,15 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         _amount = _amount + _data.queued;
         _data.queued = 0;
 
+        // no supply, all rewards are queued
+        if (totalSupply() == 0) {
+            _data.rate = 0;
+            _data.lastUpdate = uint40(block.timestamp);
+            _data.finishAt = uint40(block.timestamp + _periodLength);
+            _data.queued = uint96(_amount);
+            return;
+        }
+
         if (block.timestamp >= _data.finishAt) {
             // period finished, distribute to next period
             _data.rate = (_amount / _periodLength).toUint80();
@@ -379,7 +390,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
             }
         }
 
-        return (uint256(_data.rate) * _elapsed, uint256(_data.rate) * _left);
+        return (uint256(_data.rate) * _elapsed, uint256(_data.rate) * _left + _data.queued);
     }
 
     /*=========================== UUPS Functions =========================*/
