@@ -113,7 +113,7 @@ contract RewardDistributorFacetTest is LocalDeployTestSetup {
         vm.expectEmit(true, true, true, true, address(treasury));
         emit TreasuryStorage.ReportSubmitted(profitUSDC, true);
         vm.expectEmit(true, true, true, true, address(treasury));
-        emit TreasuryStorage.ProfitsDistributed(profitUSDC, expectedStakers, expectedInsurance, expectedSuccessFee);
+        emit TreasuryStorage.RewardsDistributed(profitUSDC, expectedStakers, expectedInsurance, expectedSuccessFee);
 
         vm.prank(address(0xBEEF));
         facet.reportRewards(profitUSDC);

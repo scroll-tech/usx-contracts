@@ -240,7 +240,6 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, I
     /*=========================== Governance Functions =========================*/
 
     /// @notice Pause deposits and withdrawals, preventing users from depositing and redeeming USX
-    /// @dev Used by Treasury to pause operations when peg is broken
     function pause() public onlyGovernance {
         USXStorage storage $ = _getStorage();
         $.paused = true;

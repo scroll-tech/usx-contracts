@@ -50,7 +50,7 @@ contract TreasuryStorage {
     event InsuranceFundFractionUpdated(uint256 oldFraction, uint256 newFraction);
     event ReporterUpdated(address indexed oldReporter, address indexed newReporter);
     event ReportSubmitted(uint256 profitLoss, bool isProfit);
-    event ProfitsDistributed(
+    event RewardsDistributed(
         uint256 totalProfits, uint256 stakerProfits, uint256 bufferProfits, uint256 governanceProfits
     );
     event ProtocolFrozen(string reason);

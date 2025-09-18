@@ -131,7 +131,7 @@ contract RewardDistributorFacet is TreasuryStorage, ReentrancyGuardUpgradeable {
         // Update netEpochProfits to include all profits in all epochs
         $.netEpochProfits = $.netEpochProfits + int256(stakerProfits);
 
-        emit ProfitsDistributed(
+        emit RewardsDistributed(
             rewards,
             stakerProfits,
             insuranceBufferProfits,
