@@ -38,7 +38,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     event EpochAdvanced(uint256 oldEpochBlock, uint256 newEpochBlock);
     event WithdrawalRequested(address indexed user, uint256 sharesAmount, uint256 withdrawalId);
     event WithdrawalClaimed(address indexed user, uint256 withdrawalId, uint256 usxAmount);
-    event DepositsPausedChanged(bool paused);
+    event DepositPausedChanged(bool paused);
     event WithdrawalPeriodSet(uint256 oldPeriod, uint256 newPeriod);
     event WithdrawalFeeFractionSet(uint256 oldFraction, uint256 newFraction);
     event EpochDurationSet(uint256 oldDuration, uint256 newDuration);
@@ -262,7 +262,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     function unpauseDeposits() external onlyGovernance {
         SUSXStorage storage $ = _getStorage();
         $.depositPaused = false;
-        emit DepositsPausedChanged(false);
+        emit DepositPausedChanged(false);
     }
 
     /// @notice Freeze deposits, preventing users from depositing USX
@@ -270,7 +270,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     function pauseDeposits() external onlyGovernance {
         SUSXStorage storage $ = _getStorage();
         $.depositPaused = true;
-        emit DepositsPausedChanged(true);
+        emit DepositPausedChanged(true);
     }
 
     /*=========================== Treasury Functions =========================*/

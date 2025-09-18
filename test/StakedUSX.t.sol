@@ -82,7 +82,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
         // Governance can freeze
         vm.prank(governance);
         vm.expectEmit(true, true, true, true, address(susx));
-        emit StakedUSX.DepositsPausedChanged(true);
+        emit StakedUSX.DepositPausedChanged(true);
         susx.pauseDeposits();
         assertTrue(susx.depositPaused());
     }
@@ -100,7 +100,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
         // Governance can unfreeze
         vm.prank(governance);
         vm.expectEmit(true, true, true, true, address(susx));
-        emit StakedUSX.DepositsPausedChanged(false);
+        emit StakedUSX.DepositPausedChanged(false);
         susx.unpauseDeposits();
         assertFalse(susx.depositPaused());
     }
