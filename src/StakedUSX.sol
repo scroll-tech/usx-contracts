@@ -25,13 +25,11 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     error NotTreasury();
     error WithdrawalAlreadyClaimed();
     error WithdrawalPeriodNotPassed();
-    error NextEpochNotStarted();
     error InvalidMinWithdrawalPeriod();
     error InvalidWithdrawalFeeFraction();
     error InvalidEpochDuration();
     error TreasuryAlreadySet();
-    error USXTransferFailed();
-    error DepositsFrozen();
+    error DepositsPaused();
 
     /*=========================== Events =========================*/
 
@@ -40,7 +38,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     event EpochAdvanced(uint256 oldEpochBlock, uint256 newEpochBlock);
     event WithdrawalRequested(address indexed user, uint256 sharesAmount, uint256 withdrawalId);
     event WithdrawalClaimed(address indexed user, uint256 withdrawalId, uint256 usxAmount);
-    event DepositsFrozenChanged(bool frozen);
+    event DepositsPausedChanged(bool paused);
     event WithdrawalPeriodSet(uint256 oldPeriod, uint256 newPeriod);
     event WithdrawalFeeFractionSet(uint256 oldFraction, uint256 newFraction);
     event EpochDurationSet(uint256 oldDuration, uint256 newDuration);
@@ -90,11 +88,11 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         address governance; // address that controls governance of the contract
         uint256 withdrawalPeriod; // withdrawal period in seconds, (default == 15 * 24 * 60 * 60 (15 days))
         uint256 withdrawalFeeFraction; // fraction of withdrawals determining the withdrawal fee, (default 0.5% == 500) with precision to 0.001 percent
-        uint256 minWithdrawalPeriod; // withdrawal period in seconds, (default == 15 * 24 * 60 * 60 (15 days))
-        uint256 withdrawalIdCounter;
+        uint256 minWithdrawalPeriod; // withdrawal period in seconds, (default == MIN_WITHDRAWAL_PERIOD (1 day))
+        uint256 withdrawalCounter;
         RewardData rewardData;
         uint256 epochDuration; //  duration of epoch in seconds, (default == 30 * 24 * 60 * 60 (30 days))
-        bool depositsFrozen; // true = deposits are frozen, false = deposits are allowed
+        bool depositPaused; // true = deposits are frozen, false = deposits are allowed
         uint256 totalPendingWithdrawals; // the total amount of USX that is pending to be withdrawn
         mapping(uint256 => WithdrawalRequest) withdrawalRequests;
     }
@@ -140,7 +138,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         $.governance = _governance;
 
         // Set default values
-        $.withdrawalPeriod = MIN_WITHDRAWAL_PERIOD;
+        $.withdrawalPeriod = 15 days;
         $.withdrawalFeeFraction = 500; // 0.5%
         $.minWithdrawalPeriod = MIN_WITHDRAWAL_PERIOD;
         $.epochDuration = 30 days;
@@ -261,10 +259,10 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     }
 
     /// @notice Unfreeze deposits, allowing users to deposit again
-    function unfreeze() external onlyGovernance {
+    function unpauseDeposits() external onlyGovernance {
         SUSXStorage storage $ = _getStorage();
-        $.depositsFrozen = false;
-        emit DepositsFrozenChanged(false);
+        $.depositPaused = false;
+        emit DepositsPausedChanged(false);
     }
 
     /*=========================== Treasury Functions =========================*/
@@ -286,10 +284,10 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
     /// @notice Freeze deposits, preventing users from depositing USX
     /// @dev Used by Treasury to freeze deposits if a loss is reported that is large enough to exceed Insurance Buffer and burn USX in sUSX vault
-    function freezeDeposits() external onlyTreasury {
+    function pauseDeposits() external onlyTreasury {
         SUSXStorage storage $ = _getStorage();
-        $.depositsFrozen = true;
-        emit DepositsFrozenChanged(true);
+        $.depositPaused = true;
+        emit DepositsPausedChanged(true);
     }
 
     /*=========================== Internal Functions =========================*/
@@ -299,7 +297,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         SUSXStorage storage $ = _getStorage();
 
         // Check if deposits are frozen
-        if ($.depositsFrozen) revert DepositsFrozen();
+        if ($.depositPaused) revert DepositsPaused();
 
         // Call parent implementation
         super._deposit(caller, receiver, assets, shares);
@@ -321,17 +319,17 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         // Record withdrawal request
         SUSXStorage storage $ = _getStorage();
         $.totalPendingWithdrawals += assets;
-        $.withdrawalRequests[$.withdrawalIdCounter] =
+        $.withdrawalRequests[$.withdrawalCounter] =
             WithdrawalRequest({user: receiver, amount: assets, withdrawalTimestamp: block.timestamp, claimed: false});
 
         // Emit standard ERC4626 Withdraw event for consistency
         emit Withdraw(caller, receiver, owner, assets, shares);
 
         // Emit additional withdrawal request event for sUSX-specific functionality
-        emit WithdrawalRequested(receiver, assets, $.withdrawalIdCounter);
+        emit WithdrawalRequested(receiver, assets, $.withdrawalCounter);
 
-        // Increment withdrawalIdCounter
-        $.withdrawalIdCounter++;
+        // Increment withdrawalCounter
+        $.withdrawalCounter++;
     }
 
     /// @dev Add new rewards to current one.
@@ -368,7 +366,6 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
             _data.queued = uint96(_amount - (_data.rate * _periodLength)); // keep rounding error
             _data.lastUpdate = uint40(block.timestamp);
             _data.finishAt = uint40(block.timestamp + _periodLength);
-            _data.lastUpdate = uint40(block.timestamp);
         }
     }
 
@@ -429,8 +426,8 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         return _getStorage().rewardData;
     }
 
-    function withdrawalIdCounter() public view returns (uint256) {
-        return _getStorage().withdrawalIdCounter;
+    function withdrawalCounter() public view returns (uint256) {
+        return _getStorage().withdrawalCounter;
     }
 
     function epochDuration() public view returns (uint256) {
@@ -441,7 +438,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         return _getStorage().withdrawalRequests[id];
     }
 
-    function depositsFrozen() public view returns (bool) {
-        return _getStorage().depositsFrozen;
+    function depositPaused() public view returns (bool) {
+        return _getStorage().depositPaused;
     }
 }

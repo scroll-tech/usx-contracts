@@ -275,16 +275,16 @@ contract USXTest is LocalDeployTestSetup {
 
         // Freeze withdrawals
         vm.prank(address(treasury));
-        usx.freeze();
+        usx.pause();
 
         // Try to request USDC withdrawal while frozen
         vm.prank(user);
-        vm.expectRevert(USX.Frozen.selector);
+        vm.expectRevert(USX.Paused.selector);
         usx.requestUSDC(50e18);
 
         // Verify no withdrawal request was recorded
-        assertEq(usx.outstandingWithdrawalRequests(user), 0, "User should have no withdrawal request when frozen");
-        assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0 when frozen");
+        assertEq(usx.outstandingWithdrawalRequests(user), 0, "User should have no withdrawal request when paused");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0 when paused");
     }
 
     function test_claimUSDC_success_with_withdrawal_request() public {
@@ -708,15 +708,15 @@ contract USXTest is LocalDeployTestSetup {
 
         // First freeze both deposits and withdrawals
         vm.prank(address(treasury));
-        usx.freeze();
-        assertTrue(usx.frozen(), "Contract should be frozen");
+        usx.pause();
+        assertTrue(usx.paused(), "Contract should be paused");
 
         // Then unfreeze both deposits and withdrawals
         vm.prank(governanceWarchest);
-        usx.unfreeze();
+        usx.unpause();
 
-        bool finalFreezeState = usx.frozen();
-        assertFalse(finalFreezeState, "Contract should be unfrozen");
+        bool finalFreezeState = usx.paused();
+        assertFalse(finalFreezeState, "Contract should be unpaused");
 
         // Test that unfrozen withdrawals allow withdrawal requests
         // First give the user some USX to request withdrawal for
@@ -732,49 +732,49 @@ contract USXTest is LocalDeployTestSetup {
     function test_unfreeze_revert_not_governance() public {
         vm.prank(user);
         vm.expectRevert(USX.NotGovernance.selector);
-        usx.unfreeze();
+        usx.unpause();
     }
 
-    function test_freeze_success() public {
+    function test_pause_success() public {
         // Test freeze through treasury (full flow)
         // Since freeze is onlyTreasury, we need to impersonate treasury
 
-        bool initialFreezeState = usx.frozen();
-        assertFalse(initialFreezeState, "Contract should not be frozen initially");
+        bool initialFreezeState = usx.paused();
+        assertFalse(initialFreezeState, "Contract should not be paused initially");
 
         // Impersonate the treasury to call freeze
         vm.prank(address(treasury));
-        usx.freeze();
+        usx.pause();
 
-        bool finalFreezeState = usx.frozen();
-        assertTrue(finalFreezeState, "Contract should be frozen");
+        bool finalFreezeState = usx.paused();
+        assertTrue(finalFreezeState, "Contract should be paused");
 
         // Test that frozen state prevents deposits
         vm.prank(user);
-        vm.expectRevert(USX.Frozen.selector);
+        vm.expectRevert(USX.Paused.selector);
         usx.deposit(100e6);
 
         // Test that frozen state prevents withdrawals
         vm.prank(user);
-        vm.expectRevert(USX.Frozen.selector);
+        vm.expectRevert(USX.Paused.selector);
         usx.requestUSDC(100e18);
     }
 
     function test_freeze_revert_not_treasury() public {
         vm.prank(user);
         vm.expectRevert(USX.NotTreasury.selector);
-        usx.freeze();
+        usx.pause();
     }
 
     function test_frozen_view() public {
         // Test frozen view function
-        assertFalse(usx.frozen(), "Contract should not be frozen initially");
+        assertFalse(usx.paused(), "Contract should not be paused initially");
 
         // Freeze contract
         vm.prank(address(treasury));
-        usx.freeze();
+        usx.pause();
 
-        assertTrue(usx.frozen(), "Contract should be frozen");
+        assertTrue(usx.paused(), "Contract should be paused");
     }
 
     /*=========================== ACCESS CONTROL TESTS =========================*/

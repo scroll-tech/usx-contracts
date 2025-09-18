@@ -125,7 +125,7 @@ contract DeployHelper is Script {
         // Test InsuranceBufferFacet
         testInsuranceBufferFacet();
 
-        // Test ProfitAndLossReporterFacet
+        // Test RewardDistributorFacet
         testProfitAndLossFacet();
 
         console.log("All facet functionality verified");
@@ -188,7 +188,7 @@ contract DeployHelper is Script {
     }
 
     function testProfitAndLossFacet() internal {
-        console.log("  Testing ProfitAndLossReporterFacet...");
+        console.log("  Testing RewardDistributorFacet...");
 
         // Test successFee function
         bytes memory successFeeData = abi.encodeWithSelector(

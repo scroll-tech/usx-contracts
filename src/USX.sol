@@ -19,8 +19,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     error NotAdmin();
     error NotTreasury();
     error UserNotWhitelisted();
-    error WithdrawalsFrozen();
-    error Frozen();
+    error Paused();
     error NoOutstandingWithdrawalRequests();
     error InsufficientUSDC();
     error TreasuryAlreadySet();
@@ -34,7 +33,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     event Deposit(address indexed user, uint256 usdcAmount, uint256 usxMinted);
     event Redeem(address indexed user, uint256 usxAmount, uint256 usdcAmount);
     event Claim(address indexed user, uint256 amount);
-    event FrozenChanged(bool frozen);
+    event PausedChanged(bool paused);
     event WhitelistUpdated(address indexed user, bool whitelisted);
 
     /*=========================== Constants =========================*/
@@ -49,8 +48,8 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         _;
     }
 
-    modifier whenNotFrozen() {
-        if (_getStorage().frozen) revert Frozen();
+    modifier notPaused() {
+        if (_getStorage().paused) revert Paused();
         _;
     }
 
@@ -75,7 +74,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     struct USXStorage {
         IERC20 USDC;
         ITreasury treasury;
-        bool frozen;
+        bool paused;
         address governanceWarchest;
         address admin;
         uint256 totalOutstandingWithdrawalAmount;
@@ -132,7 +131,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
     /// @notice Deposit USDC to get USX
     /// @param _amount The amount of USDC to deposit
-    function deposit(uint256 _amount) public nonReentrant onlyWhitelisted whenNotFrozen {
+    function deposit(uint256 _amount) public nonReentrant onlyWhitelisted notPaused {
         USXStorage storage $ = _getStorage();
 
         // Check if the USDC amount is valid
@@ -166,7 +165,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
     /// @notice Redeem USX to get USDC (automatically send if available, otherwise create withdrawal request)
     /// @param _USXredeemed The amount of USX to redeem
-    function requestUSDC(uint256 _USXredeemed) public nonReentrant onlyWhitelisted whenNotFrozen {
+    function requestUSDC(uint256 _USXredeemed) public nonReentrant onlyWhitelisted notPaused {
         USXStorage storage $ = _getStorage();
 
         // Check if the USX amount is a multiple of USDC_SCALAR
@@ -187,9 +186,9 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         _updateTotalMatchedWithdrawalAmount(false);
 
         // Check if contract has enough USDC to fulfill the request immediately
-        uint256 availableUSDCForImmedateTransfer = $.USDC.balanceOf(address(this)) - $.totalMatchedWithdrawalAmount;
+        uint256 availableUSDCForImmediateTransfer = $.USDC.balanceOf(address(this)) - $.totalMatchedWithdrawalAmount;
 
-        if (availableUSDCForImmedateTransfer >= usdcAmount) {
+        if (availableUSDCForImmediateTransfer >= usdcAmount) {
             // Automatically send USDC to user if available
             $.USDC.safeTransfer(msg.sender, usdcAmount);
             emit Redeem(msg.sender, _USXredeemed, usdcAmount);
@@ -238,11 +237,11 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
     /*=========================== Governance Functions =========================*/
 
-    /// @notice Unfreeze deposits and withdrawals, allowing users to deposit and withdraw again
-    function unfreeze() public onlyGovernance {
+    /// @notice Unpause deposits and withdrawals, allowing users to deposit and withdraw again
+    function unpause() public onlyGovernance {
         USXStorage storage $ = _getStorage();
-        $.frozen = false;
-        emit FrozenChanged(false);
+        $.paused = false;
+        emit PausedChanged(false);
     }
 
     /// @notice Set new governance address
@@ -287,12 +286,12 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         _burn(_from, _amount);
     }
 
-    /// @notice Freeze deposits and withdrawals, preventing users from depositing and redeeming USX
-    /// @dev Used by Treasury to freeze operations when peg is broken
-    function freeze() public onlyTreasury {
+    /// @notice Pause deposits and withdrawals, preventing users from depositing and redeeming USX
+    /// @dev Used by Treasury to pause operations when peg is broken
+    function pause() public onlyTreasury {
         USXStorage storage $ = _getStorage();
-        $.frozen = true;
-        emit FrozenChanged(true);
+        $.paused = true;
+        emit PausedChanged(true);
     }
 
     /*=========================== Internal Functions =========================*/
@@ -334,8 +333,8 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         return _getStorage().treasury;
     }
 
-    function frozen() public view returns (bool) {
-        return _getStorage().frozen;
+    function paused() public view returns (bool) {
+        return _getStorage().paused;
     }
 
     function governanceWarchest() public view returns (address) {

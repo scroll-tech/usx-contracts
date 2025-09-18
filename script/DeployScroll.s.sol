@@ -7,7 +7,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {USX} from "../src/USX.sol";
 import {StakedUSX} from "../src/StakedUSX.sol";
 import {TreasuryDiamond} from "../src/TreasuryDiamond.sol";
-import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
+import {RewardDistributorFacet} from "../src/facets/RewardDistributorFacet.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
 
 /**
@@ -187,7 +187,7 @@ contract DeployScroll is Script {
 
         // Deploy Facets
         console.log("2.3. Deploying Facets...");
-        profitLossFacet = address(new ProfitAndLossReporterFacet());
+        profitLossFacet = address(new RewardDistributorFacet());
         assetManagerFacet = address(new AssetManagerAllocatorFacet());
 
         console.log("Profit/Loss Facet:", profitLossFacet);
@@ -234,16 +234,16 @@ contract DeployScroll is Script {
         treasury.addFacet(assetManagerFacet, assetManagerSelectors);
         console.log("AssetManagerAllocatorFacet added");
 
-        // Add ProfitAndLossReporterFacet
-        console.log("3.3.3. Adding ProfitAndLossReporterFacet...");
+        // Add RewardDistributorFacet
+        console.log("3.3.3. Adding RewardDistributorFacet...");
         bytes4[] memory profitLossSelectors = new bytes4[](3);
-        profitLossSelectors[0] = ProfitAndLossReporterFacet.successFee.selector;
-        profitLossSelectors[1] = ProfitAndLossReporterFacet.assetManagerReport.selector;
-        profitLossSelectors[2] = ProfitAndLossReporterFacet.setSuccessFeeFraction.selector;
+        profitLossSelectors[0] = RewardDistributorFacet.successFee.selector;
+        profitLossSelectors[1] = RewardDistributorFacet.reportRewards.selector;
+        profitLossSelectors[2] = RewardDistributorFacet.setSuccessFeeFraction.selector;
 
         vm.prank(governance);
         treasury.addFacet(profitLossFacet, profitLossSelectors);
-        console.log("ProfitAndLossReporterFacet added");
+        console.log("RewardDistributorFacet added");
 
         // Note: vm.stopBroadcast() is not needed here since we're not in a broadcast context
     }
@@ -291,8 +291,8 @@ contract DeployScroll is Script {
         console.log("Treasury verification passed");
 
         // Verify Facet Accessibility
-        (bool success,) = treasuryProxy.call(abi.encodeWithSelector(ProfitAndLossReporterFacet.successFee.selector, 1000000));
-        require(success, "ProfitAndLossReporterFacet not accessible");
+        (bool success,) = treasuryProxy.call(abi.encodeWithSelector(RewardDistributorFacet.successFee.selector, 1000000));
+        require(success, "RewardDistributorFacet not accessible");
 
         console.log("Facet accessibility verification passed");
     }
@@ -321,7 +321,7 @@ contract DeployScroll is Script {
 
         // Test facet functionality through diamond
         (bool success, bytes memory data) =
-            treasuryProxy.call(abi.encodeWithSelector(ProfitAndLossReporterFacet.successFee.selector, 1000000));
+            treasuryProxy.call(abi.encodeWithSelector(RewardDistributorFacet.successFee.selector, 1000000));
         require(success, "successFee call failed");
         uint256 successFee = abi.decode(data, (uint256));
         require(successFee == 500000, "successFee should be 500000 (5% of 1000000)");

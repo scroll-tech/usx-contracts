@@ -34,7 +34,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
     }
 
     function _requestWithdraw(address owner, address receiver, uint256 shareAmount) internal returns (uint256 withdrawalId, uint256 assets) {
-        uint256 beforeId = susx.withdrawalIdCounter();
+        uint256 beforeId = susx.withdrawalCounter();
         vm.prank(owner);
         assets = susx.redeem(shareAmount, receiver, owner);
         withdrawalId = beforeId;
@@ -55,7 +55,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
         assertEq(susx.minWithdrawalPeriod(), 1 days);
         assertEq(susx.withdrawalFeeFraction(), 500); // as initialized
         assertEq(susx.epochDuration(), 30 days);
-        assertEq(susx.depositsFrozen(), false);
+        assertEq(susx.depositPaused(), false);
 
         // Share price equals 1e18 initially
         assertEq(susx.sharePrice(), 1e18);
@@ -77,32 +77,32 @@ contract StakedUSXTest is LocalDeployTestSetup {
     function test_onlyTreasury_freezeDeposits() public {
         // Non-treasury reverts
         vm.expectRevert(StakedUSX.NotTreasury.selector);
-        susx.freezeDeposits();
+        susx.pauseDeposits();
 
         // Treasury can freeze
         vm.prank(treasuryProxy);
         vm.expectEmit(true, true, true, true, address(susx));
-        emit StakedUSX.DepositsFrozenChanged(true);
-        susx.freezeDeposits();
-        assertTrue(susx.depositsFrozen());
+        emit StakedUSX.DepositsPausedChanged(true);
+        susx.pauseDeposits();
+        assertTrue(susx.depositPaused());
     }
 
     function test_governance_unfreeze() public {
         // Freeze first via treasury
         vm.prank(treasuryProxy);
-        susx.freezeDeposits();
-        assertTrue(susx.depositsFrozen());
+        susx.pauseDeposits();
+        assertTrue(susx.depositPaused());
 
         // Non-governance cannot unfreeze
         vm.expectRevert(StakedUSX.NotGovernance.selector);
-        susx.unfreeze();
+        susx.unpauseDeposits();
 
         // Governance can unfreeze
         vm.prank(governance);
         vm.expectEmit(true, true, true, true, address(susx));
-        emit StakedUSX.DepositsFrozenChanged(false);
-        susx.unfreeze();
-        assertFalse(susx.depositsFrozen());
+        emit StakedUSX.DepositsPausedChanged(false);
+        susx.unpauseDeposits();
+        assertFalse(susx.depositPaused());
     }
 
     function test_onlyTreasury_notifyRewards_and_zero_amount_no_event() public {
@@ -202,12 +202,12 @@ contract StakedUSXTest is LocalDeployTestSetup {
     function test_deposit_reverts_when_deposits_frozen() public {
         // Freeze via treasury
         vm.prank(treasuryProxy);
-        susx.freezeDeposits();
+        susx.pauseDeposits();
 
         _mintUSXTo(user, 100e6);
         vm.startPrank(user);
         usx.approve(address(susx), type(uint256).max);
-        vm.expectRevert(StakedUSX.DepositsFrozen.selector);
+        vm.expectRevert(StakedUSX.DepositsPaused.selector);
         susx.deposit(100e18, user);
         vm.stopPrank();
     }
@@ -218,7 +218,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
         _mintUSXTo(user, 1_000e6);
         _stakeUSX(user, 1_000e18);
 
-        uint256 nextId = susx.withdrawalIdCounter();
+        uint256 nextId = susx.withdrawalCounter();
         vm.expectEmit(true, true, true, true, address(susx));
         emit StakedUSX.WithdrawalRequested(user, 400e18, nextId);
         (uint256 withdrawalId, uint256 assets) = _requestWithdraw(user, user, 400e18);
@@ -288,7 +288,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
         vm.prank(user);
         susx.approve(user2, 300e18);
 
-        uint256 nextId = susx.withdrawalIdCounter();
+        uint256 nextId = susx.withdrawalCounter();
         vm.prank(user2);
         vm.expectEmit(true, true, true, true, address(susx));
         emit StakedUSX.WithdrawalRequested(user2, 300e18, nextId);
@@ -427,7 +427,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
         uint256 sharesToRedeem = 500e18;
         uint256 expectedAssets = susx.convertToAssets(sharesToRedeem);
 
-        uint256 nextId = susx.withdrawalIdCounter();
+        uint256 nextId = susx.withdrawalCounter();
         vm.prank(user);
         uint256 assets = susx.redeem(sharesToRedeem, user, user);
         assertEq(assets, expectedAssets);

@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
-import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
+import {RewardDistributorFacet} from "../src/facets/RewardDistributorFacet.sol";
 import {TreasuryDiamond} from "../src/TreasuryDiamond.sol";
 import {USX} from "../src/USX.sol";
 import {StakedUSX} from "../src/StakedUSX.sol";
@@ -139,7 +139,7 @@ contract LocalDeployTestSetup is Test {
 
         // Deploy facets
         AssetManagerAllocatorFacet assetManagerFacet = new AssetManagerAllocatorFacet();
-        ProfitAndLossReporterFacet profitLossFacet = new ProfitAndLossReporterFacet();
+        RewardDistributorFacet profitLossFacet = new RewardDistributorFacet();
 
         // Define selectors for each facet (matching deployment script)
         bytes4[] memory assetManagerSelectors = new bytes4[](6);
@@ -151,12 +151,12 @@ contract LocalDeployTestSetup is Test {
         assetManagerSelectors[5] = AssetManagerAllocatorFacet.transferUSDCForWithdrawal.selector;
 
         bytes4[] memory profitLossSelectors = new bytes4[](6);
-        profitLossSelectors[0] = ProfitAndLossReporterFacet.successFee.selector;
-        profitLossSelectors[1] = ProfitAndLossReporterFacet.insuranceFund.selector;
-        profitLossSelectors[2] = ProfitAndLossReporterFacet.assetManagerReport.selector;
-        profitLossSelectors[3] = ProfitAndLossReporterFacet.setSuccessFeeFraction.selector;
-        profitLossSelectors[4] = ProfitAndLossReporterFacet.setInsuranceFundFraction.selector;
-        profitLossSelectors[5] = ProfitAndLossReporterFacet.setReporter.selector;
+        profitLossSelectors[0] = RewardDistributorFacet.successFee.selector;
+        profitLossSelectors[1] = RewardDistributorFacet.insuranceFund.selector;
+        profitLossSelectors[2] = RewardDistributorFacet.reportRewards.selector;
+        profitLossSelectors[3] = RewardDistributorFacet.setSuccessFeeFraction.selector;
+        profitLossSelectors[4] = RewardDistributorFacet.setInsuranceFundFraction.selector;
+        profitLossSelectors[5] = RewardDistributorFacet.setReporter.selector;
 
         // Add facets to diamond
         vm.prank(governance);

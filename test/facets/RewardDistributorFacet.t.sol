@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {ProfitAndLossReporterFacet} from "../../src/facets/ProfitAndLossReporterFacet.sol";
+import {RewardDistributorFacet} from "../../src/facets/RewardDistributorFacet.sol";
 import {TreasuryDiamond} from "../../src/TreasuryDiamond.sol";
 import {TreasuryStorage} from "../../src/TreasuryStorage.sol";
 import {USX} from "../../src/USX.sol";
@@ -11,12 +11,12 @@ import {StakedUSX} from "../../src/StakedUSX.sol";
 
 import {LocalDeployTestSetup} from "../LocalDeployTestSetup.sol";
 
-contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
-    ProfitAndLossReporterFacet private facet;
+contract RewardDistributorFacetTest is LocalDeployTestSetup {
+    RewardDistributorFacet private facet;
 
     function setUp() public override {
         super.setUp();
-        facet = ProfitAndLossReporterFacet(address(treasury));
+        facet = RewardDistributorFacet(address(treasury));
     }
 
     function test_successFee_defaultFivePercent() public {
@@ -67,9 +67,9 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
     function test_setReporter_setsReporter() public {
         vm.prank(governance);
         facet.setReporter(address(0xABC));
-        // call assetManagerReport as reporter should succeed (no revert)
+        // call reportRewards as reporter should succeed (no revert)
         vm.prank(address(0xABC));
-        facet.assetManagerReport(int256(0));
+        facet.reportRewards(0);
     }
 
     function test_setReporter_revertNotGovernance() public {
@@ -86,7 +86,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
     function test_assetManagerReport_revertWhenNotReporter() public {
         // reporter not set yet → zero address, so any call should revert NotReporter
         vm.expectRevert(TreasuryStorage.NotReporter.selector);
-        facet.assetManagerReport(int256(1));
+        facet.reportRewards(1);
     }
 
     function test_assetManagerReport_profitPath_distributesCorrectly_andEmits() public {
@@ -116,7 +116,7 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
         emit TreasuryStorage.ProfitsDistributed(profitUSDC, expectedStakers, expectedInsurance, expectedSuccessFee);
 
         vm.prank(address(0xBEEF));
-        facet.assetManagerReport(int256(profitUSDC));
+        facet.reportRewards(profitUSDC);
 
         // minted amounts are scaled by DECIMAL_SCALE_FACTOR (1e12)
         uint256 scaled = 1e12;
@@ -126,22 +126,5 @@ contract ProfitAndLossReporterFacetTest is LocalDeployTestSetup {
 
         // netEpochProfits increases by staker profits (in USDC units)
         assertEq(TreasuryDiamond(payable(address(facet))).netEpochProfits(), netEpochBefore + int256(expectedStakers));
-    }
-
-    function test_assetManagerReport_lossPath_updatesNetEpochProfits_andEmits() public {
-        // set reporter
-        vm.prank(governance);
-        facet.setReporter(address(0xBEEF));
-
-        int256 netEpochBefore = TreasuryDiamond(payable(address(facet))).netEpochProfits();
-        int256 loss = -int256(250_000);
-
-        vm.expectEmit(true, true, true, true, address(treasury));
-        emit TreasuryStorage.ReportSubmitted(uint256(-loss), false);
-
-        vm.prank(address(0xBEEF));
-        facet.assetManagerReport(loss);
-
-        assertEq(TreasuryDiamond(payable(address(facet))).netEpochProfits(), netEpochBefore + loss);
     }
 }
