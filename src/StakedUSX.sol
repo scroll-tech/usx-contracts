@@ -71,7 +71,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     /// In such case, the rate won't exceed `uint80.max`, since `periodLength` is at least `86400`.
     /// Also `uint40.max` is enough for timestamp, which is about 30000 years.
     struct RewardData {
-        // The amount of rewards pending to distribute.
+        // The amount of rewards pending to distribute. In normal case it should always be the rounding error.
         uint96 queued;
         // The current reward rate per second.
         uint80 rate;
@@ -378,7 +378,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         uint256 _elapsed;
         uint256 _left;
         if (block.timestamp > _data.finishAt) {
-            // finishAt >= lastUpdate will happen, if `_notifyReward` is not called during current period.
+            // finishAt < lastUpdate will never happen, but just in case.
             _elapsed = _data.finishAt >= _data.lastUpdate ? _data.finishAt - _data.lastUpdate : 0;
         } else {
             unchecked {
