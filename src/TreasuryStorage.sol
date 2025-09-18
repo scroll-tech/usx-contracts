@@ -3,7 +3,7 @@ pragma solidity 0.8.30;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IUSX} from "./interfaces/IUSX.sol";
-import {IsUSX} from "./interfaces/IsUSX.sol";
+import {IStakedUSX} from "./interfaces/IStakedUSX.sol";
 
 /// @title TreasuryStorage
 /// @notice Contains state for the USX Protocols Treasury contracts
@@ -20,48 +20,39 @@ contract TreasuryStorage {
     error ZeroAddress();
 
     // Asset Manager errors
-    error InvalidMaxLeverageFraction();
-    error MaxLeverageExceeded();
-
-    // Insurance Buffer errors
-    error InvalidBufferRenewalRate();
-    error InvalidBufferTargetFraction();
+    error USDCWithdrawalFailed();
 
     // Profit/Loss Reporter errors
-    error ZeroValueChange();
     error InvalidSuccessFeeFraction();
-    error ProfitsDetectedUseReportProfitsFunction();
-    error LossesDetectedUseReportLossesFunction();
+    error InvalidInsuranceFundFraction();
 
     // Access control errors
     error NotGovernance();
-    error NotAssetManager();
+    error NotAllocator();
     error NotTreasury();
+    error NotReporter();
 
     /*=========================== Events =========================*/
 
     event GovernanceTransferred(address indexed oldGovernance, address indexed newGovernance);
+    event GovernanceWarchestTransferred(address indexed oldGovernanceWarchest, address indexed newGovernanceWarchest);
+    event InsuranceVaultTransferred(address indexed oldInsuranceVault, address indexed newInsuranceVault);
 
     // Asset Manager Allocator Facet Events
     event AssetManagerUpdated(address indexed oldAssetManager, address indexed newAssetManager);
-    event MaxLeverageUpdated(uint256 oldFraction, uint256 newFraction);
+    event AllocatorUpdated(address indexed oldAllocator, address indexed newAllocator);
     event USDCAllocated(uint256 amount, uint256 newAllocation);
     event USDCDeallocated(uint256 amount, uint256 newAllocation);
-
-    // Insurance Buffer Facet Events
-    event BufferRenewalRateUpdated(uint256 oldRate, uint256 newRate);
-    event BufferTargetUpdated(uint256 oldFraction, uint256 newFraction);
-    event BufferReplenished(uint256 amountUSX, uint256 bufferBalance);
-    event BufferDepleted(uint256 amountUSX, uint256 remainingLosses);
+    event USDCTransferredForWithdrawal(uint256 amount);
 
     // Profit and Loss Reporter Facet Events
     event SuccessFeeUpdated(uint256 oldFraction, uint256 newFraction);
-    event ReportSubmitted(uint256 totalBalance, uint256 profitLoss, bool isProfit);
-    event ProfitsDistributed(
+    event InsuranceFundFractionUpdated(uint256 oldFraction, uint256 newFraction);
+    event ReporterUpdated(address indexed oldReporter, address indexed newReporter);
+    event ReportSubmitted(uint256 profitLoss, bool isProfit);
+    event RewardsDistributed(
         uint256 totalProfits, uint256 stakerProfits, uint256 bufferProfits, uint256 governanceProfits
     );
-    event LossesDistributed(uint256 totalLosses, uint256 bufferLosses, uint256 vaultLosses, uint256 remainingLosses);
-    event PegUpdated(uint256 oldPeg, uint256 newPeg);
     event ProtocolFrozen(string reason);
 
     /*=========================== Modifiers =========================*/
@@ -73,8 +64,14 @@ contract TreasuryStorage {
     }
 
     // Modifier to restrict access to asset manager functions
-    modifier onlyAssetManager() {
-        if (msg.sender != _getStorage().assetManager) revert NotAssetManager();
+    modifier onlyAllocator() {
+        if (msg.sender != _getStorage().allocator) revert NotAllocator();
+        _;
+    }
+
+    // Modifier to restrict access to reporter functions
+    modifier onlyReporter() {
+        if (msg.sender != _getStorage().reporter) revert NotReporter();
         _;
     }
 
@@ -89,17 +86,18 @@ contract TreasuryStorage {
     /// @custom:storage-location erc7201:treasury.main
     struct TreasuryStorageStruct {
         IUSX USX; // USX token contract
-        IsUSX sUSX; // sUSX vault contract
+        IStakedUSX sUSX; // sUSX vault contract
         IERC20 USDC; // USDC token contract
         address governance; // Governance address
+        address reporter; // Reporter address
+        address allocator; // Allocator address
         address assetManager; // The current Asset Manager for the protocol
+        address insuranceVault; // Insurance vault address
         address governanceWarchest; // Governance warchest address
         uint256 successFeeFraction; // Success fee fraction (default 5% == 50000)
-        uint256 maxLeverageFraction; // Max leverage fraction (default 10% == 100000)
-        uint256 bufferRenewalFraction; // Buffer renewal fraction (default 10% == 100000)
-        uint256 bufferTargetFraction; // Buffer target fraction (default 5% == 50000)
+        uint256 insuranceFundFraction; // Insurance fund fraction (default 5% == 50000)
         uint256 assetManagerUSDC; // USDC allocated to Asset Manager
-        uint256 netEpochProfits; // profits reported for previous epoch, after deducting Insurance Buffer and Governance Warchest fees
+        uint256 netEpochProfits; // total profits reported for all epoches, after deducting Insurance Buffer and Governance Warchest fees
     }
 
     uint256 public constant DECIMAL_SCALE_FACTOR = 10 ** 12; // Decimal scaling: 10^12. USDC is 6 decimals, USX is 18 decimals (18 - 6 = 12)
@@ -120,7 +118,7 @@ contract TreasuryStorage {
         return _getStorage().USX;
     }
 
-    function sUSX() public view returns (IsUSX) {
+    function sUSX() public view returns (IStakedUSX) {
         return _getStorage().sUSX;
     }
 
@@ -144,16 +142,8 @@ contract TreasuryStorage {
         return _getStorage().successFeeFraction;
     }
 
-    function maxLeverageFraction() public view returns (uint256) {
-        return _getStorage().maxLeverageFraction;
-    }
-
-    function bufferRenewalFraction() public view returns (uint256) {
-        return _getStorage().bufferRenewalFraction;
-    }
-
-    function bufferTargetFraction() public view returns (uint256) {
-        return _getStorage().bufferTargetFraction;
+    function insuranceFundFraction() public view returns (uint256) {
+        return _getStorage().insuranceFundFraction;
     }
 
     function assetManagerUSDC() public view returns (uint256) {

@@ -3,7 +3,7 @@ pragma solidity 0.8.30;
 
 import {Script, console} from "forge-std/Script.sol";
 import {USX} from "../src/USX.sol";
-import {sUSX} from "../src/sUSX.sol";
+import {StakedUSX} from "../src/StakedUSX.sol";
 import {TreasuryDiamond} from "../src/TreasuryDiamond.sol";
 
 /**
@@ -13,7 +13,7 @@ import {TreasuryDiamond} from "../src/TreasuryDiamond.sol";
 contract DeployHelper is Script {
     // Contract instances
     USX public usx;
-    sUSX public susx;
+    StakedUSX public susx;
     TreasuryDiamond public treasury;
 
     // Configuration
@@ -21,12 +21,12 @@ contract DeployHelper is Script {
 
     function initialize(address _usx, address _susx, address _treasury) public {
         usx = USX(_usx);
-        susx = sUSX(_susx);
+        susx = StakedUSX(_susx);
         treasury = TreasuryDiamond(payable(_treasury));
 
         console.log("=== DEPLOYMENT HELPER SETUP ===");
         console.log("USX:", _usx);
-        console.log("sUSX:", _susx);
+        console.log("StakedUSX:", _susx);
         console.log("Treasury:", _treasury);
         console.log("=================================");
     }
@@ -37,7 +37,7 @@ contract DeployHelper is Script {
         // 1. Verify USX configuration
         verifyUSXConfiguration();
 
-        // 2. Verify sUSX configuration
+        // 2. Verify StakedUSX configuration
         verifySUSXConfiguration();
 
         // 3. Verify Treasury configuration
@@ -64,7 +64,7 @@ contract DeployHelper is Script {
         // Configuration
         console.log("USDC Address:", address(usx.USDC()));
         console.log("Treasury Address:", address(usx.treasury()));
-        console.log("Governance Warchest:", usx.governanceWarchest());
+        console.log("Governance Address:", usx.governance());
         console.log("Admin:", usx.admin());
 
         // Verify USDC is correct
@@ -77,7 +77,7 @@ contract DeployHelper is Script {
     }
 
     function verifySUSXConfiguration() internal view {
-        console.log("\n--- sUSX Configuration Verification ---");
+        console.log("\n--- StakedUSX Configuration Verification ---");
 
         // Basic contract info
         console.log("Name:", susx.name());
@@ -90,12 +90,12 @@ contract DeployHelper is Script {
         console.log("Governance:", susx.governance());
 
         // Verify USX is linked
-        require(address(susx.USX()) != address(0), "sUSX USX not linked");
-        console.log("sUSX USX linking verified");
+        require(address(susx.USX()) != address(0), "StakedUSX USX not linked");
+        console.log("StakedUSX USX linking verified");
 
         // Verify treasury is linked
-        require(address(susx.treasury()) != address(0), "sUSX treasury not linked");
-        console.log("sUSX treasury linking verified");
+        require(address(susx.treasury()) != address(0), "StakedUSX treasury not linked");
+        console.log("StakedUSX treasury linking verified");
     }
 
     function verifyTreasuryConfiguration() internal view {
@@ -104,14 +104,14 @@ contract DeployHelper is Script {
         // Basic configuration
         console.log("USDC Address:", address(treasury.USDC()));
         console.log("USX Address:", address(treasury.USX()));
-        console.log("sUSX Address:", address(treasury.sUSX()));
+        console.log("StakedUSX Address:", address(treasury.sUSX()));
         console.log("Governance:", treasury.governance());
         console.log("Asset Manager:", treasury.assetManager());
 
         // Verify addresses are correct
         require(address(treasury.USDC()) == SCROLL_USDC, "Treasury USDC address mismatch");
         require(address(treasury.USX()) != address(0), "Treasury USX not linked");
-        require(address(treasury.sUSX()) != address(0), "Treasury sUSX not linked");
+        require(address(treasury.sUSX()) != address(0), "Treasury StakedUSX not linked");
 
         console.log("Treasury address linking verified");
     }
@@ -125,7 +125,7 @@ contract DeployHelper is Script {
         // Test InsuranceBufferFacet
         testInsuranceBufferFacet();
 
-        // Test ProfitAndLossReporterFacet
+        // Test RewardDistributorFacet
         testProfitAndLossFacet();
 
         console.log("All facet functionality verified");
@@ -188,7 +188,7 @@ contract DeployHelper is Script {
     }
 
     function testProfitAndLossFacet() internal {
-        console.log("  Testing ProfitAndLossReporterFacet...");
+        console.log("  Testing RewardDistributorFacet...");
 
         // Test successFee function
         bytes memory successFeeData = abi.encodeWithSelector(
@@ -229,15 +229,15 @@ contract DeployHelper is Script {
         require(address(usx.treasury()) == address(treasury), "USX -> Treasury link broken");
         console.log("USX -> Treasury link verified");
 
-        // Verify sUSX -> Treasury link
-        require(address(susx.treasury()) == address(treasury), "sUSX -> Treasury link broken");
-        console.log("sUSX -> Treasury link verified");
+        // Verify StakedUSX -> Treasury link
+        require(address(susx.treasury()) == address(treasury), "StakedUSX -> Treasury link broken");
+        console.log("StakedUSX -> Treasury link verified");
 
         // Verify Treasury -> USX link
         require(address(treasury.USX()) == address(usx), "Treasury -> USX link broken");
         console.log("Treasury -> USX link verified");
 
-        // Verify Treasury -> sUSX link
+        // Verify Treasury -> StakedUSX link
         require(address(treasury.sUSX()) == address(susx), "Treasury -> sUSX link broken");
         console.log("Treasury -> sUSX link verified");
 

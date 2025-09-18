@@ -2,8 +2,10 @@
 pragma solidity 0.8.30;
 
 import {console} from "forge-std/Test.sol";
-import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
+
 import {USX} from "../src/USX.sol";
+
+import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
 
 contract USXTest is LocalDeployTestSetup {
     uint256 public constant INITIAL_BALANCE = 1000e6; // 1000 USDC
@@ -22,17 +24,16 @@ contract USXTest is LocalDeployTestSetup {
     /*=========================== SETUP AND CONFIGURATION TESTS =========================*/
 
     function test_setInitialTreasury_revert_already_set() public {
-        // Try to set treasury again (should revert with NotGovernance, not TreasuryAlreadySet)
-        // because the function checks governance access first
-        vm.prank(user); // Not governance
-        vm.expectRevert(USX.NotGovernance.selector);
-        usx.setInitialTreasury(address(0x666));
+        // Set treasury is already executed in setup; calling again by governance should revert TreasuryAlreadySet
+        vm.prank(governance);
+        vm.expectRevert(USX.TreasuryAlreadySet.selector);
+        usx.initializeTreasury(address(0x666));
     }
 
     function test_setInitialTreasury_revert_not_governance() public {
         vm.prank(user);
         vm.expectRevert(USX.NotGovernance.selector);
-        usx.setInitialTreasury(address(0x999));
+        usx.initializeTreasury(address(0x999));
     }
 
     /*=========================== CORE FUNCTIONALITY TESTS =========================*/
@@ -63,12 +64,10 @@ contract USXTest is LocalDeployTestSetup {
         usx.deposit(100e6);
     }
 
-    function test_deposit_zero_amount() public {
+    function test_deposit_zero_amount_reverts() public {
         vm.prank(user);
+        vm.expectRevert(USX.InvalidUSDCDepositAmount.selector);
         usx.deposit(0);
-
-        // Verify no USX was minted
-        assertEq(usx.balanceOf(user), 0);
     }
 
     function test_deposit_large_amount() public {
@@ -195,18 +194,23 @@ contract USXTest is LocalDeployTestSetup {
         assertEq(usx.outstandingWithdrawalRequests(user), 50e6, "User should have 50 USDC withdrawal request");
     }
 
-    function test_requestUSDC_zero_amount() public {
+    function test_requestUSDC_zero_amount_reverts() public {
         vm.prank(user);
         usx.deposit(100e6); // 100 USDC deposit to get USX
 
-        // Request zero amount withdrawal
+        // Request zero amount withdrawal should revert with InvalidUSXRedeemAmount
         vm.prank(user);
+        vm.expectRevert(USX.InvalidUSXRedeemAmount.selector);
         usx.requestUSDC(0);
+    }
 
-        // Verify no withdrawal request was recorded and no USDC was transferred
-        assertEq(usx.outstandingWithdrawalRequests(user), 0, "User should have no withdrawal request for zero amount");
-        assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0 for zero amount");
-        assertEq(usdc.balanceOf(address(usx)), 0, "Contract should have no USDC transferred for zero amount");
+    function test_requestUSDC_non_multiple_amount_reverts() public {
+        vm.prank(user);
+        usx.deposit(100e6);
+
+        vm.prank(user);
+        vm.expectRevert(USX.InvalidUSXRedeemAmount.selector);
+        usx.requestUSDC(1e12+1); // not multiple of 1e12
     }
 
     function test_requestUSDC_large_amount_withdrawal_request() public {
@@ -269,18 +273,18 @@ contract USXTest is LocalDeployTestSetup {
         vm.prank(user);
         usx.deposit(100e6); // 100 USDC deposit to get USX
 
-        // Freeze withdrawals
-        vm.prank(address(treasury));
-        usx.freeze();
+        // Pause withdrawals
+        vm.prank(address(governance));
+        usx.pause();
 
-        // Try to request USDC withdrawal while frozen
+        // Try to request USDC withdrawal while paused
         vm.prank(user);
-        vm.expectRevert(USX.Frozen.selector);
+        vm.expectRevert(USX.Paused.selector);
         usx.requestUSDC(50e18);
 
         // Verify no withdrawal request was recorded
-        assertEq(usx.outstandingWithdrawalRequests(user), 0, "User should have no withdrawal request when frozen");
-        assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0 when frozen");
+        assertEq(usx.outstandingWithdrawalRequests(user), 0, "User should have no withdrawal request when paused");
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 0, "Total outstanding should be 0 when paused");
     }
 
     function test_claimUSDC_success_with_withdrawal_request() public {
@@ -638,9 +642,8 @@ contract USXTest is LocalDeployTestSetup {
     function test_view_functions_return_correct_values() public view {
         assertEq(address(usx.USDC()), address(usdc));
         assertEq(address(usx.treasury()), address(treasury));
-        assertEq(usx.governanceWarchest(), governanceWarchest);
+        assertEq(usx.governance(), governance);
         assertEq(usx.admin(), admin);
-        assertEq(usx.usxPrice(), 1e18);
         assertEq(usx.decimals(), 18);
         assertEq(usx.name(), "USX");
         assertEq(usx.symbol(), "USX");
@@ -697,50 +700,25 @@ contract USXTest is LocalDeployTestSetup {
         usx.burnUSX(user, 100e18);
     }
 
-    function test_updatePeg_success() public {
-        // Test updatePeg through the treasury (full flow)
-        // Since updatePeg is onlyTreasury, we need to impersonate the treasury
+    // Removed nonexistent peg update test; USX has no peg state/logic
 
-        uint256 newPeg = 2e18; // 2 USDC per USX
+    function test_unpause_success() public {
+        // Test unpause through governance (full flow)
+        // Since unpause is onlyGovernance, we need to impersonate governance
 
-        // Impersonate the treasury to call updatePeg
-        vm.prank(address(treasury));
-        usx.updatePeg(newPeg);
+        // First pause both deposits and withdrawals
+        vm.prank(address(governance));
+        usx.pause();
+        assertTrue(usx.paused(), "Contract should be paused");
 
-        uint256 finalPeg = usx.usxPrice();
-        assertEq(finalPeg, newPeg, "USX peg should be updated");
-        assertEq(finalPeg, 2e18, "USX peg should be 2 USDC");
+        // Then unpause both deposits and withdrawals
+        vm.prank(governance);
+        usx.unpause();
 
-        // Note: The current deposit function doesn't use the peg price - it just scales USDC to USX by 1e12
-        // This is a limitation of the current implementation
-        // The peg price is stored but not used in deposit calculations
-        console.log("Peg updated to:", newPeg);
-        console.log("Note: Deposit function currently uses hardcoded 1:1 scaling, not the peg price");
-    }
+        bool finalPauseState = usx.paused();
+        assertFalse(finalPauseState, "Contract should be unpaused");
 
-    function test_updatePeg_revert_not_treasury() public {
-        vm.prank(user);
-        vm.expectRevert(USX.NotTreasury.selector);
-        usx.updatePeg(2e18);
-    }
-
-    function test_unfreeze_success() public {
-        // Test unfreeze through governance (full flow)
-        // Since unfreeze is onlyGovernance, we need to impersonate governance
-
-        // First freeze both deposits and withdrawals
-        vm.prank(address(treasury));
-        usx.freeze();
-        assertTrue(usx.frozen(), "Contract should be frozen");
-
-        // Then unfreeze both deposits and withdrawals
-        vm.prank(governanceWarchest);
-        usx.unfreeze();
-
-        bool finalFreezeState = usx.frozen();
-        assertFalse(finalFreezeState, "Contract should be unfrozen");
-
-        // Test that unfrozen withdrawals allow withdrawal requests
+        // Test that unpaused withdrawals allow withdrawal requests
         // First give the user some USX to request withdrawal for
         vm.prank(address(treasury));
         usx.mintUSX(user, 1000e18); // Give user 1000 USX
@@ -751,52 +729,52 @@ contract USXTest is LocalDeployTestSetup {
         // Should not revert
     }
 
-    function test_unfreeze_revert_not_governance() public {
+    function test_unpause_revert_not_governance() public {
         vm.prank(user);
         vm.expectRevert(USX.NotGovernance.selector);
-        usx.unfreeze();
+        usx.unpause();
     }
 
-    function test_freeze_success() public {
-        // Test freeze through treasury (full flow)
-        // Since freeze is onlyTreasury, we need to impersonate treasury
+    function test_pause_success() public {
+        // Test pause through governance (full flow)
+        // Since pause is onlyGovernance, we need to impersonate governance
 
-        bool initialFreezeState = usx.frozen();
-        assertFalse(initialFreezeState, "Contract should not be frozen initially");
+        bool initialPauseState = usx.paused();
+        assertFalse(initialPauseState, "Contract should not be paused initially");
 
-        // Impersonate the treasury to call freeze
-        vm.prank(address(treasury));
-        usx.freeze();
+        // Impersonate the governance to call pause
+        vm.prank(address(governance));
+        usx.pause();
 
-        bool finalFreezeState = usx.frozen();
-        assertTrue(finalFreezeState, "Contract should be frozen");
+        bool finalPauseState = usx.paused();
+        assertTrue(finalPauseState, "Contract should be paused");
 
-        // Test that frozen state prevents deposits
+        // Test that paused state prevents deposits
         vm.prank(user);
-        vm.expectRevert(USX.Frozen.selector);
+        vm.expectRevert(USX.Paused.selector);
         usx.deposit(100e6);
 
-        // Test that frozen state prevents withdrawals
+        // Test that paused state prevents withdrawals
         vm.prank(user);
-        vm.expectRevert(USX.Frozen.selector);
+        vm.expectRevert(USX.Paused.selector);
         usx.requestUSDC(100e18);
     }
 
-    function test_freeze_revert_not_treasury() public {
+    function test_pause_revert_not_governance() public {
         vm.prank(user);
-        vm.expectRevert(USX.NotTreasury.selector);
-        usx.freeze();
+        vm.expectRevert(USX.NotGovernance.selector);
+        usx.pause();
     }
 
-    function test_frozen_view() public {
-        // Test frozen view function
-        assertFalse(usx.frozen(), "Contract should not be frozen initially");
+    function test_paused_view() public {
+        // Test paused view function
+        assertFalse(usx.paused(), "Contract should not be paused initially");
 
-        // Freeze contract
-        vm.prank(address(treasury));
-        usx.freeze();
+        // Pause contract
+        vm.prank(address(governance));
+        usx.pause();
 
-        assertTrue(usx.frozen(), "Contract should be frozen");
+        assertTrue(usx.paused(), "Contract should be paused");
     }
 
     /*=========================== ACCESS CONTROL TESTS =========================*/
@@ -826,11 +804,11 @@ contract USXTest is LocalDeployTestSetup {
         address newGovernance = address(0x555);
 
         // Set new governance (should succeed)
-        vm.prank(governanceWarchest); // Use governanceWarchest, not governance
+        vm.prank(governance); // Use governance, not governanceWarchest
         usx.setGovernance(newGovernance);
 
         // Verify governance was updated
-        assertEq(usx.governanceWarchest(), newGovernance);
+        assertEq(usx.governance(), newGovernance);
     }
 
     function test_setGovernance_revert_not_governance() public {
@@ -1006,8 +984,8 @@ contract USXTest is LocalDeployTestSetup {
         assertTrue(address(usx) != address(0), "USX should be deployed");
 
         // Test that governance can call governance functions
-        // The governance address is the governanceWarchest
-        address governanceAddress = usx.governanceWarchest();
+        // The governance address is the governance
+        address governanceAddress = usx.governance();
         vm.prank(governanceAddress);
         usx.setGovernance(governanceAddress); // This should not revert
 
@@ -1140,5 +1118,142 @@ contract USXTest is LocalDeployTestSetup {
         assertEq(
             userUSDCBalanceAfter, userUSDCBalanceBefore + 500000e6, "User should receive 500,000 USDC automatically"
         );
+    }
+
+    /*=========================== Matched/Outstanding Update Branch Coverage =========================*/
+
+    function test_updateMatched_transfers_excess_to_treasury_on_update_true() public {
+        // Setup: user creates outstanding request of 50 USDC
+        vm.prank(user);
+        usx.deposit(100e6);
+        vm.prank(user);
+        usx.requestUSDC(50e18);
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 50e6);
+        assertEq(usx.totalMatchedWithdrawalAmount(), 0);
+
+        // Fund contract with more USDC than outstanding (70 > 50)
+        deal(address(usdc), address(usx), 70e6);
+        uint256 treasuryBefore = usdc.balanceOf(address(treasury));
+
+        // Trigger update with transferExcessToTreasury = true via deposit()
+        // All deposit goes to treasury because shortfall becomes 0 after update
+        vm.prank(user);
+        usx.deposit(10e6);
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 50e6);
+        assertEq(usx.totalMatchedWithdrawalAmount(), 50e6);
+
+        // Expect excess (20) + deposit (10) transferred to treasury
+        uint256 treasuryAfter = usdc.balanceOf(address(treasury));
+        assertEq(treasuryAfter, treasuryBefore + 30e6, "Treasury should receive excess + deposit");
+
+        // The outstanding remains until user claims; no new outstanding created here
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 50e6, "Outstanding should remain 50 USDC");
+        // Matched remains fully matched at 50 after deposit
+        assertEq(usx.totalMatchedWithdrawalAmount(), 50e6, "Matched should remain 50 after deposit");
+    }
+
+    function test_updateMatched_does_not_transfer_excess_on_update_false() public {
+        // Setup: user1 creates outstanding request of 50 USDC
+        address user2 = address(0xBEEF);
+        vm.prank(admin);
+        usx.whitelistUser(user2, true);
+        vm.prank(user);
+        usx.deposit(100e6);
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 0);
+        assertEq(usx.totalMatchedWithdrawalAmount(), 0);
+        vm.prank(user);
+        usx.requestUSDC(50e18);
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 50e6);
+        assertEq(usx.totalMatchedWithdrawalAmount(), 0);
+
+        // Fund contract with more USDC than outstanding (70 > 50)
+        deal(address(usdc), address(usx), 70e6);
+        uint256 treasuryBefore = usdc.balanceOf(address(treasury));
+
+        // Give user2 USX directly without depositing to avoid triggering update(true)
+        vm.prank(address(treasury));
+        usx.mintUSX(user2, 100e18);
+
+        // Trigger update with transferExcessToTreasury = false via requestUSDC()
+        // Available = 70 - 50 = 20, so user2's 20 USDC request should auto-fulfill, and no treasury transfer
+        uint256 user2Before = usdc.balanceOf(user2);
+        vm.prank(user2);
+        usx.requestUSDC(20e18);
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 50e6);
+        assertEq(usx.totalMatchedWithdrawalAmount(), 50e6);
+
+        // No treasury transfer should have happened from the 70 excess
+        uint256 treasuryAfter = usdc.balanceOf(address(treasury));
+        assertEq(treasuryAfter, treasuryBefore, "Treasury should not receive excess on update false");
+
+        // User2 should receive 20 USDC automatically
+        assertEq(usdc.balanceOf(user2), user2Before + 20e6, "User2 should receive 20 USDC automatically");
+    }
+
+    function test_updateMatched_sets_to_balance_when_less_equal_outstanding_no_treasury_transfer() public {
+        // Setup: user creates outstanding request of 100 USDC
+        vm.prank(user);
+        usx.deposit(200e6);
+        vm.prank(user);
+        usx.requestUSDC(100e18);
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 100e6);
+        assertEq(usx.totalMatchedWithdrawalAmount(), 0);
+
+        // Fund contract with less than outstanding (60 <= 100)
+        deal(address(usdc), address(usx), 60e6);
+        uint256 treasuryBefore = usdc.balanceOf(address(treasury));
+
+        // Trigger update with transferExcessToTreasury = true via deposit(); no excess should be transferred
+        vm.prank(user);
+        usx.deposit(1e6); // minimal deposit to trigger update
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 100e6);
+        assertEq(usx.totalMatchedWithdrawalAmount(), 61e6);
+
+        // No transfer to treasury from the 60
+        uint256 treasuryAfter = usdc.balanceOf(address(treasury));
+        // Deposit 1e6 goes to contract shortfall; so treasury should not increase from update or deposit
+        assertEq(treasuryAfter, treasuryBefore, "No treasury transfer when balance <= outstanding");
+
+        // Since all contract USDC is matched, requesting any amount should create/extend outstanding (no auto-transfer)
+        vm.prank(user);
+        usx.requestUSDC(10e18); // adds 10 to outstanding
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 110e6, "Outstanding should increase by 10 USDC");
+        // Matched should still be 60 (capped by previous balance)
+        assertEq(usx.totalMatchedWithdrawalAmount(), 61e6, "Matched should remain 60 after request increases outstanding");
+    }
+
+    function test_updateMatched_no_change_when_balance_not_increased() public {
+        // Setup: create outstanding of 100, then partially match 40 via deposit
+        vm.prank(user);
+        usx.deposit(200e6);
+        vm.prank(user);
+        usx.requestUSDC(100e18);
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 100e6);
+        assertEq(usx.totalMatchedWithdrawalAmount(), 0);
+
+        // Deposit 40 to contract shortfall (match to 40)
+        vm.prank(user);
+        usx.deposit(40e6);
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 100e6);
+        assertEq(usx.totalMatchedWithdrawalAmount(), 40e6);
+
+        // Record treasury balance to ensure no unexpected transfers
+        uint256 treasuryBefore = usdc.balanceOf(address(treasury));
+
+        // Without changing contract USDC balance, trigger update with false via another request from same user
+        // Since available is zero, this will add to outstanding and matched should remain unchanged internally
+        vm.prank(user);
+        usx.requestUSDC(10e18);
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 110e6);
+        assertEq(usx.totalMatchedWithdrawalAmount(), 40e6);
+
+        // Treasury should not change because no excess was present nor transferred
+        uint256 treasuryAfter = usdc.balanceOf(address(treasury));
+        assertEq(treasuryAfter, treasuryBefore, "Treasury should be unchanged");
+
+        // Outstanding should have increased by 10 (from 100 to 110)
+        assertEq(usx.totalOutstandingWithdrawalAmount(), 110e6, "Outstanding should be 110 after additional 10 request");
+        // Matched should remain at 40 (the amount matched earlier) until more USDC arrives or is claimed
+        assertEq(usx.totalMatchedWithdrawalAmount(), 40e6, "Matched should stay 40 without new balance increase");
     }
 }

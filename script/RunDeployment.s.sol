@@ -100,7 +100,7 @@ contract RunDeployment is Script {
         console.log("Facets Added:");
         console.log("  AssetManagerAllocatorFacet");
         console.log("  InsuranceBufferFacet");
-        console.log("  ProfitAndLossReporterFacet");
+        console.log("  RewardDistributorFacet");
         console.log("");
         console.log("Configuration:");
         console.log("  USDC Address:", 0x06eFdBFf2a14a7c8E15944D1F4A48F9F95F663A4);

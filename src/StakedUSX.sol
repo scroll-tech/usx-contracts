@@ -3,16 +3,23 @@ pragma solidity 0.8.30;
 
 import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ITreasury} from "./interfaces/ITreasury.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-/// @title sUSX
+import {IStakedUSX} from "./interfaces/IStakedUSX.sol";
+
+/// @title StakedUSX
 /// @notice The main contract for the sUSX token, allowing USX holders to stake to share in protocols profits
 /// @dev ERC4626 vault
 
-contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, IStakedUSX {
+    using SafeCast for uint256;
+    using SafeERC20 for IERC20;
+
     /*=========================== Errors =========================*/
 
     error ZeroAddress();
@@ -20,12 +27,11 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
     error NotTreasury();
     error WithdrawalAlreadyClaimed();
     error WithdrawalPeriodNotPassed();
-    error NextEpochNotStarted();
     error InvalidMinWithdrawalPeriod();
     error InvalidWithdrawalFeeFraction();
+    error InvalidEpochDuration();
     error TreasuryAlreadySet();
-    error USXTransferFailed();
-    error DepositsFrozen();
+    error DepositsPaused();
 
     /*=========================== Events =========================*/
 
@@ -34,10 +40,19 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
     event EpochAdvanced(uint256 oldEpochBlock, uint256 newEpochBlock);
     event WithdrawalRequested(address indexed user, uint256 sharesAmount, uint256 withdrawalId);
     event WithdrawalClaimed(address indexed user, uint256 withdrawalId, uint256 usxAmount);
-    event DepositsFrozenChanged(bool frozen);
+    event DepositPausedChanged(bool paused);
     event WithdrawalPeriodSet(uint256 oldPeriod, uint256 newPeriod);
     event WithdrawalFeeFractionSet(uint256 oldFraction, uint256 newFraction);
     event EpochDurationSet(uint256 oldDuration, uint256 newDuration);
+    event RewardsReceived(uint256 amount);
+
+    /*=========================== Constants =========================*/
+
+    /// @dev Minimum withdrawal period in seconds
+    uint256 private constant MIN_WITHDRAWAL_PERIOD = 1 days;
+
+    /// @dev Minimum epoch duration in seconds
+    uint256 private constant MIN_EPOCH_DURATION = 1 days;
 
     /*=========================== Modifiers =========================*/
 
@@ -53,25 +68,41 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
 
     /*=========================== Storage =========================*/
 
+    /// @dev Compiler will pack this into single `uint256`.
+    /// Usually, we assume the amount of rewards won't exceed `uint96.max`.
+    /// In such case, the rate won't exceed `uint80.max`, since `periodLength` is at least `86400`.
+    /// Also `uint40.max` is enough for timestamp, which is about 30000 years.
+    struct RewardData {
+        // The amount of rewards pending to distribute. In normal case it should always be the rounding error.
+        uint96 queued;
+        // The current reward rate per second.
+        uint80 rate;
+        // The last timestamp when the reward is distributed.
+        uint40 lastUpdate;
+        // The timestamp when this period will finish.
+        uint40 finishAt;
+    }
+
     /// @custom:storage-location erc7201:susx.main
     struct SUSXStorage {
         IERC20 USX; // USX token reference (the underlying asset)
         ITreasury treasury; // treasury contract
         address governance; // address that controls governance of the contract
-        uint256 withdrawalPeriod; // withdrawal period in blocks, (default == 108000 (15 days))
+        uint256 withdrawalPeriod; // withdrawal period in seconds, (default == 15 * 24 * 60 * 60 (15 days))
         uint256 withdrawalFeeFraction; // fraction of withdrawals determining the withdrawal fee, (default 0.5% == 500) with precision to 0.001 percent
-        uint256 minWithdrawalPeriod; // withdrawal period in blocks, (default == 108000 (15 days))
-        uint256 lastEpochBlock; // block number of the last epoch
-        uint256 withdrawalIdCounter;
-        uint256 epochDuration; //  duration of epoch in blocks, (default == 216000 (30days))
-        bool depositsFrozen; // true = deposits are frozen, false = deposits are allowed
+        uint256 minWithdrawalPeriod; // withdrawal period in seconds, (default == MIN_WITHDRAWAL_PERIOD (1 day))
+        uint256 withdrawalCounter;
+        RewardData rewardData;
+        uint256 epochDuration; //  duration of epoch in seconds, (default == 30 * 24 * 60 * 60 (30 days))
+        bool depositPaused; // true = deposits are frozen, false = deposits are allowed
+        uint256 totalPendingWithdrawals; // the total amount of USX that is pending to be withdrawn
         mapping(uint256 => WithdrawalRequest) withdrawalRequests;
     }
 
     struct WithdrawalRequest {
         address user; // Address of withdrawer
-        uint256 amount; // sUSX amount redeemed
-        uint256 withdrawalBlock; // Block number of the withdrawal request
+        uint256 amount; // USX amount redeemed
+        uint256 withdrawalTimestamp; // Timestamp of the withdrawal request
         bool claimed; // True = withdrawal request has been claimed
     }
 
@@ -109,16 +140,15 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
         $.governance = _governance;
 
         // Set default values
-        $.withdrawalPeriod = 108000; // 15 days (assuming 12 second block time)
+        $.withdrawalPeriod = 15 days;
         $.withdrawalFeeFraction = 500; // 0.5%
-        $.minWithdrawalPeriod = 108000; // 15 days
-        $.epochDuration = 216000; // 30 days
-        $.lastEpochBlock = block.number; // Set to current block number
+        $.minWithdrawalPeriod = MIN_WITHDRAWAL_PERIOD;
+        $.epochDuration = 30 days;
     }
 
     /// @notice Set the initial Treasury address - can only be called once when treasury is address(0)
     /// @param _treasury Address of the Treasury contract
-    function setInitialTreasury(address _treasury) external onlyGovernance {
+    function initializeTreasury(address _treasury) external onlyGovernance {
         if (_treasury == address(0)) revert ZeroAddress();
         SUSXStorage storage $ = _getStorage();
         if ($.treasury != ITreasury(address(0))) revert TreasuryAlreadySet();
@@ -128,6 +158,14 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
     }
 
     /*=========================== Public Functions =========================*/
+
+    /// @inheritdoc ERC4626Upgradeable
+    function totalAssets() public view override returns (uint256) {
+        SUSXStorage storage $ = _getStorage();
+        uint256 balanceOfUSX = $.USX.balanceOf(address(this));
+        (, uint256 undistributedRewardsUSX) = _pendingRewards($.rewardData);
+        return balanceOfUSX - undistributedRewardsUSX - $.totalPendingWithdrawals;
+    }
 
     /// @notice Finishes a withdrawal, claiming a specified withdrawal claim
     /// @dev Allowed after withdrawalPeriod AND epoch the user made withdrawal on is finished, after Gross Profits has been counted
@@ -140,31 +178,24 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
         if ($.withdrawalRequests[withdrawalId].claimed) revert WithdrawalAlreadyClaimed();
 
         // Check if the withdrawal period has passed
-        if ($.withdrawalRequests[withdrawalId].withdrawalBlock + $.withdrawalPeriod > block.number) {
+        if ($.withdrawalRequests[withdrawalId].withdrawalTimestamp + $.withdrawalPeriod > block.timestamp) {
             revert WithdrawalPeriodNotPassed();
         }
 
-        // Check if the next epoch has started since the withdrawal request was made
-        if ($.withdrawalRequests[withdrawalId].withdrawalBlock > $.lastEpochBlock) revert NextEpochNotStarted();
-
         // Get the total USX amount for the amount of sUSX being redeemed
-        uint256 USXAmount = _convertToAssets($.withdrawalRequests[withdrawalId].amount, Math.Rounding.Floor);
-
-        // Burn sUSX shares
-        _burn(msg.sender, $.withdrawalRequests[withdrawalId].amount);
+        uint256 USXAmount = $.withdrawalRequests[withdrawalId].amount;
 
         // Distribute portion of USX to the Governance Warchest
         uint256 governanceWarchestPortion = withdrawalFee(USXAmount);
-        bool success = $.USX.transfer($.treasury.governanceWarchest(), governanceWarchestPortion);
-        if (!success) revert USXTransferFailed();
+        $.USX.safeTransfer($.treasury.governanceWarchest(), governanceWarchestPortion);
 
         // Send the remaining USX to the user
         uint256 userPortion = USXAmount - governanceWarchestPortion;
-        success = $.USX.transfer($.withdrawalRequests[withdrawalId].user, userPortion);
-        if (!success) revert USXTransferFailed();
+        $.USX.safeTransfer($.withdrawalRequests[withdrawalId].user, userPortion);
 
         // Mark the withdrawal as claimed
         $.withdrawalRequests[withdrawalId].claimed = true;
+        $.totalPendingWithdrawals -= USXAmount;
 
         emit WithdrawalClaimed($.withdrawalRequests[withdrawalId].user, withdrawalId, USXAmount);
     }
@@ -173,19 +204,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
     /// @dev Calculated using on chain USX balance and linear profit accrual (USX.balanceOf(this) - profits not yet distributed for last epoch)
     /// @return The current share price of sUSX
     function sharePrice() public view returns (uint256) {
-        uint256 supply = totalSupply();
-
-        // Handle the first deposit case
-        if (supply == 0) {
-            return 1e18; // 1:1 ratio for first deposit
-        }
-
-        SUSXStorage storage $ = _getStorage();
-        uint256 base = $.USX.balanceOf(address(this));
-        uint256 undistributedRewardsUSX = $.treasury.substractProfitLatestEpoch() * 1e12;
-        uint256 totalUSX = base - undistributedRewardsUSX;
-
-        return Math.mulDiv(totalUSX, 1e18, supply, Math.Rounding.Floor);
+        return convertToAssets(1e18);
     }
 
     /// @notice Returns the withdrawal fee for a specified withdrawal amount
@@ -199,10 +218,10 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
 
     /*=========================== Governance Functions =========================*/
 
-    /// @notice Sets withdrawal period in blocks
-    /// @param _minWithdrawalPeriod The new withdrawal period in blocks
+    /// @notice Sets withdrawal period in seconds
+    /// @param _minWithdrawalPeriod The new withdrawal period in seconds
     function setMinWithdrawalPeriod(uint256 _minWithdrawalPeriod) public onlyGovernance {
-        if (_minWithdrawalPeriod < 108000) revert InvalidMinWithdrawalPeriod();
+        if (_minWithdrawalPeriod < MIN_WITHDRAWAL_PERIOD) revert InvalidMinWithdrawalPeriod();
         SUSXStorage storage $ = _getStorage();
         uint256 oldPeriod = $.minWithdrawalPeriod;
         $.minWithdrawalPeriod = _minWithdrawalPeriod;
@@ -219,13 +238,14 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
         emit WithdrawalFeeFractionSet(oldFraction, _withdrawalFeeFraction);
     }
 
-    /// @notice Sets duration of epoch in blocks
-    /// @param _epochDurationBlocks The new epoch duration in blocks
-    function setEpochDuration(uint256 _epochDurationBlocks) public onlyGovernance {
+    /// @notice Sets duration of epoch in seconds
+    /// @param _epochDurationSeconds The new epoch duration in seconds
+    function setEpochDuration(uint256 _epochDurationSeconds) public onlyGovernance {
+        if (_epochDurationSeconds < MIN_EPOCH_DURATION) revert InvalidEpochDuration();
         SUSXStorage storage $ = _getStorage();
         uint256 oldDuration = $.epochDuration;
-        $.epochDuration = _epochDurationBlocks;
-        emit EpochDurationSet(oldDuration, _epochDurationBlocks);
+        $.epochDuration = _epochDurationSeconds;
+        emit EpochDurationSet(oldDuration, _epochDurationSeconds);
     }
 
     /// @notice Set new governance address
@@ -240,40 +260,45 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
         emit GovernanceTransferred(oldGovernance, newGovernance);
     }
 
-    /// @notice Unfreeze deposits, allowing users to deposit again
-    function unfreeze() external onlyGovernance {
+    /// @notice Unpause deposit, allowing users to deposit again
+    function unpauseDeposit() external onlyGovernance {
         SUSXStorage storage $ = _getStorage();
-        $.depositsFrozen = false;
-        emit DepositsFrozenChanged(false);
+        $.depositPaused = false;
+        emit DepositPausedChanged(false);
+    }
+
+    /// @notice Pause deposit, preventing users from depositing USX
+    function pauseDeposit() external onlyGovernance {
+        SUSXStorage storage $ = _getStorage();
+        $.depositPaused = true;
+        emit DepositPausedChanged(true);
     }
 
     /*=========================== Treasury Functions =========================*/
 
-    /// @notice Updates lastEpochBlock to the current block number
-    function updateLastEpochBlock() external onlyTreasury {
+    /// @notice Allows the owner to transfer rewards from the controller contract into this contract.
+    /// @dev Caller should make sure the rewards are transferred to this contract before calling this function
+    /// @param amount The amount of rewards to transfer.
+    function notifyRewards(uint256 amount) external nonReentrant onlyTreasury {
+        if (amount == 0) return; // do nothing when no rewards are transferred
         SUSXStorage storage $ = _getStorage();
 
-        uint256 oldEpochBlock = $.lastEpochBlock;
-        $.lastEpochBlock = block.number;
-        emit EpochAdvanced(oldEpochBlock, block.number);
-    }
+        // update rewards
+        RewardData memory data = $.rewardData;
+        _increaseRewards(data, $.epochDuration, amount);
+        $.rewardData = data;
 
-    /// @notice Freeze deposits, preventing users from depositing USX
-    /// @dev Used by Treasury to freeze deposits if a loss is reported that is large enough to exceed Insurance Buffer and burn USX in sUSX vault
-    function freezeDeposits() external onlyTreasury {
-        SUSXStorage storage $ = _getStorage();
-        $.depositsFrozen = true;
-        emit DepositsFrozenChanged(true);
+        emit RewardsReceived(amount);
     }
 
     /*=========================== Internal Functions =========================*/
 
     /// @dev Override default ERC4626 to check if deposits are frozen
-    function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
+    function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal nonReentrant override {
         SUSXStorage storage $ = _getStorage();
 
         // Check if deposits are frozen
-        if ($.depositsFrozen) revert DepositsFrozen();
+        if ($.depositPaused) revert DepositsPaused();
 
         // Call parent implementation
         super._deposit(caller, receiver, assets, shares);
@@ -283,45 +308,87 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
     /// @dev Override default ERC4626 for the 2 step withdrawal process in protocol
     function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares)
         internal
+        nonReentrant
         override
     {
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
         }
 
+        _burn(owner, shares);
+
         // Record withdrawal request
         SUSXStorage storage $ = _getStorage();
-        $.withdrawalRequests[$.withdrawalIdCounter] =
-            WithdrawalRequest({user: receiver, amount: shares, withdrawalBlock: block.number, claimed: false});
+        $.totalPendingWithdrawals += assets;
+        $.withdrawalRequests[$.withdrawalCounter] =
+            WithdrawalRequest({user: receiver, amount: assets, withdrawalTimestamp: block.timestamp, claimed: false});
 
         // Emit standard ERC4626 Withdraw event for consistency
         emit Withdraw(caller, receiver, owner, assets, shares);
 
         // Emit additional withdrawal request event for sUSX-specific functionality
-        emit WithdrawalRequested(receiver, shares, $.withdrawalIdCounter);
+        emit WithdrawalRequested(receiver, assets, $.withdrawalCounter);
 
-        // Increment withdrawalIdCounter
-        $.withdrawalIdCounter++;
+        // Increment withdrawalCounter
+        $.withdrawalCounter++;
     }
 
-    /// @dev Override default ERC4626 to use sharePrice
-    function _convertToShares(uint256 assets, Math.Rounding /* rounding */ )
-        internal
-        view
-        override
-        returns (uint256 shares)
-    {
-        return Math.mulDiv(assets, 1e18, sharePrice(), Math.Rounding.Floor);
+    /// @dev Add new rewards to current one.
+    ///
+    /// @param _data The struct of reward data, will be modified inplace.
+    /// @param _periodLength The length of a period, caller should make sure it is at least `86400`.
+    /// @param _amount The amount of new rewards to distribute.
+    function _increaseRewards(
+        RewardData memory _data,
+        uint256 _periodLength,
+        uint256 _amount
+    ) internal view {
+        _amount = _amount + _data.queued;
+        _data.queued = 0;
+
+        // no supply, all rewards are queued
+        if (totalSupply() == 0) {
+            _data.rate = 0;
+            _data.lastUpdate = uint40(block.timestamp);
+            _data.finishAt = uint40(block.timestamp + _periodLength);
+            _data.queued = uint96(_amount);
+            return;
+        }
+
+        if (block.timestamp >= _data.finishAt) {
+            // period finished, distribute to next period
+            _data.rate = (_amount / _periodLength).toUint80();
+            _data.queued = uint96(_amount - (_data.rate * _periodLength)); // keep rounding error
+            _data.lastUpdate = uint40(block.timestamp);
+            _data.finishAt = uint40(block.timestamp + _periodLength);
+        } else {
+            _amount = _amount + uint256(_data.rate) * (_data.finishAt - block.timestamp);
+            _data.rate = (_amount / _periodLength).toUint80();
+            _data.queued = uint96(_amount - (_data.rate * _periodLength)); // keep rounding error
+            _data.lastUpdate = uint40(block.timestamp);
+            _data.finishAt = uint40(block.timestamp + _periodLength);
+        }
     }
 
-    /// @dev Override default ERC4626 to use sharePrice
-    function _convertToAssets(uint256 shares, Math.Rounding /* rounding */ )
-        internal
-        view
-        override
-        returns (uint256 assets)
-    {
-        return Math.mulDiv(shares, sharePrice(), 1e18, Math.Rounding.Floor);
+    /// @dev Return the amount of pending distributed rewards in current period.
+    ///
+    /// @param _data The struct of reward data.
+    /// @return The amount of distributed rewards in current period.
+    /// @return The amount of pending distributed rewards in current period.
+    function _pendingRewards(RewardData memory _data) internal view returns (uint256, uint256) {
+        uint256 _elapsed;
+        uint256 _left;
+        if (block.timestamp > _data.finishAt) {
+            // finishAt < lastUpdate will never happen, but just in case.
+            _elapsed = _data.finishAt >= _data.lastUpdate ? _data.finishAt - _data.lastUpdate : 0;
+        } else {
+            unchecked {
+                _elapsed = block.timestamp - _data.lastUpdate;
+                _left = uint256(_data.finishAt) - block.timestamp;
+            }
+        }
+
+        return (uint256(_data.rate) * _elapsed, uint256(_data.rate) * _left + _data.queued);
     }
 
     /*=========================== UUPS Functions =========================*/
@@ -356,12 +423,12 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
         return _getStorage().minWithdrawalPeriod;
     }
 
-    function lastEpochBlock() public view returns (uint256) {
-        return _getStorage().lastEpochBlock;
+    function rewardData() public view returns (RewardData memory) {
+        return _getStorage().rewardData;
     }
 
-    function withdrawalIdCounter() public view returns (uint256) {
-        return _getStorage().withdrawalIdCounter;
+    function withdrawalCounter() public view returns (uint256) {
+        return _getStorage().withdrawalCounter;
     }
 
     function epochDuration() public view returns (uint256) {
@@ -372,7 +439,7 @@ contract sUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable
         return _getStorage().withdrawalRequests[id];
     }
 
-    function depositsFrozen() public view returns (bool) {
-        return _getStorage().depositsFrozen;
+    function depositPaused() public view returns (bool) {
+        return _getStorage().depositPaused;
     }
 }

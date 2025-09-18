@@ -5,10 +5,9 @@ import {Script, console} from "forge-std/Script.sol";
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {USX} from "../src/USX.sol";
-import {sUSX} from "../src/sUSX.sol";
+import {StakedUSX} from "../src/StakedUSX.sol";
 import {TreasuryDiamond} from "../src/TreasuryDiamond.sol";
-import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
-import {InsuranceBufferFacet} from "../src/facets/InsuranceBufferFacet.sol";
+import {RewardDistributorFacet} from "../src/facets/RewardDistributorFacet.sol";
 import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
 
 /**
@@ -24,6 +23,7 @@ contract DeployScroll is Script {
     address public usdcAddress;
     address public governance;
     address public governanceWarchest;
+    address public insuranceVault;
     address public assetManager;
     address public admin;
     string public deploymentTarget;
@@ -49,6 +49,7 @@ contract DeployScroll is Script {
         usdcAddress = vm.envAddress("USDC_ADDRESS");
         governance = vm.envAddress("GOVERNANCE_ADDRESS");
         governanceWarchest = vm.envAddress("GOVERNANCE_WARCHEST_ADDRESS");
+        insuranceVault = vm.envAddress("INSURANCE_VAULT_ADDRESS");
         assetManager = vm.envAddress("ASSET_MANAGER_ADDRESS");
         admin = vm.envAddress("ADMIN_ADDRESS");
         deploymentTarget = vm.envString("DEPLOYMENT_TARGET");
@@ -115,7 +116,7 @@ contract DeployScroll is Script {
 
         console.log("\n=== DEPLOYMENT COMPLETE! ===");
         console.log("USX Token:", usxProxy);
-        console.log("sUSX Vault:", susxProxy);
+        console.log("StakedUSX Vault:", susxProxy);
         console.log("Treasury Diamond:", treasuryProxy);
         console.log("=========================================");
     }
@@ -132,7 +133,7 @@ contract DeployScroll is Script {
             (
                 usdcAddress,
                 address(0), // Treasury address (will be set later)
-                governanceWarchest,
+                governance,
                 admin
             )
         );
@@ -144,10 +145,10 @@ contract DeployScroll is Script {
         usxProxy = address(new ERC1967Proxy(address(usxImpl), usxInitData));
         console.log("USX Token deployed at:", usxProxy);
 
-        // Deploy sUSX Vault with UUPS proxy using OpenZeppelin
-        console.log("1.2. Deploying sUSX Vault...");
+        // Deploy StakedUSX Vault with UUPS proxy using OpenZeppelin
+        console.log("1.2. Deploying StakedUSX Vault...");
         bytes memory susxInitData = abi.encodeCall(
-            sUSX.initialize,
+            StakedUSX.initialize,
             (
                 address(usxProxy),
                 address(0), // Treasury address (will be set later)
@@ -156,11 +157,11 @@ contract DeployScroll is Script {
         );
 
         // Deploy implementation first
-        sUSX susxImpl = new sUSX();
+        StakedUSX susxImpl = new StakedUSX();
 
         // Deploy proxy
         susxProxy = address(new ERC1967Proxy(address(susxImpl), susxInitData));
-        console.log("sUSX Vault deployed at:", susxProxy);
+        console.log("StakedUSX Vault deployed at:", susxProxy);
 
         vm.stopBroadcast();
     }
@@ -178,7 +179,7 @@ contract DeployScroll is Script {
         console.log("2.2. Deploying Treasury Proxy...");
         bytes memory treasuryInitData = abi.encodeCall(
             TreasuryDiamond.initialize,
-            (usdcAddress, address(usxProxy), address(susxProxy), governance, governanceWarchest, assetManager)
+            (usdcAddress, address(usxProxy), address(susxProxy), governance, governanceWarchest, assetManager, insuranceVault)
         );
 
         treasuryProxy = address(new ERC1967Proxy(address(treasuryImpl), treasuryInitData));
@@ -186,12 +187,10 @@ contract DeployScroll is Script {
 
         // Deploy Facets
         console.log("2.3. Deploying Facets...");
-        profitLossFacet = address(new ProfitAndLossReporterFacet());
-        insuranceBufferFacet = address(new InsuranceBufferFacet());
+        profitLossFacet = address(new RewardDistributorFacet());
         assetManagerFacet = address(new AssetManagerAllocatorFacet());
 
         console.log("Profit/Loss Facet:", profitLossFacet);
-        console.log("Insurance Buffer Facet:", insuranceBufferFacet);
         console.log("Asset Manager Facet:", assetManagerFacet);
 
         vm.stopBroadcast();
@@ -202,18 +201,18 @@ contract DeployScroll is Script {
 
         // Link USX to Treasury
         console.log("3.1. Linking USX to Treasury...");
-        vm.startBroadcast(governanceWarchest);
+        vm.startBroadcast(governance);
         USX usx = USX(usxProxy);
-        usx.setInitialTreasury(treasuryProxy);
+        usx.initializeTreasury(treasuryProxy);
         console.log("USX linked to Treasury");
         vm.stopBroadcast();
 
-        // Link sUSX to Treasury
-        console.log("3.2. Linking sUSX to Treasury...");
+        // Link StakedUSX to Treasury
+        console.log("3.2. Linking StakedUSX to Treasury...");
         vm.startBroadcast(governance);
-        sUSX susx = sUSX(susxProxy);
-        susx.setInitialTreasury(treasuryProxy);
-        console.log("sUSX linked to Treasury");
+        StakedUSX susx = StakedUSX(susxProxy);
+        susx.initializeTreasury(treasuryProxy);
+        console.log("StakedUSX linked to Treasury");
         vm.stopBroadcast();
 
         // Add Facets to Diamond
@@ -224,45 +223,27 @@ contract DeployScroll is Script {
 
         // Add AssetManagerAllocatorFacet
         console.log("3.3.1. Adding AssetManagerAllocatorFacet...");
-        bytes4[] memory assetManagerSelectors = new bytes4[](7);
-        assetManagerSelectors[0] = AssetManagerAllocatorFacet.maxLeverage.selector;
-        assetManagerSelectors[1] = AssetManagerAllocatorFacet.checkMaxLeverage.selector;
-        assetManagerSelectors[2] = AssetManagerAllocatorFacet.netDeposits.selector;
-        assetManagerSelectors[3] = AssetManagerAllocatorFacet.setAssetManager.selector;
-        assetManagerSelectors[4] = AssetManagerAllocatorFacet.setMaxLeverageFraction.selector;
-        assetManagerSelectors[5] = AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector;
-        assetManagerSelectors[6] = AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector;
+        bytes4[] memory assetManagerSelectors = new bytes4[](5);
+        assetManagerSelectors[0] = AssetManagerAllocatorFacet.netDeposits.selector;
+        assetManagerSelectors[1] = AssetManagerAllocatorFacet.setAssetManager.selector;
+        assetManagerSelectors[2] = AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector;
+        assetManagerSelectors[3] = AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector;
+        assetManagerSelectors[4] = AssetManagerAllocatorFacet.transferUSDCForWithdrawal.selector;
 
         vm.prank(governance);
         treasury.addFacet(assetManagerFacet, assetManagerSelectors);
         console.log("AssetManagerAllocatorFacet added");
 
-        // Add InsuranceBufferFacet
-        console.log("3.3.2. Adding InsuranceBufferFacet...");
-        bytes4[] memory insuranceBufferSelectors = new bytes4[](5);
-        insuranceBufferSelectors[0] = InsuranceBufferFacet.bufferTarget.selector;
-        insuranceBufferSelectors[1] = InsuranceBufferFacet.topUpBuffer.selector;
-        insuranceBufferSelectors[2] = InsuranceBufferFacet.slashBuffer.selector;
-        insuranceBufferSelectors[3] = InsuranceBufferFacet.setBufferTargetFraction.selector;
-        insuranceBufferSelectors[4] = InsuranceBufferFacet.setBufferRenewalRate.selector;
-
-        vm.prank(governance);
-        treasury.addFacet(insuranceBufferFacet, insuranceBufferSelectors);
-        console.log("InsuranceBufferFacet added");
-
-        // Add ProfitAndLossReporterFacet
-        console.log("3.3.3. Adding ProfitAndLossReporterFacet...");
-        bytes4[] memory profitLossSelectors = new bytes4[](6);
-        profitLossSelectors[0] = ProfitAndLossReporterFacet.successFee.selector;
-        profitLossSelectors[1] = ProfitAndLossReporterFacet.profitLatestEpoch.selector;
-        profitLossSelectors[2] = ProfitAndLossReporterFacet.profitPerBlock.selector;
-        profitLossSelectors[3] = ProfitAndLossReporterFacet.substractProfitLatestEpoch.selector;
-        profitLossSelectors[4] = ProfitAndLossReporterFacet.assetManagerReport.selector;
-        profitLossSelectors[5] = ProfitAndLossReporterFacet.setSuccessFeeFraction.selector;
+        // Add RewardDistributorFacet
+        console.log("3.3.3. Adding RewardDistributorFacet...");
+        bytes4[] memory profitLossSelectors = new bytes4[](3);
+        profitLossSelectors[0] = RewardDistributorFacet.successFee.selector;
+        profitLossSelectors[1] = RewardDistributorFacet.reportRewards.selector;
+        profitLossSelectors[2] = RewardDistributorFacet.setSuccessFeeFraction.selector;
 
         vm.prank(governance);
         treasury.addFacet(profitLossFacet, profitLossSelectors);
-        console.log("ProfitAndLossReporterFacet added");
+        console.log("RewardDistributorFacet added");
 
         // Note: vm.stopBroadcast() is not needed here since we're not in a broadcast context
     }
@@ -285,20 +266,20 @@ contract DeployScroll is Script {
         require(address(usx.treasury()) == treasuryProxy, "USX treasury verification failed");
         console.log("USX verification passed");
 
-        // Verify sUSX
-        sUSX susx = sUSX(susxProxy);
+        // Verify StakedUSX
+        StakedUSX susx = StakedUSX(susxProxy);
         require(
-            keccak256(abi.encodePacked(susx.name())) == keccak256(abi.encodePacked("sUSX Token")),
-            "sUSX name verification failed"
+            keccak256(abi.encodePacked(susx.name())) == keccak256(abi.encodePacked("StakedUSX Token")),
+            "StakedUSX name verification failed"
         );
         require(
-            keccak256(abi.encodePacked(susx.symbol())) == keccak256(abi.encodePacked("sUSX")),
-            "sUSX symbol verification failed"
+            keccak256(abi.encodePacked(susx.symbol())) == keccak256(abi.encodePacked("StakedUSX")),
+            "StakedUSX symbol verification failed"
         );
-        require(susx.decimals() == 18, "sUSX decimals verification failed");
-        require(address(susx.USX()) == usxProxy, "sUSX USX address verification failed");
-        require(address(susx.treasury()) == treasuryProxy, "sUSX treasury verification failed");
-        console.log("sUSX verification passed");
+        require(susx.decimals() == 18, "StakedUSX decimals verification failed");
+        require(address(susx.USX()) == usxProxy, "StakedUSX USX address verification failed");
+        require(address(susx.treasury()) == treasuryProxy, "StakedUSX treasury verification failed");
+        console.log("StakedUSX verification passed");
 
         // Verify Treasury
         TreasuryDiamond treasury = TreasuryDiamond(payable(treasuryProxy));
@@ -310,14 +291,8 @@ contract DeployScroll is Script {
         console.log("Treasury verification passed");
 
         // Verify Facet Accessibility
-        (bool success,) = treasuryProxy.call(abi.encodeWithSelector(AssetManagerAllocatorFacet.maxLeverage.selector));
-        require(success, "AssetManagerAllocatorFacet not accessible");
-
-        (success,) = treasuryProxy.call(abi.encodeWithSelector(InsuranceBufferFacet.bufferTarget.selector));
-        require(success, "InsuranceBufferFacet not accessible");
-
-        (success,) = treasuryProxy.call(abi.encodeWithSelector(ProfitAndLossReporterFacet.successFee.selector, 1000000));
-        require(success, "ProfitAndLossReporterFacet not accessible");
+        (bool success,) = treasuryProxy.call(abi.encodeWithSelector(RewardDistributorFacet.successFee.selector, 1000000));
+        require(success, "RewardDistributorFacet not accessible");
 
         console.log("Facet accessibility verification passed");
     }
@@ -331,35 +306,22 @@ contract DeployScroll is Script {
         require(usx.totalSupply() == 0, "USX initial supply should be 0");
         console.log("USX basic functionality verified");
 
-        // Test sUSX basic functionality
-        console.log("5.2. Testing sUSX basic functionality...");
-        sUSX susx = sUSX(susxProxy);
-        require(susx.totalSupply() == 0, "sUSX initial supply should be 0");
-        console.log("sUSX basic functionality verified");
+        // Test StakedUSX basic functionality
+        console.log("5.2. Testing StakedUSX basic functionality...");
+        StakedUSX susx = StakedUSX(susxProxy);
+        require(susx.totalSupply() == 0, "StakedUSX initial supply should be 0");
+        console.log("StakedUSX basic functionality verified");
 
         // Test Treasury basic functionality
         console.log("5.3. Testing Treasury basic functionality...");
         TreasuryDiamond treasury = TreasuryDiamond(payable(treasuryProxy));
-        require(treasury.maxLeverageFraction() == 100000, "Treasury maxLeverageFraction should be 100000");
         require(treasury.successFeeFraction() == 50000, "Treasury successFeeFraction should be 50000");
-        require(treasury.bufferTargetFraction() == 50000, "Treasury bufferTargetFraction should be 50000");
+        require(treasury.insuranceFundFraction() == 50000, "Treasury insuranceFundFraction should be 50000");
         console.log("Treasury basic functionality verified");
 
         // Test facet functionality through diamond
-        console.log("5.4. Testing facet functionality through diamond...");
         (bool success, bytes memory data) =
-            treasuryProxy.call(abi.encodeWithSelector(AssetManagerAllocatorFacet.maxLeverage.selector));
-        require(success, "maxLeverage call failed");
-        uint256 maxLeverage = abi.decode(data, (uint256));
-        require(maxLeverage == 0, "maxLeverage should be 0 for empty vault");
-
-        (success, data) = treasuryProxy.call(abi.encodeWithSelector(InsuranceBufferFacet.bufferTarget.selector));
-        require(success, "bufferTarget call failed");
-        uint256 bufferTarget = abi.decode(data, (uint256));
-        require(bufferTarget == 0, "bufferTarget should be 0 for empty vault");
-
-        (success, data) =
-            treasuryProxy.call(abi.encodeWithSelector(ProfitAndLossReporterFacet.successFee.selector, 1000000));
+            treasuryProxy.call(abi.encodeWithSelector(RewardDistributorFacet.successFee.selector, 1000000));
         require(success, "successFee call failed");
         uint256 successFee = abi.decode(data, (uint256));
         require(successFee == 500000, "successFee should be 500000 (5% of 1000000)");

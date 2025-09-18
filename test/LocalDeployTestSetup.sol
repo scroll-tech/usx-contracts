@@ -2,16 +2,18 @@
 pragma solidity ^0.8.0;
 
 import {Test, console} from "forge-std/Test.sol";
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+
+import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
+import {RewardDistributorFacet} from "../src/facets/RewardDistributorFacet.sol";
 import {TreasuryDiamond} from "../src/TreasuryDiamond.sol";
 import {USX} from "../src/USX.sol";
-import {sUSX} from "../src/sUSX.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {StakedUSX} from "../src/StakedUSX.sol";
+
 import {MockAssetManager} from "../src/mocks/MockAssetManager.sol";
 import {MockUSDC} from "./mocks/MockUSDC.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {AssetManagerAllocatorFacet} from "../src/facets/AssetManagerAllocatorFacet.sol";
-import {InsuranceBufferFacet} from "../src/facets/InsuranceBufferFacet.sol";
-import {ProfitAndLossReporterFacet} from "../src/facets/ProfitAndLossReporterFacet.sol";
 
 /**
  * @title LocalDeployTestSetup
@@ -24,6 +26,7 @@ contract LocalDeployTestSetup is Test {
     address public admin = 0x4000000000000000000000000000000000000004;
     address public assetManager;
     address public governanceWarchest = 0x2000000000000000000000000000000000000002;
+    address public insuranceVault = 0x3000000000000000000000000000000000000003;
     address public user = address(0x999); // Test user address
 
     // Deployed contract addresses
@@ -33,7 +36,7 @@ contract LocalDeployTestSetup is Test {
 
     // Contract interfaces
     USX public usx;
-    sUSX public susx;
+    StakedUSX public susx;
     TreasuryDiamond public treasury;
     IERC20 public usdc;
     MockAssetManager public mockAssetManager;
@@ -59,21 +62,21 @@ contract LocalDeployTestSetup is Test {
         console.log("USX implementation deployed at:", address(usxImpl));
 
         bytes memory usxData =
-            abi.encodeWithSelector(USX.initialize.selector, address(usdc), address(0), governanceWarchest, admin);
+            abi.encodeWithSelector(USX.initialize.selector, address(usdc), address(0), governance, admin);
         ERC1967Proxy usxProxyContract = new ERC1967Proxy(address(usxImpl), usxData);
         usx = USX(address(usxProxyContract));
         usxProxy = address(usxProxyContract);
         console.log("USX proxy deployed at:", address(usx));
 
-        // Deploy sUSX implementation and proxy
-        sUSX susxImpl = new sUSX();
-        console.log("sUSX implementation deployed at:", address(susxImpl));
+        // Deploy StakedUSX implementation and proxy
+        StakedUSX susxImpl = new StakedUSX();
+        console.log("StakedUSX implementation deployed at:", address(susxImpl));
 
-        bytes memory susxData = abi.encodeWithSelector(sUSX.initialize.selector, address(usx), address(0), governance);
+        bytes memory susxData = abi.encodeWithSelector(StakedUSX.initialize.selector, address(usx), address(0), governance);
         ERC1967Proxy susxProxyContract = new ERC1967Proxy(address(susxImpl), susxData);
-        susx = sUSX(address(susxProxyContract));
+        susx = StakedUSX(address(susxProxyContract));
         susxProxy = address(susxProxyContract);
-        console.log("sUSX proxy deployed at:", address(susx));
+        console.log("StakedUSX proxy deployed at:", address(susx));
 
         // Deploy Treasury Diamond
         TreasuryDiamond treasuryImpl = new TreasuryDiamond();
@@ -81,14 +84,15 @@ contract LocalDeployTestSetup is Test {
 
         try new ERC1967Proxy(
             address(treasuryImpl),
-            abi.encodeWithSelector(
-                TreasuryDiamond.initialize.selector,
-                address(usdc),
+            abi.encodeCall(
+                TreasuryDiamond.initialize,
+                (address(usdc),
                 address(usx),
                 address(susx),
                 governance,
                 governanceWarchest,
-                address(mockAssetManager)
+                address(mockAssetManager),
+                insuranceVault)
             )
         ) returns (ERC1967Proxy treasuryProxyContract) {
             treasury = TreasuryDiamond(payable(treasuryProxyContract));
@@ -105,18 +109,18 @@ contract LocalDeployTestSetup is Test {
         // Link contracts properly
         console.log("Linking contracts...");
 
-        vm.prank(governanceWarchest);
-        try usx.setInitialTreasury(address(treasury)) {
+        vm.prank(governance);
+        try usx.initializeTreasury(address(treasury)) {
             console.log("USX treasury set successfully");
         } catch {
             console.log("USX treasury already set or failed");
         }
 
         vm.prank(governance);
-        try susx.setInitialTreasury(address(treasury)) {
-            console.log("sUSX treasury set successfully");
+        try susx.initializeTreasury(address(treasury)) {
+            console.log("StakedUSX treasury set successfully");
         } catch {
-            console.log("sUSX treasury already set or failed");
+            console.log("StakedUSX treasury already set or failed");
         }
 
         console.log("Contracts linked successfully");
@@ -135,40 +139,28 @@ contract LocalDeployTestSetup is Test {
 
         // Deploy facets
         AssetManagerAllocatorFacet assetManagerFacet = new AssetManagerAllocatorFacet();
-        InsuranceBufferFacet insuranceBufferFacet = new InsuranceBufferFacet();
-        ProfitAndLossReporterFacet profitLossFacet = new ProfitAndLossReporterFacet();
+        RewardDistributorFacet profitLossFacet = new RewardDistributorFacet();
 
         // Define selectors for each facet (matching deployment script)
-        bytes4[] memory assetManagerSelectors = new bytes4[](7);
-        assetManagerSelectors[0] = AssetManagerAllocatorFacet.maxLeverage.selector;
-        assetManagerSelectors[1] = AssetManagerAllocatorFacet.checkMaxLeverage.selector;
-        assetManagerSelectors[2] = AssetManagerAllocatorFacet.netDeposits.selector;
-        assetManagerSelectors[3] = AssetManagerAllocatorFacet.setAssetManager.selector;
-        assetManagerSelectors[4] = AssetManagerAllocatorFacet.setMaxLeverageFraction.selector;
-        assetManagerSelectors[5] = AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector;
-        assetManagerSelectors[6] = AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector;
-
-        bytes4[] memory insuranceBufferSelectors = new bytes4[](5);
-        insuranceBufferSelectors[0] = InsuranceBufferFacet.bufferTarget.selector;
-        insuranceBufferSelectors[1] = InsuranceBufferFacet.topUpBuffer.selector;
-        insuranceBufferSelectors[2] = InsuranceBufferFacet.slashBuffer.selector;
-        insuranceBufferSelectors[3] = InsuranceBufferFacet.setBufferTargetFraction.selector;
-        insuranceBufferSelectors[4] = InsuranceBufferFacet.setBufferRenewalRate.selector;
+        bytes4[] memory assetManagerSelectors = new bytes4[](6);
+        assetManagerSelectors[0] = AssetManagerAllocatorFacet.netDeposits.selector;
+        assetManagerSelectors[1] = AssetManagerAllocatorFacet.setAssetManager.selector;
+        assetManagerSelectors[2] = AssetManagerAllocatorFacet.setAllocator.selector;
+        assetManagerSelectors[3] = AssetManagerAllocatorFacet.transferUSDCtoAssetManager.selector;
+        assetManagerSelectors[4] = AssetManagerAllocatorFacet.transferUSDCFromAssetManager.selector;
+        assetManagerSelectors[5] = AssetManagerAllocatorFacet.transferUSDCForWithdrawal.selector;
 
         bytes4[] memory profitLossSelectors = new bytes4[](6);
-        profitLossSelectors[0] = ProfitAndLossReporterFacet.successFee.selector;
-        profitLossSelectors[1] = ProfitAndLossReporterFacet.profitLatestEpoch.selector;
-        profitLossSelectors[2] = ProfitAndLossReporterFacet.profitPerBlock.selector;
-        profitLossSelectors[3] = ProfitAndLossReporterFacet.substractProfitLatestEpoch.selector;
-        profitLossSelectors[4] = ProfitAndLossReporterFacet.assetManagerReport.selector;
-        profitLossSelectors[5] = ProfitAndLossReporterFacet.setSuccessFeeFraction.selector;
+        profitLossSelectors[0] = RewardDistributorFacet.successFee.selector;
+        profitLossSelectors[1] = RewardDistributorFacet.insuranceFund.selector;
+        profitLossSelectors[2] = RewardDistributorFacet.reportRewards.selector;
+        profitLossSelectors[3] = RewardDistributorFacet.setSuccessFeeFraction.selector;
+        profitLossSelectors[4] = RewardDistributorFacet.setInsuranceFundFraction.selector;
+        profitLossSelectors[5] = RewardDistributorFacet.setReporter.selector;
 
         // Add facets to diamond
         vm.prank(governance);
         treasury.addFacet(address(assetManagerFacet), assetManagerSelectors);
-
-        vm.prank(governance);
-        treasury.addFacet(address(insuranceBufferFacet), insuranceBufferSelectors);
 
         vm.prank(governance);
         treasury.addFacet(address(profitLossFacet), profitLossSelectors);
@@ -214,9 +206,7 @@ contract LocalDeployTestSetup is Test {
         // Update lastEpochBlock to current block number after advancement
         console.log("  Updating lastEpochBlock to current block number...");
         vm.prank(address(treasury));
-        susx.updateLastEpochBlock();
-        console.log("  lastEpochBlock updated to:", susx.lastEpochBlock());
 
-        console.log("  Initial state: USX supply =", usx.totalSupply(), ", sUSX supply =", susx.totalSupply());
+        console.log("  Initial state: USX supply =", usx.totalSupply(), ", StakedUSX supply =", susx.totalSupply());
     }
 }
