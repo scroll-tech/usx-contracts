@@ -108,7 +108,7 @@ contract RewardDistributorFacetTest is LocalDeployTestSetup {
         uint256 usxBalInsuranceBefore = _usx.balanceOf(insurance);
         uint256 usxBalWarchestBefore = _usx.balanceOf(warchest);
         uint256 usxBalSusxBefore = _usx.balanceOf(address(_susx));
-        int256 netEpochBefore = TreasuryDiamond(payable(address(facet))).netEpochProfits();
+        uint256 netEpochBefore = TreasuryDiamond(payable(address(facet))).netEpochProfits();
 
         vm.expectEmit(true, true, true, true, address(treasury));
         emit TreasuryStorage.ReportSubmitted(profitUSDC, true);
@@ -125,6 +125,6 @@ contract RewardDistributorFacetTest is LocalDeployTestSetup {
         assertEq(_usx.balanceOf(address(_susx)) - usxBalSusxBefore, expectedStakers * scaled);
 
         // netEpochProfits increases by staker profits (in USDC units)
-        assertEq(TreasuryDiamond(payable(address(facet))).netEpochProfits(), netEpochBefore + int256(expectedStakers));
+        assertEq(TreasuryDiamond(payable(address(facet))).netEpochProfits(), netEpochBefore + expectedStakers);
     }
 }

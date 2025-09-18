@@ -97,7 +97,7 @@ contract TreasuryStorage {
         uint256 successFeeFraction; // Success fee fraction (default 5% == 50000)
         uint256 insuranceFundFraction; // Insurance fund fraction (default 5% == 50000)
         uint256 assetManagerUSDC; // USDC allocated to Asset Manager
-        int256 netEpochProfits; // total profits reported for all epoches, after deducting Insurance Buffer and Governance Warchest fees
+        uint256 netEpochProfits; // total profits reported for all epoches, after deducting Insurance Buffer and Governance Warchest fees
     }
 
     uint256 public constant DECIMAL_SCALE_FACTOR = 10 ** 12; // Decimal scaling: 10^12. USDC is 6 decimals, USX is 18 decimals (18 - 6 = 12)
@@ -150,7 +150,7 @@ contract TreasuryStorage {
         return _getStorage().assetManagerUSDC;
     }
 
-    function netEpochProfits() public view returns (int256) {
+    function netEpochProfits() public view returns (uint256) {
         return _getStorage().netEpochProfits;
     }
 }

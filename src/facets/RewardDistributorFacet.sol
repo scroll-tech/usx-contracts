@@ -129,7 +129,7 @@ contract RewardDistributorFacet is TreasuryStorage, ReentrancyGuardUpgradeable {
         IStakedUSX($.sUSX).notifyRewards(stakerProfitsUSX);
 
         // Update netEpochProfits to include all profits in all epochs
-        $.netEpochProfits = $.netEpochProfits + int256(stakerProfits);
+        $.netEpochProfits = $.netEpochProfits + stakerProfits;
 
         emit RewardsDistributed(
             rewards,
