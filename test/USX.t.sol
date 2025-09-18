@@ -706,7 +706,7 @@ contract USXTest is LocalDeployTestSetup {
         // Test unpause through governance (full flow)
         // Since unpause is onlyGovernance, we need to impersonate governance
 
-        // First freeze both deposits and withdrawals
+        // First pause both deposits and withdrawals
         vm.prank(address(governance));
         usx.pause();
         assertTrue(usx.paused(), "Contract should be paused");
@@ -760,7 +760,7 @@ contract USXTest is LocalDeployTestSetup {
         usx.requestUSDC(100e18);
     }
 
-    function test_freeze_revert_not_governance() public {
+    function test_pause_revert_not_governance() public {
         vm.prank(user);
         vm.expectRevert(USX.NotGovernance.selector);
         usx.pause();

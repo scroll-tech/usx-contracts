@@ -9,7 +9,9 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+import {IUSX} from "./interfaces/IUSX.sol";
+
+contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, IUSX {
     using SafeERC20 for IERC20;
 
     /*=========================== Errors =========================*/

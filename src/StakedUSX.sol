@@ -10,11 +10,13 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {IStakedUSX} from "./interfaces/IStakedUSX.sol";
+
 /// @title StakedUSX
 /// @notice The main contract for the sUSX token, allowing USX holders to stake to share in protocols profits
 /// @dev ERC4626 vault
 
-contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, IStakedUSX {
     using SafeCast for uint256;
     using SafeERC20 for IERC20;
 
@@ -258,16 +260,15 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         emit GovernanceTransferred(oldGovernance, newGovernance);
     }
 
-    /// @notice Unfreeze deposits, allowing users to deposit again
-    function unpauseDeposits() external onlyGovernance {
+    /// @notice Unpause deposit, allowing users to deposit again
+    function unpauseDeposit() external onlyGovernance {
         SUSXStorage storage $ = _getStorage();
         $.depositPaused = false;
         emit DepositPausedChanged(false);
     }
 
-    /// @notice Freeze deposits, preventing users from depositing USX
-    /// @dev Used by Treasury to freeze deposits if a loss is reported that is large enough to exceed Insurance Buffer and burn USX in sUSX vault
-    function pauseDeposits() external onlyGovernance {
+    /// @notice Pause deposit, preventing users from depositing USX
+    function pauseDeposit() external onlyGovernance {
         SUSXStorage storage $ = _getStorage();
         $.depositPaused = true;
         emit DepositPausedChanged(true);

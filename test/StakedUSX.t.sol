@@ -74,34 +74,34 @@ contract StakedUSXTest is LocalDeployTestSetup {
 
     /* =========================== Access Control =========================== */
 
-    function test_onlyTreasury_freezeDeposits() public {
+    function test_onlyTreasury_pauseDeposits() public {
         // Non-governance reverts
         vm.expectRevert(StakedUSX.NotGovernance.selector);
-        susx.pauseDeposits();
+        susx.pauseDeposit();
 
-        // Governance can freeze
+        // Governance can pause
         vm.prank(governance);
         vm.expectEmit(true, true, true, true, address(susx));
         emit StakedUSX.DepositPausedChanged(true);
-        susx.pauseDeposits();
+        susx.pauseDeposit();
         assertTrue(susx.depositPaused());
     }
 
-    function test_governance_unfreeze() public {
-        // Freeze first via treasury
+    function test_governance_unpauseDeposit() public {
+        // Pause first via treasury
         vm.prank(governance);
-        susx.pauseDeposits();
+        susx.pauseDeposit();
         assertTrue(susx.depositPaused());
 
-        // Non-governance cannot unfreeze
+        // Non-governance cannot unpauseDeposit
         vm.expectRevert(StakedUSX.NotGovernance.selector);
-        susx.unpauseDeposits();
+        susx.unpauseDeposit();
 
-        // Governance can unfreeze
+        // Governance can unpauseDeposit
         vm.prank(governance);
         vm.expectEmit(true, true, true, true, address(susx));
         emit StakedUSX.DepositPausedChanged(false);
-        susx.unpauseDeposits();
+        susx.unpauseDeposit();
         assertFalse(susx.depositPaused());
     }
 
@@ -200,9 +200,9 @@ contract StakedUSXTest is LocalDeployTestSetup {
     }
 
     function test_deposit_reverts_when_deposits_frozen() public {
-        // Freeze via treasury
+        // Pause via governance
         vm.prank(governance);
-        susx.pauseDeposits();
+        susx.pauseDeposit();
 
         _mintUSXTo(user, 100e6);
         vm.startPrank(user);

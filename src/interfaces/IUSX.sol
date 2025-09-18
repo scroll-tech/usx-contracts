@@ -1,26 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 /// @title IUSX
 /// @notice Interface for the USX token contract
-interface IUSX {
-    // Core ERC20 functions
-    function totalSupply() external view returns (uint256);
-    function balanceOf(address account) external view returns (uint256);
-    function transfer(address to, uint256 amount) external returns (bool);
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-    function approve(address spender, uint256 amount) external returns (bool);
-    function allowance(address owner, address spender) external view returns (uint256);
-
+interface IUSX is IERC20 {
     // Treasury functions
     function mintUSX(address to, uint256 amount) external;
     function burnUSX(address from, uint256 amount) external;
-    function freeze() external;
-    function unfreeze() external;
+    function pause() external;
+    function unpause() external;
 
     // State getters
-    function frozen() external view returns (bool);
-    function governanceWarchest() external view returns (address);
+    function paused() external view returns (bool);
+    function governance() external view returns (address);
 
     function totalOutstandingWithdrawalAmount() external view returns (uint256);
     function totalMatchedWithdrawalAmount() external view returns (uint256);
