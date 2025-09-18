@@ -25,15 +25,15 @@ contract USXTest is LocalDeployTestSetup {
 
     function test_setInitialTreasury_revert_already_set() public {
         // Set treasury is already executed in setup; calling again by governance should revert TreasuryAlreadySet
-        vm.prank(governanceWarchest);
+        vm.prank(governance);
         vm.expectRevert(USX.TreasuryAlreadySet.selector);
-        usx.setInitialTreasury(address(0x666));
+        usx.initializeTreasury(address(0x666));
     }
 
     function test_setInitialTreasury_revert_not_governance() public {
         vm.prank(user);
         vm.expectRevert(USX.NotGovernance.selector);
-        usx.setInitialTreasury(address(0x999));
+        usx.initializeTreasury(address(0x999));
     }
 
     /*=========================== CORE FUNCTIONALITY TESTS =========================*/
@@ -273,11 +273,11 @@ contract USXTest is LocalDeployTestSetup {
         vm.prank(user);
         usx.deposit(100e6); // 100 USDC deposit to get USX
 
-        // Freeze withdrawals
-        vm.prank(address(treasury));
+        // Pause withdrawals
+        vm.prank(address(governance));
         usx.pause();
 
-        // Try to request USDC withdrawal while frozen
+        // Try to request USDC withdrawal while paused
         vm.prank(user);
         vm.expectRevert(USX.Paused.selector);
         usx.requestUSDC(50e18);
@@ -642,7 +642,7 @@ contract USXTest is LocalDeployTestSetup {
     function test_view_functions_return_correct_values() public view {
         assertEq(address(usx.USDC()), address(usdc));
         assertEq(address(usx.treasury()), address(treasury));
-        assertEq(usx.governanceWarchest(), governanceWarchest);
+        assertEq(usx.governance(), governance);
         assertEq(usx.admin(), admin);
         assertEq(usx.decimals(), 18);
         assertEq(usx.name(), "USX");
@@ -702,23 +702,23 @@ contract USXTest is LocalDeployTestSetup {
 
     // Removed nonexistent peg update test; USX has no peg state/logic
 
-    function test_unfreeze_success() public {
-        // Test unfreeze through governance (full flow)
-        // Since unfreeze is onlyGovernance, we need to impersonate governance
+    function test_unpause_success() public {
+        // Test unpause through governance (full flow)
+        // Since unpause is onlyGovernance, we need to impersonate governance
 
         // First freeze both deposits and withdrawals
-        vm.prank(address(treasury));
+        vm.prank(address(governance));
         usx.pause();
         assertTrue(usx.paused(), "Contract should be paused");
 
-        // Then unfreeze both deposits and withdrawals
-        vm.prank(governanceWarchest);
+        // Then unpause both deposits and withdrawals
+        vm.prank(governance);
         usx.unpause();
 
-        bool finalFreezeState = usx.paused();
-        assertFalse(finalFreezeState, "Contract should be unpaused");
+        bool finalPauseState = usx.paused();
+        assertFalse(finalPauseState, "Contract should be unpaused");
 
-        // Test that unfrozen withdrawals allow withdrawal requests
+        // Test that unpaused withdrawals allow withdrawal requests
         // First give the user some USX to request withdrawal for
         vm.prank(address(treasury));
         usx.mintUSX(user, 1000e18); // Give user 1000 USX
@@ -729,49 +729,49 @@ contract USXTest is LocalDeployTestSetup {
         // Should not revert
     }
 
-    function test_unfreeze_revert_not_governance() public {
+    function test_unpause_revert_not_governance() public {
         vm.prank(user);
         vm.expectRevert(USX.NotGovernance.selector);
         usx.unpause();
     }
 
     function test_pause_success() public {
-        // Test freeze through treasury (full flow)
-        // Since freeze is onlyTreasury, we need to impersonate treasury
+        // Test pause through governance (full flow)
+        // Since pause is onlyGovernance, we need to impersonate governance
 
-        bool initialFreezeState = usx.paused();
-        assertFalse(initialFreezeState, "Contract should not be paused initially");
+        bool initialPauseState = usx.paused();
+        assertFalse(initialPauseState, "Contract should not be paused initially");
 
-        // Impersonate the treasury to call freeze
-        vm.prank(address(treasury));
+        // Impersonate the governance to call pause
+        vm.prank(address(governance));
         usx.pause();
 
-        bool finalFreezeState = usx.paused();
-        assertTrue(finalFreezeState, "Contract should be paused");
+        bool finalPauseState = usx.paused();
+        assertTrue(finalPauseState, "Contract should be paused");
 
-        // Test that frozen state prevents deposits
+        // Test that paused state prevents deposits
         vm.prank(user);
         vm.expectRevert(USX.Paused.selector);
         usx.deposit(100e6);
 
-        // Test that frozen state prevents withdrawals
+        // Test that paused state prevents withdrawals
         vm.prank(user);
         vm.expectRevert(USX.Paused.selector);
         usx.requestUSDC(100e18);
     }
 
-    function test_freeze_revert_not_treasury() public {
+    function test_freeze_revert_not_governance() public {
         vm.prank(user);
-        vm.expectRevert(USX.NotTreasury.selector);
+        vm.expectRevert(USX.NotGovernance.selector);
         usx.pause();
     }
 
-    function test_frozen_view() public {
-        // Test frozen view function
+    function test_paused_view() public {
+        // Test paused view function
         assertFalse(usx.paused(), "Contract should not be paused initially");
 
-        // Freeze contract
-        vm.prank(address(treasury));
+        // Pause contract
+        vm.prank(address(governance));
         usx.pause();
 
         assertTrue(usx.paused(), "Contract should be paused");
@@ -804,11 +804,11 @@ contract USXTest is LocalDeployTestSetup {
         address newGovernance = address(0x555);
 
         // Set new governance (should succeed)
-        vm.prank(governanceWarchest); // Use governanceWarchest, not governance
+        vm.prank(governance); // Use governance, not governanceWarchest
         usx.setGovernance(newGovernance);
 
         // Verify governance was updated
-        assertEq(usx.governanceWarchest(), newGovernance);
+        assertEq(usx.governance(), newGovernance);
     }
 
     function test_setGovernance_revert_not_governance() public {
@@ -984,8 +984,8 @@ contract USXTest is LocalDeployTestSetup {
         assertTrue(address(usx) != address(0), "USX should be deployed");
 
         // Test that governance can call governance functions
-        // The governance address is the governanceWarchest
-        address governanceAddress = usx.governanceWarchest();
+        // The governance address is the governance
+        address governanceAddress = usx.governance();
         vm.prank(governanceAddress);
         usx.setGovernance(governanceAddress); // This should not revert
 

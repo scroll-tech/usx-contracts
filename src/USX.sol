@@ -54,7 +54,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     }
 
     modifier onlyGovernance() {
-        if (msg.sender != _getStorage().governanceWarchest) revert NotGovernance();
+        if (msg.sender != _getStorage().governance) revert NotGovernance();
         _;
     }
 
@@ -75,7 +75,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         IERC20 USDC;
         ITreasury treasury;
         bool paused;
-        address governanceWarchest;
+        address governance;
         address admin;
         uint256 totalOutstandingWithdrawalAmount;
         uint256 totalMatchedWithdrawalAmount;
@@ -99,11 +99,11 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
     /*=========================== Initialization =========================*/
 
-    function initialize(address _USDC, address _treasury, address _governanceWarchest, address _admin)
+    function initialize(address _USDC, address _treasury, address _governance, address _admin)
         public
         initializer
     {
-        if (_USDC == address(0) || _governanceWarchest == address(0) || _admin == address(0)) revert ZeroAddress();
+        if (_USDC == address(0) || _governance == address(0) || _admin == address(0)) revert ZeroAddress();
 
         // Initialize ERC20 and ReentrancyGuard
         __ERC20_init("USX", "USX");
@@ -112,13 +112,13 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         USXStorage storage $ = _getStorage();
         $.USDC = IERC20(_USDC);
         $.treasury = ITreasury(_treasury);
-        $.governanceWarchest = _governanceWarchest;
+        $.governance = _governance;
         $.admin = _admin;
     }
 
     /// @dev Set the initial Treasury address - can only be called once when treasury is address(0)
     /// @param _treasury Address of the Treasury contract
-    function setInitialTreasury(address _treasury) external onlyGovernance {
+    function initializeTreasury(address _treasury) external onlyGovernance {
         if (_treasury == address(0)) revert ZeroAddress();
         USXStorage storage $ = _getStorage();
         if ($.treasury != ITreasury(address(0))) revert TreasuryAlreadySet();
@@ -237,6 +237,14 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
     /*=========================== Governance Functions =========================*/
 
+    /// @notice Pause deposits and withdrawals, preventing users from depositing and redeeming USX
+    /// @dev Used by Treasury to pause operations when peg is broken
+    function pause() public onlyGovernance {
+        USXStorage storage $ = _getStorage();
+        $.paused = true;
+        emit PausedChanged(true);
+    }
+
     /// @notice Unpause deposits and withdrawals, allowing users to deposit and withdraw again
     function unpause() public onlyGovernance {
         USXStorage storage $ = _getStorage();
@@ -250,8 +258,8 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         if (newGovernance == address(0)) revert ZeroAddress();
 
         USXStorage storage $ = _getStorage();
-        address oldGovernance = $.governanceWarchest;
-        $.governanceWarchest = newGovernance;
+        address oldGovernance = $.governance;
+        $.governance = newGovernance;
 
         emit GovernanceTransferred(oldGovernance, newGovernance);
     }
@@ -284,14 +292,6 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     /// @dev Used by Treasury to burn USX when losses are reported by Asset Manager
     function burnUSX(address _from, uint256 _amount) public onlyTreasury {
         _burn(_from, _amount);
-    }
-
-    /// @notice Pause deposits and withdrawals, preventing users from depositing and redeeming USX
-    /// @dev Used by Treasury to pause operations when peg is broken
-    function pause() public onlyTreasury {
-        USXStorage storage $ = _getStorage();
-        $.paused = true;
-        emit PausedChanged(true);
     }
 
     /*=========================== Internal Functions =========================*/
@@ -337,8 +337,8 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
         return _getStorage().paused;
     }
 
-    function governanceWarchest() public view returns (address) {
-        return _getStorage().governanceWarchest;
+    function governance() public view returns (address) {
+        return _getStorage().governance;
     }
 
     function admin() public view returns (address) {

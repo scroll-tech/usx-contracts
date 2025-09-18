@@ -133,7 +133,7 @@ contract DeployScroll is Script {
             (
                 usdcAddress,
                 address(0), // Treasury address (will be set later)
-                governanceWarchest,
+                governance,
                 admin
             )
         );
@@ -201,9 +201,9 @@ contract DeployScroll is Script {
 
         // Link USX to Treasury
         console.log("3.1. Linking USX to Treasury...");
-        vm.startBroadcast(governanceWarchest);
+        vm.startBroadcast(governance);
         USX usx = USX(usxProxy);
-        usx.setInitialTreasury(treasuryProxy);
+        usx.initializeTreasury(treasuryProxy);
         console.log("USX linked to Treasury");
         vm.stopBroadcast();
 
@@ -211,7 +211,7 @@ contract DeployScroll is Script {
         console.log("3.2. Linking StakedUSX to Treasury...");
         vm.startBroadcast(governance);
         StakedUSX susx = StakedUSX(susxProxy);
-        susx.setInitialTreasury(treasuryProxy);
+        susx.initializeTreasury(treasuryProxy);
         console.log("StakedUSX linked to Treasury");
         vm.stopBroadcast();
 

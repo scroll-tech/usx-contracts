@@ -62,7 +62,7 @@ contract LocalDeployTestSetup is Test {
         console.log("USX implementation deployed at:", address(usxImpl));
 
         bytes memory usxData =
-            abi.encodeWithSelector(USX.initialize.selector, address(usdc), address(0), governanceWarchest, admin);
+            abi.encodeWithSelector(USX.initialize.selector, address(usdc), address(0), governance, admin);
         ERC1967Proxy usxProxyContract = new ERC1967Proxy(address(usxImpl), usxData);
         usx = USX(address(usxProxyContract));
         usxProxy = address(usxProxyContract);
@@ -109,15 +109,15 @@ contract LocalDeployTestSetup is Test {
         // Link contracts properly
         console.log("Linking contracts...");
 
-        vm.prank(governanceWarchest);
-        try usx.setInitialTreasury(address(treasury)) {
+        vm.prank(governance);
+        try usx.initializeTreasury(address(treasury)) {
             console.log("USX treasury set successfully");
         } catch {
             console.log("USX treasury already set or failed");
         }
 
         vm.prank(governance);
-        try susx.setInitialTreasury(address(treasury)) {
+        try susx.initializeTreasury(address(treasury)) {
             console.log("StakedUSX treasury set successfully");
         } catch {
             console.log("StakedUSX treasury already set or failed");

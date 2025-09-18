@@ -64,7 +64,7 @@ contract DeployHelper is Script {
         // Configuration
         console.log("USDC Address:", address(usx.USDC()));
         console.log("Treasury Address:", address(usx.treasury()));
-        console.log("Governance Warchest:", usx.governanceWarchest());
+        console.log("Governance Address:", usx.governance());
         console.log("Admin:", usx.admin());
 
         // Verify USDC is correct

@@ -146,7 +146,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
     /// @notice Set the initial Treasury address - can only be called once when treasury is address(0)
     /// @param _treasury Address of the Treasury contract
-    function setInitialTreasury(address _treasury) external onlyGovernance {
+    function initializeTreasury(address _treasury) external onlyGovernance {
         if (_treasury == address(0)) revert ZeroAddress();
         SUSXStorage storage $ = _getStorage();
         if ($.treasury != ITreasury(address(0))) revert TreasuryAlreadySet();
@@ -265,6 +265,14 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         emit DepositsPausedChanged(false);
     }
 
+    /// @notice Freeze deposits, preventing users from depositing USX
+    /// @dev Used by Treasury to freeze deposits if a loss is reported that is large enough to exceed Insurance Buffer and burn USX in sUSX vault
+    function pauseDeposits() external onlyGovernance {
+        SUSXStorage storage $ = _getStorage();
+        $.depositPaused = true;
+        emit DepositsPausedChanged(true);
+    }
+
     /*=========================== Treasury Functions =========================*/
 
     /// @notice Allows the owner to transfer rewards from the controller contract into this contract.
@@ -280,14 +288,6 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         $.rewardData = data;
 
         emit RewardsReceived(amount);
-    }
-
-    /// @notice Freeze deposits, preventing users from depositing USX
-    /// @dev Used by Treasury to freeze deposits if a loss is reported that is large enough to exceed Insurance Buffer and burn USX in sUSX vault
-    function pauseDeposits() external onlyTreasury {
-        SUSXStorage storage $ = _getStorage();
-        $.depositPaused = true;
-        emit DepositsPausedChanged(true);
     }
 
     /*=========================== Internal Functions =========================*/
@@ -361,7 +361,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
             _data.lastUpdate = uint40(block.timestamp);
             _data.finishAt = uint40(block.timestamp + _periodLength);
         } else {
-            _amount = _amount + uint256(_data.rate) * (_data.finishAt - _data.lastUpdate);
+            _amount = _amount + uint256(_data.rate) * (_data.finishAt - block.timestamp);
             _data.rate = (_amount / _periodLength).toUint80();
             _data.queued = uint96(_amount - (_data.rate * _periodLength)); // keep rounding error
             _data.lastUpdate = uint40(block.timestamp);

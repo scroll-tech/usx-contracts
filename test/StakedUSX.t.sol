@@ -75,12 +75,12 @@ contract StakedUSXTest is LocalDeployTestSetup {
     /* =========================== Access Control =========================== */
 
     function test_onlyTreasury_freezeDeposits() public {
-        // Non-treasury reverts
-        vm.expectRevert(StakedUSX.NotTreasury.selector);
+        // Non-governance reverts
+        vm.expectRevert(StakedUSX.NotGovernance.selector);
         susx.pauseDeposits();
 
-        // Treasury can freeze
-        vm.prank(treasuryProxy);
+        // Governance can freeze
+        vm.prank(governance);
         vm.expectEmit(true, true, true, true, address(susx));
         emit StakedUSX.DepositsPausedChanged(true);
         susx.pauseDeposits();
@@ -89,7 +89,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
 
     function test_governance_unfreeze() public {
         // Freeze first via treasury
-        vm.prank(treasuryProxy);
+        vm.prank(governance);
         susx.pauseDeposits();
         assertTrue(susx.depositPaused());
 
@@ -175,7 +175,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
         // setInitialTreasury already called in setup; calling again should revert
         vm.prank(governance);
         vm.expectRevert(StakedUSX.TreasuryAlreadySet.selector);
-        susx.setInitialTreasury(address(treasury));
+        susx.initializeTreasury(address(treasury));
     }
 
     /* =========================== Deposits =========================== */
@@ -201,7 +201,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
 
     function test_deposit_reverts_when_deposits_frozen() public {
         // Freeze via treasury
-        vm.prank(treasuryProxy);
+        vm.prank(governance);
         susx.pauseDeposits();
 
         _mintUSXTo(user, 100e6);
