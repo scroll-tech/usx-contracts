@@ -92,7 +92,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         ITreasury treasury; // treasury contract
         address governance; // address that controls governance of the contract
         uint256 withdrawalPeriod; // withdrawal period in seconds, (default == 15 * 24 * 60 * 60 (15 days))
-        uint256 withdrawalFeeFraction; // fraction of withdrawals determining the withdrawal fee, (default 0.5% == 5000) with precision 6 decimals
+        uint256 withdrawalFeeFraction; // fraction of withdrawals determining the withdrawal fee, (default 0.05% == 500) with precision 6 decimals
         uint256 minWithdrawalPeriod; // withdrawal period in seconds, (default == MIN_WITHDRAWAL_PERIOD (1 day))
         uint256 withdrawalCounter;
         RewardData rewardData;
@@ -144,7 +144,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
         // Set default values
         $.withdrawalPeriod = 15 days;
-        $.withdrawalFeeFraction = 5000; // 0.5%
+        $.withdrawalFeeFraction = 500; // 0.5%
         $.minWithdrawalPeriod = MIN_WITHDRAWAL_PERIOD;
         $.epochDuration = 30 days;
     }
