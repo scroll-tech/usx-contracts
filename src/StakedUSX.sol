@@ -54,6 +54,9 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     /// @dev Minimum epoch duration in seconds
     uint256 private constant MIN_EPOCH_DURATION = 1 days;
 
+    /// @dev Precision for the fee fractions
+    uint256 private constant FEE_PRECISION = 1000000;
+
     /*=========================== Modifiers =========================*/
 
     modifier onlyGovernance() {
@@ -89,7 +92,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         ITreasury treasury; // treasury contract
         address governance; // address that controls governance of the contract
         uint256 withdrawalPeriod; // withdrawal period in seconds, (default == 15 * 24 * 60 * 60 (15 days))
-        uint256 withdrawalFeeFraction; // fraction of withdrawals determining the withdrawal fee, (default 0.5% == 500) with precision to 0.001 percent
+        uint256 withdrawalFeeFraction; // fraction of withdrawals determining the withdrawal fee, (default 0.05% == 500) with precision 6 decimals
         uint256 minWithdrawalPeriod; // withdrawal period in seconds, (default == MIN_WITHDRAWAL_PERIOD (1 day))
         uint256 withdrawalCounter;
         RewardData rewardData;
@@ -141,7 +144,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
         // Set default values
         $.withdrawalPeriod = 15 days;
-        $.withdrawalFeeFraction = 500; // 0.5%
+        $.withdrawalFeeFraction = 500;
         $.minWithdrawalPeriod = MIN_WITHDRAWAL_PERIOD;
         $.epochDuration = 30 days;
     }
@@ -213,7 +216,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     /// @return The withdrawal fee for the specified withdrawal amount
     function withdrawalFee(uint256 withdrawalAmount) public view returns (uint256) {
         SUSXStorage storage $ = _getStorage();
-        return Math.mulDiv(withdrawalAmount, $.withdrawalFeeFraction, 1000000, Math.Rounding.Floor);
+        return Math.mulDiv(withdrawalAmount, $.withdrawalFeeFraction, FEE_PRECISION, Math.Rounding.Floor);
     }
 
     /*=========================== Governance Functions =========================*/
