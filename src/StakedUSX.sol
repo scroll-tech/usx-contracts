@@ -144,7 +144,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
         // Set default values
         $.withdrawalPeriod = 15 days;
-        $.withdrawalFeeFraction = 500; // 0.5%
+        $.withdrawalFeeFraction = 500;
         $.minWithdrawalPeriod = MIN_WITHDRAWAL_PERIOD;
         $.epochDuration = 30 days;
     }
