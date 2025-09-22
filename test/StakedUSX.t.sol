@@ -53,7 +53,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
 
         // Defaults
         assertEq(susx.minWithdrawalPeriod(), 1 days);
-        assertEq(susx.withdrawalFeeFraction(), 500); // as initialized
+        assertEq(susx.withdrawalFeeFraction(), 5000); // as initialized
         assertEq(susx.epochDuration(), 30 days);
         assertEq(susx.depositPaused(), false);
 
@@ -139,7 +139,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
         susx.setWithdrawalFeeFraction(1000);
         vm.prank(governance);
         vm.expectEmit(true, true, true, true, address(susx));
-        emit StakedUSX.WithdrawalFeeFractionSet(500, 20000);
+        emit StakedUSX.WithdrawalFeeFractionSet(5000, 20000);
         susx.setWithdrawalFeeFraction(20000);
         assertEq(susx.withdrawalFeeFraction(), 20000);
         vm.prank(governance);
