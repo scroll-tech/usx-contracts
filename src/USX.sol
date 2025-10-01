@@ -295,6 +295,12 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, I
         _burn(_from, _amount);
     }
 
+    /// @notice Update the total matched withdrawal amount based on the latest USDC balance
+    /// @dev Used by Treasury to update the total matched withdrawal amount
+    function updateTotalMatchedWithdrawalAmount() external onlyTreasury {
+        _updateTotalMatchedWithdrawalAmount(true);
+    }
+
     /*=========================== Internal Functions =========================*/
 
     /// @notice Update the total matched withdrawal amount based on the latest USDC balance
