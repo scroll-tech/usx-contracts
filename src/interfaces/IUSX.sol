@@ -16,6 +16,7 @@ interface IUSX is IERC20 {
     function paused() external view returns (bool);
     function governance() external view returns (address);
 
+    function updateTotalMatchedWithdrawalAmount() external;
     function totalOutstandingWithdrawalAmount() external view returns (uint256);
     function totalMatchedWithdrawalAmount() external view returns (uint256);
 }

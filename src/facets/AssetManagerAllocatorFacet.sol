@@ -98,6 +98,7 @@ contract AssetManagerAllocatorFacet is
     function transferUSDCForWithdrawal() external onlyAllocator nonReentrant {
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
 
+        $.USX.updateTotalMatchedWithdrawalAmount(); // update before reading
         uint256 totalOutstandingWithdrawalAmount = $.USX.totalOutstandingWithdrawalAmount();
         uint256 totalMatchedWithdrawalAmount = $.USX.totalMatchedWithdrawalAmount();
         uint256 missingUSDCForWithdrawal = totalOutstandingWithdrawalAmount - totalMatchedWithdrawalAmount;
