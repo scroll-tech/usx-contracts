@@ -23,6 +23,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     /*=========================== Errors =========================*/
 
     error ZeroAddress();
+    error ZeroAmount();
     error NotGovernance();
     error NotTreasury();
     error WithdrawalAlreadyClaimed();
@@ -298,6 +299,8 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
     /// @dev Override default ERC4626 to check if deposits are frozen
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal nonReentrant override {
+        if (assets == 0 || shares == 0) revert ZeroAmount();
+
         SUSXStorage storage $ = _getStorage();
 
         // Check if deposits are frozen
@@ -314,6 +317,8 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         nonReentrant
         override
     {
+        if (assets == 0 || shares == 0) revert ZeroAmount();
+
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
         }
