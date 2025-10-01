@@ -351,6 +351,9 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
         // no supply, all rewards are queued
         if (totalSupply() == 0) {
+            if (block.timestamp < _data.finishAt) {
+                _amount += uint256(_data.rate) * (_data.finishAt - block.timestamp);
+            }
             _data.rate = 0;
             _data.lastUpdate = uint40(block.timestamp);
             _data.finishAt = uint40(block.timestamp + _periodLength);
