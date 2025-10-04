@@ -86,7 +86,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, I
     }
 
     // keccak256(abi.encode(uint256(keccak256("usx.main")) - 1)) & ~bytes32(uint256(0xff));
-    bytes32 private constant USX_STORAGE_LOCATION = 0x0c53c51c00000000000000000000000000000000000000000000000000000000;
+    bytes32 private constant USX_STORAGE_LOCATION = 0xc9db443a76878c18b8727ca7977c3e648e5a60974201d1ee927d7e63744b5500;
 
     function _getStorage() private pure returns (USXStorage storage $) {
         assembly {
