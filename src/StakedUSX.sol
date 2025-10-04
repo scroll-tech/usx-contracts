@@ -110,7 +110,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     }
 
     // keccak256(abi.encode(uint256(keccak256("susx.main")) - 1)) & ~bytes32(uint256(0xff));
-    bytes32 private constant SUSX_STORAGE_LOCATION = 0x0c53c51c00000000000000000000000000000000000000000000000000000000;
+    bytes32 private constant SUSX_STORAGE_LOCATION = 0x7ef495ffa61cc9596b858592e81bad4189b8a35b6b875460d576397f44d3c900;
 
     function _getStorage() private pure returns (SUSXStorage storage $) {
         assembly {
