@@ -122,7 +122,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
     }
 
     function test_governance_setters_happy_paths_and_reverts() public {
-        // Only governance can set withdrawal period; must be >= 1 day
+        // Only governance can set withdrawal period
         vm.expectRevert(StakedUSX.NotGovernance.selector);
         susx.setWithdrawalPeriod(2 days);
         vm.expectEmit(true, true, true, true, address(susx));
@@ -130,9 +130,6 @@ contract StakedUSXTest is LocalDeployTestSetup {
         vm.prank(governance);
         susx.setWithdrawalPeriod(2 days);
         assertEq(susx.withdrawalPeriod(), 2 days);
-        vm.expectRevert(StakedUSX.InvalidWithdrawalPeriod.selector);
-        vm.prank(governance);
-        susx.setWithdrawalPeriod(12 hours);
 
         // Only governance can set fee fraction; must be <= 20000
         vm.expectRevert(StakedUSX.NotGovernance.selector);

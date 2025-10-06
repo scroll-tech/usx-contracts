@@ -48,9 +48,6 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
     /*=========================== Constants =========================*/
 
-    /// @dev Minimum withdrawal period in seconds
-    uint256 private constant MIN_WITHDRAWAL_PERIOD = 1 days;
-
     /// @dev Minimum epoch duration in seconds
     uint256 private constant MIN_EPOCH_DURATION = 1 days;
 
@@ -222,7 +219,6 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     /// @notice Sets withdrawal period in seconds
     /// @param _withdrawalPeriod The new withdrawal period in seconds
     function setWithdrawalPeriod(uint256 _withdrawalPeriod) public onlyGovernance {
-        if (_withdrawalPeriod < MIN_WITHDRAWAL_PERIOD) revert InvalidWithdrawalPeriod();
         SUSXStorage storage $ = _getStorage();
         uint256 oldPeriod = $.withdrawalPeriod;
         $.withdrawalPeriod = _withdrawalPeriod;
