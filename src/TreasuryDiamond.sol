@@ -21,6 +21,7 @@ contract TreasuryDiamond is Initializable, UUPSUpgradeable, ReentrancyGuardUpgra
     event FacetRemoved(bytes4 indexed selector);
     event FacetReplaced(bytes4 indexed selector, address indexed oldFacet, address indexed newFacet);
     event TreasuryInitialized(address indexed USDC, address indexed USX, address indexed sUSX);
+    event InvalidFacet();
 
     /*=========================== Storage =========================*/
 
@@ -143,6 +144,7 @@ contract TreasuryDiamond is Initializable, UUPSUpgradeable, ReentrancyGuardUpgra
     /// @param _newFacet Address of the new facet
     function replaceFacet(address _oldFacet, address _newFacet) external onlyGovernance {
         if (_newFacet == address(0)) revert ZeroAddress();
+        if (_oldFacet == _newFacet) revert InvalidFacet();
 
         bytes4[] memory selectors = facetFunctionSelectors[_oldFacet];
 
