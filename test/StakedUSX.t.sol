@@ -52,7 +52,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
         assertEq(address(susx.treasury()), treasuryProxy);
 
         // Defaults
-        assertEq(susx.minWithdrawalPeriod(), 1 days);
+        assertEq(susx.withdrawalPeriod(), 15 days);
         assertEq(susx.withdrawalFeeFraction(), 500); // as initialized
         assertEq(susx.epochDuration(), 30 days);
         assertEq(susx.depositPaused(), false);
@@ -122,17 +122,17 @@ contract StakedUSXTest is LocalDeployTestSetup {
     }
 
     function test_governance_setters_happy_paths_and_reverts() public {
-        // Only governance can set min withdrawal period; must be >= 1 day
+        // Only governance can set withdrawal period; must be >= 1 day
         vm.expectRevert(StakedUSX.NotGovernance.selector);
-        susx.setMinWithdrawalPeriod(2 days);
+        susx.setWithdrawalPeriod(2 days);
         vm.expectEmit(true, true, true, true, address(susx));
-        emit StakedUSX.WithdrawalPeriodSet(susx.minWithdrawalPeriod(), 2 days);
+        emit StakedUSX.WithdrawalPeriodSet(susx.withdrawalPeriod(), 2 days);
         vm.prank(governance);
-        susx.setMinWithdrawalPeriod(2 days);
-        assertEq(susx.minWithdrawalPeriod(), 2 days);
-        vm.expectRevert(StakedUSX.InvalidMinWithdrawalPeriod.selector);
+        susx.setWithdrawalPeriod(2 days);
+        assertEq(susx.withdrawalPeriod(), 2 days);
+        vm.expectRevert(StakedUSX.InvalidWithdrawalPeriod.selector);
         vm.prank(governance);
-        susx.setMinWithdrawalPeriod(12 hours);
+        susx.setWithdrawalPeriod(12 hours);
 
         // Only governance can set fee fraction; must be <= 20000
         vm.expectRevert(StakedUSX.NotGovernance.selector);
