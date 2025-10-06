@@ -170,6 +170,17 @@ contract TreasuryDiamondTest is LocalDeployTestSetup {
         vm.stopPrank();
     }
 
+    function test_replaceFacet_revertsOnIdenticalFacet() public {
+        DummyFacet d1 = new DummyFacet();
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = DummyFacet.ping.selector;
+        vm.startPrank(governance);
+        treasury.addFacet(address(d1), selectors);
+        vm.expectRevert(TreasuryStorage.InvalidFacet.selector);
+        treasury.replaceFacet(address(d1), address(d1));
+        vm.stopPrank();
+    }
+
     function test_fallback_revertsOnUnknownSelector() public {
         vm.expectRevert(TreasuryStorage.SelectorNotFound.selector);
         (bool ok,) = address(treasury).call(abi.encodeWithSelector(bytes4(0xDEADBEEF)));

@@ -21,7 +21,6 @@ contract TreasuryDiamond is Initializable, UUPSUpgradeable, ReentrancyGuardUpgra
     event FacetRemoved(bytes4 indexed selector);
     event FacetReplaced(bytes4 indexed selector, address indexed oldFacet, address indexed newFacet);
     event TreasuryInitialized(address indexed USDC, address indexed USX, address indexed sUSX);
-    event InvalidFacet();
 
     /*=========================== Storage =========================*/
 
