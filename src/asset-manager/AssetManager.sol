@@ -59,9 +59,9 @@ contract AssetManager is
         uint256 totalWeight;
     }
 
-    // keccak256("asset-manager.main")
+    // keccak256(abi.encode(uint256(keccak256("asset-manager.main")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant ASSET_MANAGER_STORAGE_LOCATION =
-        0x80eb0cdd16cb622196d298bc0913d06d921aa48c024ad1954e8e8ef1bbf9387d;
+        0xde282b4c51a1df38ec1c6abe7d3af4a304418f4234a686e0dde0c8e3f160a500;
 
     function _getStorage()
         private
