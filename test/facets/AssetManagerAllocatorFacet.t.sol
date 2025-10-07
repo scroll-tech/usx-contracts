@@ -228,4 +228,63 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         assertEq(usdc.balanceOf(address(treasury)), trBefore2 - 1_000e6, "treasury down by missing");
         assertEq(usdc.balanceOf(address(usx)), usxBefore2 + 1_000e6, "USX up by missing");
     }
+
+    function test_transferUSDCForWithdrawal_updatesBeforeRead_whenUSXHasPreexistingBalance() public {
+        // Create an outstanding withdrawal of 1000 USDC
+        uint256 outstandingUSDC = 1_000e6;
+        vm.startPrank(user);
+        // Ensure the user has enough USX to redeem
+        if (usx.balanceOf(user) < outstandingUSDC * 1e12) {
+            usx.deposit(outstandingUSDC);
+        }
+        usx.requestUSDC(outstandingUSDC * 1e12);
+        vm.stopPrank();
+
+        // Simulate users sending USDC directly to USX (e.g., donations) of 700 USDC
+        uint256 preexistingUSXUSDC = 700e6;
+        vm.prank(user);
+        usdc.transfer(address(usx), preexistingUSXUSDC);
+
+        // Before calling the function, record balances
+        uint256 treasuryBefore = usdc.balanceOf(address(treasury));
+        uint256 usxBefore = usdc.balanceOf(address(usx));
+
+        // Only allocator can call
+        vm.prank(admin);
+        alloc.transferUSDCForWithdrawal();
+
+        // Since updateTotalMatchedWithdrawalAmount is called BEFORE reading totals,
+        // matched becomes 700 and missing = 1000 - 700 = 300, so transfer 300 from treasury to USX
+        assertEq(usdc.balanceOf(address(treasury)), treasuryBefore - (outstandingUSDC - preexistingUSXUSDC), "treasury should decrease by missing");
+        assertEq(usdc.balanceOf(address(usx)), usxBefore + (outstandingUSDC - preexistingUSXUSDC), "USX should increase by missing");
+    }
+
+    function test_transferUSDCForWithdrawal_updatesBeforeRead_sweepsExcessToTreasury() public {
+        // Create an outstanding withdrawal of 1000 USDC
+        uint256 outstandingUSDC = 1_000e6;
+        vm.startPrank(user);
+        if (usx.balanceOf(user) < outstandingUSDC * 1e12) {
+            usx.deposit(outstandingUSDC);
+        }
+        usx.requestUSDC(outstandingUSDC * 1e12);
+        vm.stopPrank();
+
+        // Send 1200 USDC directly to USX, exceeding outstanding by 200
+        uint256 directToUSX = 1_200e6;
+        vm.prank(user);
+        usdc.transfer(address(usx), directToUSX);
+
+        uint256 treasuryBefore = usdc.balanceOf(address(treasury));
+        uint256 usxBefore = usdc.balanceOf(address(usx));
+
+        // Call allocator function
+        vm.prank(admin);
+        alloc.transferUSDCForWithdrawal();
+
+        // updateTotalMatchedWithdrawalAmount is called first with transferExcessToTreasury = true,
+        // so 200 USDC is swept from USX to treasury, matched becomes 1000, and missing is 0.
+        // Therefore, no additional transfer from treasury to USX occurs.
+        assertEq(usdc.balanceOf(address(treasury)), treasuryBefore + (directToUSX - outstandingUSDC), "treasury should receive excess from USX");
+        assertEq(usdc.balanceOf(address(usx)), usxBefore - (directToUSX - outstandingUSDC), "USX should lose excess to treasury");
+    }
 }
