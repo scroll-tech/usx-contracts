@@ -143,6 +143,7 @@ contract TreasuryDiamond is Initializable, UUPSUpgradeable, ReentrancyGuardUpgra
     /// @param _newFacet Address of the new facet
     function replaceFacet(address _oldFacet, address _newFacet) external onlyGovernance {
         if (_newFacet == address(0)) revert ZeroAddress();
+        if (_oldFacet == _newFacet) revert InvalidFacet();
 
         bytes4[] memory selectors = facetFunctionSelectors[_oldFacet];
 
