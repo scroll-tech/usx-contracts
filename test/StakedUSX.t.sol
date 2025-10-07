@@ -209,6 +209,15 @@ contract StakedUSXTest is LocalDeployTestSetup {
         vm.stopPrank();
     }
 
+    function test_deposit_reverts_with_zero_amount() public {
+        _mintUSXTo(user, 100e6);
+        vm.startPrank(user);
+        usx.approve(address(susx), type(uint256).max);
+        vm.expectRevert(StakedUSX.ZeroAmount.selector);
+        susx.deposit(0, user);
+        vm.stopPrank();
+    }
+
     /* =========================== Withdrawals & Claims =========================== */
 
     function test_redeem_creates_withdrawal_request_and_updates_state() public {
@@ -231,6 +240,16 @@ contract StakedUSXTest is LocalDeployTestSetup {
         assertEq(susx.totalSupply(), 600e18); // shares burned
         assertEq(susx.balanceOf(address(susx)), 0); // shares are burned, contract holds no shares
         assertEq(usx.balanceOf(address(susx)), 1_000e18); // underlying remains in vault until claim
+    }
+
+    function test_withdraw_reverts_with_zero_amount() public {
+        _mintUSXTo(user, 1_000e6);
+        _stakeUSX(user, 1_000e18);
+
+        vm.expectRevert(StakedUSX.ZeroAmount.selector);
+        vm.prank(user);
+        susx.redeem(0, user, user);
+        vm.stopPrank();
     }
 
     function test_claimWithdraw_reverts_before_period() public {
