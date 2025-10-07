@@ -27,7 +27,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     error NotTreasury();
     error WithdrawalAlreadyClaimed();
     error WithdrawalPeriodNotPassed();
-    error InvalidMinWithdrawalPeriod();
+    error InvalidWithdrawalPeriod();
     error InvalidWithdrawalFeeFraction();
     error InvalidEpochDuration();
     error TreasuryAlreadySet();
@@ -47,9 +47,6 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     event RewardsReceived(uint256 amount);
 
     /*=========================== Constants =========================*/
-
-    /// @dev Minimum withdrawal period in seconds
-    uint256 private constant MIN_WITHDRAWAL_PERIOD = 1 days;
 
     /// @dev Minimum epoch duration in seconds
     uint256 private constant MIN_EPOCH_DURATION = 1 days;
@@ -93,7 +90,6 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         address governance; // address that controls governance of the contract
         uint256 withdrawalPeriod; // withdrawal period in seconds, (default == 15 * 24 * 60 * 60 (15 days))
         uint256 withdrawalFeeFraction; // fraction of withdrawals determining the withdrawal fee, (default 0.05% == 500) with precision 6 decimals
-        uint256 minWithdrawalPeriod; // withdrawal period in seconds, (default == MIN_WITHDRAWAL_PERIOD (1 day))
         uint256 withdrawalCounter;
         RewardData rewardData;
         uint256 epochDuration; //  duration of epoch in seconds, (default == 30 * 24 * 60 * 60 (30 days))
@@ -145,7 +141,6 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         // Set default values
         $.withdrawalPeriod = 15 days;
         $.withdrawalFeeFraction = 500;
-        $.minWithdrawalPeriod = MIN_WITHDRAWAL_PERIOD;
         $.epochDuration = 30 days;
     }
 
@@ -222,13 +217,12 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     /*=========================== Governance Functions =========================*/
 
     /// @notice Sets withdrawal period in seconds
-    /// @param _minWithdrawalPeriod The new withdrawal period in seconds
-    function setMinWithdrawalPeriod(uint256 _minWithdrawalPeriod) public onlyGovernance {
-        if (_minWithdrawalPeriod < MIN_WITHDRAWAL_PERIOD) revert InvalidMinWithdrawalPeriod();
+    /// @param _withdrawalPeriod The new withdrawal period in seconds
+    function setWithdrawalPeriod(uint256 _withdrawalPeriod) public onlyGovernance {
         SUSXStorage storage $ = _getStorage();
-        uint256 oldPeriod = $.minWithdrawalPeriod;
-        $.minWithdrawalPeriod = _minWithdrawalPeriod;
-        emit WithdrawalPeriodSet(oldPeriod, _minWithdrawalPeriod);
+        uint256 oldPeriod = $.withdrawalPeriod;
+        $.withdrawalPeriod = _withdrawalPeriod;
+        emit WithdrawalPeriodSet(oldPeriod, _withdrawalPeriod);
     }
 
     /// @notice Sets withdrawal fee with precision to 0.001 percent
@@ -420,10 +414,6 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
     function withdrawalFeeFraction() public view returns (uint256) {
         return _getStorage().withdrawalFeeFraction;
-    }
-
-    function minWithdrawalPeriod() public view returns (uint256) {
-        return _getStorage().minWithdrawalPeriod;
     }
 
     function rewardData() public view returns (RewardData memory) {
