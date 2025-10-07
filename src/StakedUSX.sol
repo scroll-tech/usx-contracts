@@ -166,8 +166,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     }
 
     /// @notice Finishes a withdrawal, claiming a specified withdrawal claim
-    /// @dev Allowed after withdrawalPeriod AND epoch the user made withdrawal on is finished, after Gross Profits has been counted
-    ///     Portion is sent to the Governance Warchest (withdrawalFee applied here)
+    /// @dev Allowed only after withdrawalPeriod has passed since the withdrawal request
     /// @param withdrawalId The id of the withdrawal to claim
     function claimWithdraw(uint256 withdrawalId) public nonReentrant {
         SUSXStorage storage $ = _getStorage();
