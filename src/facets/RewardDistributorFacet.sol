@@ -93,7 +93,7 @@ contract RewardDistributorFacet is TreasuryStorage, ReentrancyGuardUpgradeable {
 
     /// @notice Sets the current Reporter for the protocol
     /// @param _reporter The address of the new Reporter
-    function setReporter(address _reporter) external onlyGovernance {
+    function setReporter(address _reporter) external onlyAdmin {
         if (_reporter == address(0)) revert ZeroAddress();
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         address oldReporter = $.reporter;

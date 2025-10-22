@@ -56,7 +56,7 @@ contract AssetManagerAllocatorFacet is
 
     /// @notice Sets the current Allocator for the protocol
     /// @param _allocator The address of the new Allocator
-    function setAllocator(address _allocator) external onlyGovernance {
+    function setAllocator(address _allocator) external onlyAdmin {
         if (_allocator == address(0)) revert ZeroAddress();
         TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
         address oldAllocator = $.allocator;

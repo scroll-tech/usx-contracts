@@ -167,7 +167,7 @@ contract AssetManager is
     function updateWeight(
         address account,
         uint256 newWeight
-    ) external onlyRole(GOVERNANCE_ROLE) {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         AssetManagerStorage storage $ = _getStorage();
         (bool exists, uint256 oldWeight) = $.weights.tryGet(account);
         if (!exists) {

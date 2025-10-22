@@ -152,6 +152,7 @@ contract DeployScroll is Script {
             (
                 address(usxProxy),
                 address(0), // Treasury address (will be set later)
+                admin,
                 governance
             )
         );
@@ -179,7 +180,7 @@ contract DeployScroll is Script {
         console.log("2.2. Deploying Treasury Proxy...");
         bytes memory treasuryInitData = abi.encodeCall(
             TreasuryDiamond.initialize,
-            (usdcAddress, address(usxProxy), address(susxProxy), governance, governanceWarchest, assetManager, insuranceVault)
+            (usdcAddress, address(usxProxy), address(susxProxy), admin, governance, governanceWarchest, assetManager, insuranceVault)
         );
 
         treasuryProxy = address(new ERC1967Proxy(address(treasuryImpl), treasuryInitData));

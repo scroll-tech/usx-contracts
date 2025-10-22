@@ -62,7 +62,7 @@ contract LocalDeployTestSetup is Test {
         console.log("USX implementation deployed at:", address(usxImpl));
 
         bytes memory usxData =
-            abi.encodeWithSelector(USX.initialize.selector, address(usdc), address(0), governance, admin);
+            abi.encodeCall(USX.initialize, (address(usdc), address(0), governance, admin));
         ERC1967Proxy usxProxyContract = new ERC1967Proxy(address(usxImpl), usxData);
         usx = USX(address(usxProxyContract));
         usxProxy = address(usxProxyContract);
@@ -72,7 +72,7 @@ contract LocalDeployTestSetup is Test {
         StakedUSX susxImpl = new StakedUSX();
         console.log("StakedUSX implementation deployed at:", address(susxImpl));
 
-        bytes memory susxData = abi.encodeWithSelector(StakedUSX.initialize.selector, address(usx), address(0), governance);
+        bytes memory susxData = abi.encodeCall(StakedUSX.initialize, (address(usx), address(0), admin, governance));
         ERC1967Proxy susxProxyContract = new ERC1967Proxy(address(susxImpl), susxData);
         susx = StakedUSX(address(susxProxyContract));
         susxProxy = address(susxProxyContract);
@@ -89,6 +89,7 @@ contract LocalDeployTestSetup is Test {
                 (address(usdc),
                 address(usx),
                 address(susx),
+                admin,
                 governance,
                 governanceWarchest,
                 address(mockAssetManager),
@@ -109,14 +110,14 @@ contract LocalDeployTestSetup is Test {
         // Link contracts properly
         console.log("Linking contracts...");
 
-        vm.prank(governance);
+        vm.prank(admin);
         try usx.initializeTreasury(address(treasury)) {
             console.log("USX treasury set successfully");
         } catch {
             console.log("USX treasury already set or failed");
         }
 
-        vm.prank(governance);
+        vm.prank(admin);
         try susx.initializeTreasury(address(treasury)) {
             console.log("StakedUSX treasury set successfully");
         } catch {

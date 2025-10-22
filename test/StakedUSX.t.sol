@@ -74,31 +74,31 @@ contract StakedUSXTest is LocalDeployTestSetup {
 
     /* =========================== Access Control =========================== */
 
-    function test_onlyTreasury_pauseDeposits() public {
-        // Non-governance reverts
-        vm.expectRevert(StakedUSX.NotGovernance.selector);
+    function test_onlyAdmin_pauseDeposits() public {
+        // Non-admin reverts
+        vm.expectRevert(StakedUSX.NotAdmin.selector);
         susx.pauseDeposit();
 
-        // Governance can pause
-        vm.prank(governance);
+        // Admin can pause
+        vm.prank(admin);
         vm.expectEmit(true, true, true, true, address(susx));
         emit StakedUSX.DepositPausedChanged(true);
         susx.pauseDeposit();
         assertTrue(susx.depositPaused());
     }
 
-    function test_governance_unpauseDeposit() public {
+    function test_admin_unpauseDeposit() public {
         // Pause first via treasury
-        vm.prank(governance);
+        vm.prank(admin);
         susx.pauseDeposit();
         assertTrue(susx.depositPaused());
 
-        // Non-governance cannot unpauseDeposit
-        vm.expectRevert(StakedUSX.NotGovernance.selector);
+        // Non-admin cannot unpauseDeposit
+        vm.expectRevert(StakedUSX.NotAdmin.selector);
         susx.unpauseDeposit();
 
-        // Governance can unpauseDeposit
-        vm.prank(governance);
+        // Admin can unpauseDeposit
+        vm.prank(admin);
         vm.expectEmit(true, true, true, true, address(susx));
         emit StakedUSX.DepositPausedChanged(false);
         susx.unpauseDeposit();
@@ -121,13 +121,13 @@ contract StakedUSXTest is LocalDeployTestSetup {
         susx.notifyRewards(1000);
     }
 
-    function test_governance_setters_happy_paths_and_reverts() public {
-        // Only governance can set withdrawal period
-        vm.expectRevert(StakedUSX.NotGovernance.selector);
+    function test_admin_setters_happy_paths_and_reverts() public {
+        // Only admin can set withdrawal period
+        vm.expectRevert(StakedUSX.NotAdmin.selector);
         susx.setWithdrawalPeriod(2 days);
         vm.expectEmit(true, true, true, true, address(susx));
         emit StakedUSX.WithdrawalPeriodSet(susx.withdrawalPeriod(), 2 days);
-        vm.prank(governance);
+        vm.prank(admin);
         susx.setWithdrawalPeriod(2 days);
         assertEq(susx.withdrawalPeriod(), 2 days);
 
@@ -143,15 +143,15 @@ contract StakedUSXTest is LocalDeployTestSetup {
         vm.expectRevert(StakedUSX.InvalidWithdrawalFeeFraction.selector);
         susx.setWithdrawalFeeFraction(20001);
 
-        // Only governance can set epoch duration; must be >= 1 day
-        vm.expectRevert(StakedUSX.NotGovernance.selector);
+        // Only admin can set epoch duration; must be >= 1 day
+        vm.expectRevert(StakedUSX.NotAdmin.selector);
         susx.setEpochDuration(2 days);
-        vm.prank(governance);
+        vm.prank(admin);
         vm.expectEmit(true, true, true, true, address(susx));
         emit StakedUSX.EpochDurationSet(30 days, 2 days);
         susx.setEpochDuration(2 days);
         assertEq(susx.epochDuration(), 2 days);
-        vm.prank(governance);
+        vm.prank(admin);
         vm.expectRevert(StakedUSX.InvalidEpochDuration.selector);
         susx.setEpochDuration(12 hours);
 
@@ -168,9 +168,43 @@ contract StakedUSXTest is LocalDeployTestSetup {
         assertEq(susx.governance(), address(0xBEEF));
     }
 
+    function test_setAdmin_success() public {
+        address newAdmin = address(0x999);
+
+        // Set new admin (should succeed)
+        vm.prank(admin);
+        vm.expectEmit(true, true, true, true, address(susx));
+        emit StakedUSX.AdminTransferred(admin, newAdmin);
+        susx.setAdmin(newAdmin);
+
+        // Verify admin was updated
+        assertEq(susx.admin(), newAdmin);
+    }
+
+    function test_setAdmin_revert_not_admin() public {
+        vm.prank(user);
+        vm.expectRevert(StakedUSX.NotAdmin.selector);
+        susx.setAdmin(address(0x999));
+    }
+
+    function test_setAdmin_revert_zero_address() public {
+        // Try to set admin to zero address (should revert with NotAdmin, not ZeroAddress)
+        // because the function checks admin access first
+        vm.prank(user); // Not admin
+        vm.expectRevert(StakedUSX.NotAdmin.selector);
+        susx.setAdmin(address(0));
+    }
+
+    function test_setAdmin_revert_zero_address_as_admin() public {
+        // Try to set admin to zero address as admin (should revert with ZeroAddress)
+        vm.prank(admin);
+        vm.expectRevert(StakedUSX.ZeroAddress.selector);
+        susx.setAdmin(address(0));
+    }
+
     function test_setInitialTreasury_onlyOnce_and_validations() public {
         // setInitialTreasury already called in setup; calling again should revert
-        vm.prank(governance);
+        vm.prank(admin);
         vm.expectRevert(StakedUSX.TreasuryAlreadySet.selector);
         susx.initializeTreasury(address(treasury));
     }
@@ -197,8 +231,8 @@ contract StakedUSXTest is LocalDeployTestSetup {
     }
 
     function test_deposit_reverts_when_deposits_frozen() public {
-        // Pause via governance
-        vm.prank(governance);
+        // Pause via admin
+        vm.prank(admin);
         susx.pauseDeposit();
 
         _mintUSXTo(user, 100e6);

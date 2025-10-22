@@ -65,20 +65,20 @@ contract RewardDistributorFacetTest is LocalDeployTestSetup {
     }
 
     function test_setReporter_setsReporter() public {
-        vm.prank(governance);
+        vm.prank(admin);
         facet.setReporter(address(0xABC));
         // call reportRewards as reporter should succeed (no revert)
         vm.prank(address(0xABC));
         facet.reportRewards(0);
     }
 
-    function test_setReporter_revertNotGovernance() public {
-        vm.expectRevert(TreasuryStorage.NotGovernance.selector);
+    function test_setReporter_revertNotAdmin() public {
+        vm.expectRevert(TreasuryStorage.NotAdmin.selector);
         facet.setReporter(address(0xABC));
     }
 
     function test_setReporter_revertZeroAddress() public {
-        vm.prank(governance);
+        vm.prank(admin);
         vm.expectRevert(TreasuryStorage.ZeroAddress.selector);
         facet.setReporter(address(0));
     }
@@ -91,7 +91,7 @@ contract RewardDistributorFacetTest is LocalDeployTestSetup {
 
     function test_assetManagerReport_profitPath_distributesCorrectly_andEmits() public {
         // set reporter
-        vm.prank(governance);
+        vm.prank(admin);
         facet.setReporter(address(0xBEEF));
 
         // capture initial balances
