@@ -2,7 +2,6 @@
 pragma solidity 0.8.30;
 
 import {TreasuryStorage} from "../TreasuryStorage.sol";
-import {AssetManagerAllocatorFacet} from "./AssetManagerAllocatorFacet.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -51,9 +50,9 @@ contract RewardDistributorFacet is TreasuryStorage, ReentrancyGuardUpgradeable {
             );
     }
 
-    /*=========================== Asset Manager Functions =========================*/
+    /*=========================== Reporter Functions =========================*/
 
-    /// @notice Asset Manager reports rewards
+    /// @notice Reports and distributes rewards
     /// @param rewards The rewards to report
     function reportRewards(uint256 rewards) public onlyReporter nonReentrant {
         // Handle rewards

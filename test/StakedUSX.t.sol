@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import {LocalDeployTestSetup} from "./LocalDeployTestSetup.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {StakedUSX} from "../src/StakedUSX.sol";
 import {USX} from "../src/USX.sol";
 
