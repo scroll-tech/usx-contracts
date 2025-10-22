@@ -47,7 +47,7 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         vm.stopPrank();
 
         // Set allocator to admin for tests
-        vm.prank(governance);
+        vm.prank(admin);
         alloc.setAllocator(admin);
     }
 
@@ -67,18 +67,18 @@ contract AssetManagerAllocatorFacetTest is LocalDeployTestSetup {
         assertEq(afterDealloc, initial, "net deposits should be invariant on deallocation");
     }
 
-    function test_setAllocator_onlyGovernance_andZeroAddressReverts() public {
-        // non-governance
-        vm.expectRevert(TreasuryStorage.NotGovernance.selector);
+    function test_setAllocator_onlyAdmin_andZeroAddressReverts() public {
+        // non-admin
+        vm.expectRevert(TreasuryStorage.NotAdmin.selector);
         alloc.setAllocator(address(1));
 
         // zero address
-        vm.prank(governance);
+        vm.prank(admin);
         vm.expectRevert(TreasuryStorage.ZeroAddress.selector);
         alloc.setAllocator(address(0));
 
         // success
-        vm.prank(governance);
+        vm.prank(admin);
         alloc.setAllocator(address(0xABC));
     }
 

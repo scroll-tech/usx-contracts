@@ -27,6 +27,7 @@ contract TreasuryStorage {
     error InvalidInsuranceFundFraction();
 
     // Access control errors
+    error NotAdmin();
     error NotGovernance();
     error NotAllocator();
     error NotTreasury();
@@ -34,6 +35,7 @@ contract TreasuryStorage {
 
     /*=========================== Events =========================*/
 
+    event AdminTransferred(address indexed oldAdmin, address indexed newAdmin);
     event GovernanceTransferred(address indexed oldGovernance, address indexed newGovernance);
     event GovernanceWarchestTransferred(address indexed oldGovernanceWarchest, address indexed newGovernanceWarchest);
     event InsuranceVaultTransferred(address indexed oldInsuranceVault, address indexed newInsuranceVault);
@@ -56,6 +58,12 @@ contract TreasuryStorage {
     event ProtocolFrozen(string reason);
 
     /*=========================== Modifiers =========================*/
+
+    // Modifier to restrict access to admin functions
+    modifier onlyAdmin() {
+        if (msg.sender != _getStorage().admin) revert NotAdmin();
+        _;
+    }
 
     // Modifier to restrict access to governance functions
     modifier onlyGovernance() {
@@ -88,6 +96,7 @@ contract TreasuryStorage {
         IUSX USX; // USX token contract
         IStakedUSX sUSX; // sUSX vault contract
         IERC20 USDC; // USDC token contract
+        address admin; // Admin address
         address governance; // Governance address
         address reporter; // Reporter address
         address allocator; // Allocator address
@@ -124,6 +133,10 @@ contract TreasuryStorage {
 
     function USDC() public view returns (IERC20) {
         return _getStorage().USDC;
+    }
+
+    function admin() public view returns (address) {
+        return _getStorage().admin;
     }
 
     function governance() public view returns (address) {

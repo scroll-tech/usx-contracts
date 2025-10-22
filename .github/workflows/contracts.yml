@@ -1,0 +1,92 @@
+name: Contracts
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**'
+      - '.github/workflows/contracts.yaml'
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+    paths:
+      - '**'
+      - '.github/workflows/contracts.yaml'
+
+defaults:
+  run:
+    working-directory: '.'
+
+jobs:
+  foundry:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions: {}
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1.4.0
+        with:
+          version: nightly
+
+      - name: Setup LCOV
+        uses: hrishikesh-kadam/setup-lcov@6c1aa0cc9e1c02f9f58f01ac599f1064ccc83470 # v1
+
+      - name: Install Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+
+      - name: Cache yarn dependencies
+        uses: actions/cache@v4
+        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - name: Cache node_modules
+        id: npm_cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node_modules-${{ hashFiles('yarn.lock') }}
+
+      - name: yarn install
+        # if: steps.npm_cache.outputs.cache-hit != 'true'
+        run: yarn install
+
+      - name: Compile with foundry
+        run: forge build --evm-version cancun
+
+      - name: Run foundry tests
+        run: forge test --evm-version cancun -vvv
+
+      - name: Run foundry coverage
+        run : forge coverage --evm-version cancun --report lcov
+
+      - name : Prune coverage
+        run : lcov --rc branch_coverage=1 --remove ./lcov.info -o ./lcov.info.pruned 'src/mocks/*' 'test/*' 'script/*' 'node_modules/*' 'lib/*' --ignore-errors unused,unused
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@ad3126e916f78f00edff4ed0317cf185271ccc2d # v5.4.2
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          files: lcov.info.pruned
+          flags: contracts

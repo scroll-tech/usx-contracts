@@ -31,6 +31,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, I
     /*=========================== Events =========================*/
 
     event TreasurySet(address indexed treasury);
+    event AdminTransferred(address indexed oldAdmin, address indexed newAdmin);
     event GovernanceTransferred(address indexed oldGovernance, address indexed newGovernance);
     event Deposit(address indexed user, uint256 usdcAmount, uint256 usxMinted);
     event Redeem(address indexed user, uint256 usxAmount, uint256 usdcAmount);
@@ -120,7 +121,7 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, I
 
     /// @dev Set the initial Treasury address - can only be called once when treasury is address(0)
     /// @param _treasury Address of the Treasury contract
-    function initializeTreasury(address _treasury) external onlyGovernance {
+    function initializeTreasury(address _treasury) external onlyAdmin {
         if (_treasury == address(0)) revert ZeroAddress();
         USXStorage storage $ = _getStorage();
         if ($.treasury != ITreasury(address(0))) revert TreasuryAlreadySet();
@@ -239,20 +240,6 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, I
 
     /*=========================== Governance Functions =========================*/
 
-    /// @notice Pause deposits and withdrawals, preventing users from depositing and redeeming USX
-    function pause() public onlyGovernance {
-        USXStorage storage $ = _getStorage();
-        $.paused = true;
-        emit PausedChanged(true);
-    }
-
-    /// @notice Unpause deposits and withdrawals, allowing users to deposit and withdraw again
-    function unpause() public onlyGovernance {
-        USXStorage storage $ = _getStorage();
-        $.paused = false;
-        emit PausedChanged(false);
-    }
-
     /// @notice Set new governance address
     /// @param newGovernance Address of new governance
     function setGovernance(address newGovernance) external onlyGovernance {
@@ -266,6 +253,30 @@ contract USX is ERC20Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, I
     }
 
     /*=========================== Admin Functions =========================*/
+
+    /// @notice Pause deposits and withdrawals, preventing users from depositing and redeeming USX
+    function pause() public onlyAdmin {
+        USXStorage storage $ = _getStorage();
+        $.paused = true;
+        emit PausedChanged(true);
+    }
+
+    /// @notice Unpause deposits and withdrawals, allowing users to deposit and withdraw again
+    function unpause() public onlyAdmin {
+        USXStorage storage $ = _getStorage();
+        $.paused = false;
+        emit PausedChanged(false);
+    }
+
+    /// @notice Set new admin address
+    /// @param newAdmin Address of new admin
+    function setAdmin(address newAdmin) external onlyAdmin {
+        if (newAdmin == address(0)) revert ZeroAddress();
+        USXStorage storage $ = _getStorage();
+        address oldAdmin = $.admin;
+        $.admin = newAdmin;
+        emit AdminTransferred(oldAdmin, newAdmin);
+    }
 
     /// @notice Whitelist a user to mint/redeem USX
     /// @param _user The address to whitelist

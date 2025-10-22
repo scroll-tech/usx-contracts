@@ -21,10 +21,11 @@ contract TreasuryDiamondTest is LocalDeployTestSetup {
 
     /*=========================== Initialization =========================*/
 
-    function test_initialize_setsCoreStateAndDefaults() public {
+    function test_initialize_setsCoreStateAndDefaults() public view {
         assertEq(address(treasury.USDC()), address(usdc));
         assertEq(address(treasury.USX()), address(usx));
         assertEq(address(treasury.sUSX()), address(susx));
+        assertEq(treasury.admin(), admin);
         assertEq(treasury.governance(), governance);
         assertEq(treasury.governanceWarchest(), governanceWarchest);
         assertEq(treasury.successFeeFraction(), 50000);
@@ -35,7 +36,7 @@ contract TreasuryDiamondTest is LocalDeployTestSetup {
         TreasuryDiamond impl = new TreasuryDiamond();
         bytes memory data = abi.encodeCall(
             TreasuryDiamond.initialize,
-            (address(0), address(usx), address(susx), governance, governanceWarchest, assetManager, insuranceVault)
+            (address(0), address(usx), address(susx), admin, governance, governanceWarchest, assetManager, insuranceVault)
         );
         vm.expectRevert(TreasuryStorage.ZeroAddress.selector);
         new ERC1967Proxy(address(impl), data);
@@ -91,6 +92,40 @@ contract TreasuryDiamondTest is LocalDeployTestSetup {
         vm.prank(governance);
         vm.expectRevert(TreasuryStorage.ZeroAddress.selector);
         treasury.setInsuranceVault(address(0));
+    }
+
+    function test_setAdmin_success() public {
+        address newAdmin = address(0x999);
+
+        // Set new admin (should succeed)
+        vm.prank(admin);
+        vm.expectEmit(true, true, true, true, address(treasury));
+        emit TreasuryStorage.AdminTransferred(admin, newAdmin);
+        treasury.setAdmin(newAdmin);
+
+        // Verify admin was updated
+        assertEq(treasury.admin(), newAdmin);
+    }
+
+    function test_setAdmin_revert_not_admin() public {
+        vm.prank(user);
+        vm.expectRevert(TreasuryStorage.NotAdmin.selector);
+        treasury.setAdmin(address(0x999));
+    }
+
+    function test_setAdmin_revert_zero_address() public {
+        // Try to set admin to zero address (should revert with NotAdmin, not ZeroAddress)
+        // because the function checks admin access first
+        vm.prank(user); // Not admin
+        vm.expectRevert(TreasuryStorage.NotAdmin.selector);
+        treasury.setAdmin(address(0));
+    }
+
+    function test_setAdmin_revert_zero_address_as_admin() public {
+        // Try to set admin to zero address as admin (should revert with ZeroAddress)
+        vm.prank(admin);
+        vm.expectRevert(TreasuryStorage.ZeroAddress.selector);
+        treasury.setAdmin(address(0));
     }
 
     /*=========================== Facet Management =========================*/

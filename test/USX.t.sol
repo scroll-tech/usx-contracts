@@ -24,15 +24,15 @@ contract USXTest is LocalDeployTestSetup {
     /*=========================== SETUP AND CONFIGURATION TESTS =========================*/
 
     function test_setInitialTreasury_revert_already_set() public {
-        // Set treasury is already executed in setup; calling again by governance should revert TreasuryAlreadySet
-        vm.prank(governance);
+        // Set treasury is already executed in setup; calling again by admin should revert TreasuryAlreadySet
+        vm.prank(admin);
         vm.expectRevert(USX.TreasuryAlreadySet.selector);
         usx.initializeTreasury(address(0x666));
     }
 
-    function test_setInitialTreasury_revert_not_governance() public {
+    function test_setInitialTreasury_revert_not_admin() public {
         vm.prank(user);
-        vm.expectRevert(USX.NotGovernance.selector);
+        vm.expectRevert(USX.NotAdmin.selector);
         usx.initializeTreasury(address(0x999));
     }
 
@@ -274,7 +274,7 @@ contract USXTest is LocalDeployTestSetup {
         usx.deposit(100e6); // 100 USDC deposit to get USX
 
         // Pause withdrawals
-        vm.prank(address(governance));
+        vm.prank(address(admin));
         usx.pause();
 
         // Try to request USDC withdrawal while paused
@@ -703,16 +703,16 @@ contract USXTest is LocalDeployTestSetup {
     // Removed nonexistent peg update test; USX has no peg state/logic
 
     function test_unpause_success() public {
-        // Test unpause through governance (full flow)
-        // Since unpause is onlyGovernance, we need to impersonate governance
+        // Test unpause through admin (full flow)
+        // Since unpause is onlyAdmin, we need to impersonate admin
 
         // First pause both deposits and withdrawals
-        vm.prank(address(governance));
+        vm.prank(address(admin));
         usx.pause();
         assertTrue(usx.paused(), "Contract should be paused");
 
         // Then unpause both deposits and withdrawals
-        vm.prank(governance);
+        vm.prank(admin);
         usx.unpause();
 
         bool finalPauseState = usx.paused();
@@ -729,21 +729,21 @@ contract USXTest is LocalDeployTestSetup {
         // Should not revert
     }
 
-    function test_unpause_revert_not_governance() public {
+    function test_unpause_revert_not_admin() public {
         vm.prank(user);
-        vm.expectRevert(USX.NotGovernance.selector);
+        vm.expectRevert(USX.NotAdmin.selector);
         usx.unpause();
     }
 
     function test_pause_success() public {
-        // Test pause through governance (full flow)
-        // Since pause is onlyGovernance, we need to impersonate governance
+        // Test pause through admin (full flow)
+        // Since pause is onlyAdmin, we need to impersonate admin
 
         bool initialPauseState = usx.paused();
         assertFalse(initialPauseState, "Contract should not be paused initially");
 
-        // Impersonate the governance to call pause
-        vm.prank(address(governance));
+        // Impersonate the admin to call pause
+        vm.prank(address(admin));
         usx.pause();
 
         bool finalPauseState = usx.paused();
@@ -760,9 +760,9 @@ contract USXTest is LocalDeployTestSetup {
         usx.requestUSDC(100e18);
     }
 
-    function test_pause_revert_not_governance() public {
+    function test_pause_revert_not_admin() public {
         vm.prank(user);
-        vm.expectRevert(USX.NotGovernance.selector);
+        vm.expectRevert(USX.NotAdmin.selector);
         usx.pause();
     }
 
@@ -771,7 +771,7 @@ contract USXTest is LocalDeployTestSetup {
         assertFalse(usx.paused(), "Contract should not be paused initially");
 
         // Pause contract
-        vm.prank(address(governance));
+        vm.prank(address(admin));
         usx.pause();
 
         assertTrue(usx.paused(), "Contract should be paused");
@@ -798,6 +798,40 @@ contract USXTest is LocalDeployTestSetup {
         vm.prank(admin);
         vm.expectRevert(USX.ZeroAddress.selector);
         usx.whitelistUser(address(0), true);
+    }
+
+    function test_setAdmin_success() public {
+        address newAdmin = address(0x999);
+
+        // Set new admin (should succeed)
+        vm.prank(admin);
+        vm.expectEmit(true, true, true, true, address(usx));
+        emit USX.AdminTransferred(admin, newAdmin);
+        usx.setAdmin(newAdmin);
+
+        // Verify admin was updated
+        assertEq(usx.admin(), newAdmin);
+    }
+
+    function test_setAdmin_revert_not_admin() public {
+        vm.prank(user);
+        vm.expectRevert(USX.NotAdmin.selector);
+        usx.setAdmin(address(0x999));
+    }
+
+    function test_setAdmin_revert_zero_address() public {
+        // Try to set admin to zero address (should revert with NotAdmin, not ZeroAddress)
+        // because the function checks admin access first
+        vm.prank(user); // Not admin
+        vm.expectRevert(USX.NotAdmin.selector);
+        usx.setAdmin(address(0));
+    }
+
+    function test_setAdmin_revert_zero_address_as_admin() public {
+        // Try to set admin to zero address as admin (should revert with ZeroAddress)
+        vm.prank(admin);
+        vm.expectRevert(USX.ZeroAddress.selector);
+        usx.setAdmin(address(0));
     }
 
     function test_setGovernance_success() public {

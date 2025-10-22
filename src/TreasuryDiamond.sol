@@ -52,13 +52,14 @@ contract TreasuryDiamond is Initializable, UUPSUpgradeable, ReentrancyGuardUpgra
         address _USDC,
         address _USX,
         address _sUSX,
+        address _admin,
         address _governance,
         address _governanceWarchest,
         address _assetManager,
         address _insuranceVault
     ) public initializer {
         if (
-            _USDC == address(0) || _USX == address(0) || _sUSX == address(0) || _governance == address(0)
+            _USDC == address(0) || _USX == address(0) || _sUSX == address(0) || _admin == address(0) || _governance == address(0)
                 || _governanceWarchest == address(0)
         ) {
             revert ZeroAddress();
@@ -71,6 +72,7 @@ contract TreasuryDiamond is Initializable, UUPSUpgradeable, ReentrancyGuardUpgra
         $.USDC = IERC20(_USDC);
         $.USX = IUSX(_USX);
         $.sUSX = IStakedUSX(_sUSX);
+        $.admin = _admin;
         $.governance = _governance;
         $.assetManager = _assetManager;
         $.governanceWarchest = _governanceWarchest;
@@ -199,6 +201,16 @@ contract TreasuryDiamond is Initializable, UUPSUpgradeable, ReentrancyGuardUpgra
         emit InsuranceVaultTransferred(oldInsuranceVault, newInsuranceVault);
     }
 
+    /// @notice Set new admin address
+    /// @param newAdmin Address of new admin
+    function setAdmin(address newAdmin) external onlyAdmin {
+        if (newAdmin == address(0)) revert ZeroAddress();
+        TreasuryStorage.TreasuryStorageStruct storage $ = _getStorage();
+        address oldAdmin = $.admin;
+        $.admin = newAdmin;
+
+        emit AdminTransferred(oldAdmin, newAdmin);
+    }
     /*=========================== Fallback =========================*/
 
     /// @dev Fallback function that delegates calls to facets

@@ -56,18 +56,18 @@ contract AssetManagerTest is Test {
         assertEq(weights.length, 0);
     }
 
-    function test_updateWeight_onlyGovernance() public {
+    function test_updateWeight_onlyAdmin() public {
         vm.expectRevert();
         assetManager.updateWeight(alice, 100);
 
-        vm.prank(governance);
+        vm.prank(admin);
         assetManager.updateWeight(alice, 100);
         assertEq(assetManager.getWeight(alice), 100);
     }
 
     function test_updateWeight_addUpdateRemove_affectsTotalsAndGetters() public {
         // Add alice 100, bob 300
-        vm.startPrank(governance);
+        vm.startPrank(admin);
         vm.expectEmit(true, true, true, true);
         emit AssetManager.WeightUpdated(alice, 0, 100);
         assetManager.updateWeight(alice, 100);
@@ -82,7 +82,7 @@ contract AssetManagerTest is Test {
         assertEq(assetManager.getWeight(bob), 300);
 
         // Update alice to 200
-        vm.prank(governance);
+        vm.prank(admin);
         vm.expectEmit(true, true, true, true);
         emit AssetManager.WeightUpdated(alice, 100, 200);
         assetManager.updateWeight(alice, 200);
@@ -91,7 +91,7 @@ contract AssetManagerTest is Test {
         assertEq(assetManager.getWeight(alice), 200);
 
         // Remove bob
-        vm.prank(governance);
+        vm.prank(admin);
         vm.expectEmit(true, true, true, true);
         emit AssetManager.WeightUpdated(bob, 300, 0);
         assetManager.updateWeight(bob, 0);
@@ -153,7 +153,7 @@ contract AssetManagerTest is Test {
 
     function test_deposit_distributesProportionally_andEmits_andLeavesRemainder() public {
         // Set weights: alice 1, bob 3 (total 4)
-        vm.startPrank(governance);
+        vm.startPrank(admin);
         assetManager.updateWeight(alice, 1);
         assetManager.updateWeight(bob, 3);
         vm.stopPrank();
@@ -195,14 +195,14 @@ contract AssetManagerTest is Test {
 
     function test_deposit_afterRemovingOneRecipient_onlyRemainingReceives() public {
         // Set two recipients
-        vm.startPrank(governance);
+        vm.startPrank(admin);
         assetManager.updateWeight(alice, 2);
         assetManager.updateWeight(bob, 2);
         vm.stopPrank();
         assertEq(assetManager.getTotalWeight(), 4);
 
         // Remove bob
-        vm.prank(governance);
+        vm.prank(admin);
         assetManager.updateWeight(bob, 0);
         assertEq(assetManager.getTotalWeight(), 2);
 
@@ -220,7 +220,7 @@ contract AssetManagerTest is Test {
     }
 
     function test_getWeights_returnsAllCurrentMappings() public {
-        vm.startPrank(governance);
+        vm.startPrank(admin);
         assetManager.updateWeight(alice, 5);
         assetManager.updateWeight(bob, 7);
         vm.stopPrank();

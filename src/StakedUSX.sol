@@ -25,6 +25,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     error ZeroAddress();
     error ZeroAmount();
     error NotGovernance();
+    error NotAdmin();
     error NotTreasury();
     error WithdrawalAlreadyClaimed();
     error WithdrawalPeriodNotPassed();
@@ -38,6 +39,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
     event TreasurySet(address indexed treasury);
     event GovernanceTransferred(address indexed oldGovernance, address indexed newGovernance);
+    event AdminTransferred(address indexed oldAdmin, address indexed newAdmin);
     event EpochAdvanced(uint256 oldEpochBlock, uint256 newEpochBlock);
     event WithdrawalRequested(address indexed user, uint256 sharesAmount, uint256 withdrawalId);
     event WithdrawalClaimed(address indexed user, uint256 withdrawalId, uint256 usxAmount);
@@ -59,6 +61,11 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
     modifier onlyGovernance() {
         if (msg.sender != _getStorage().governance) revert NotGovernance();
+        _;
+    }
+
+    modifier onlyAdmin() {
+        if (msg.sender != _getStorage().admin) revert NotAdmin();
         _;
     }
 
@@ -88,6 +95,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     struct SUSXStorage {
         IERC20 USX; // USX token reference (the underlying asset)
         ITreasury treasury; // treasury contract
+        address admin; // address that controls admin of the contract
         address governance; // address that controls governance of the contract
         uint256 withdrawalPeriod; // withdrawal period in seconds, (default == 15 * 24 * 60 * 60 (15 days))
         uint256 withdrawalFeeFraction; // fraction of withdrawals determining the withdrawal fee, (default 0.05% == 500) with precision 6 decimals
@@ -126,7 +134,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     /// @param _usx Address of the USX token
     /// @param _treasury Address of the Treasury contract
     /// @param _governance Address of the governance
-    function initialize(address _usx, address _treasury, address _governance) public initializer {
+    function initialize(address _usx, address _treasury, address _admin, address _governance) public initializer {
         if (_usx == address(0) || _governance == address(0)) revert ZeroAddress();
 
         // Initialize ERC4626, ERC20, and ReentrancyGuard
@@ -137,6 +145,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         SUSXStorage storage $ = _getStorage();
         $.USX = IERC20(_usx);
         $.treasury = ITreasury(_treasury);
+        $.admin = _admin;
         $.governance = _governance;
 
         // Set default values
@@ -147,7 +156,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
     /// @notice Set the initial Treasury address - can only be called once when treasury is address(0)
     /// @param _treasury Address of the Treasury contract
-    function initializeTreasury(address _treasury) external onlyGovernance {
+    function initializeTreasury(address _treasury) external onlyAdmin {
         if (_treasury == address(0)) revert ZeroAddress();
         SUSXStorage storage $ = _getStorage();
         if ($.treasury != ITreasury(address(0))) revert TreasuryAlreadySet();
@@ -216,15 +225,6 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
     /*=========================== Governance Functions =========================*/
 
-    /// @notice Sets withdrawal period in seconds
-    /// @param _withdrawalPeriod The new withdrawal period in seconds
-    function setWithdrawalPeriod(uint256 _withdrawalPeriod) public onlyGovernance {
-        SUSXStorage storage $ = _getStorage();
-        uint256 oldPeriod = $.withdrawalPeriod;
-        $.withdrawalPeriod = _withdrawalPeriod;
-        emit WithdrawalPeriodSet(oldPeriod, _withdrawalPeriod);
-    }
-
     /// @notice Sets withdrawal fee with precision to 0.001 percent
     /// @param _withdrawalFeeFraction The new withdrawal fee fraction
     function setWithdrawalFeeFraction(uint256 _withdrawalFeeFraction) public onlyGovernance {
@@ -233,16 +233,6 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         uint256 oldFraction = $.withdrawalFeeFraction;
         $.withdrawalFeeFraction = _withdrawalFeeFraction;
         emit WithdrawalFeeFractionSet(oldFraction, _withdrawalFeeFraction);
-    }
-
-    /// @notice Sets duration of epoch in seconds
-    /// @param _epochDurationSeconds The new epoch duration in seconds
-    function setEpochDuration(uint256 _epochDurationSeconds) public onlyGovernance {
-        if (_epochDurationSeconds < MIN_EPOCH_DURATION) revert InvalidEpochDuration();
-        SUSXStorage storage $ = _getStorage();
-        uint256 oldDuration = $.epochDuration;
-        $.epochDuration = _epochDurationSeconds;
-        emit EpochDurationSet(oldDuration, _epochDurationSeconds);
     }
 
     /// @notice Set new governance address
@@ -257,15 +247,46 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         emit GovernanceTransferred(oldGovernance, newGovernance);
     }
 
+    /*=========================== Admin Functions =========================*/
+
+    /// @notice Set new admin address
+    /// @param newAdmin Address of new admin
+    function setAdmin(address newAdmin) external onlyAdmin {
+        if (newAdmin == address(0)) revert ZeroAddress();
+        SUSXStorage storage $ = _getStorage();
+        address oldAdmin = $.admin;
+        $.admin = newAdmin;
+        emit AdminTransferred(oldAdmin, newAdmin);
+    }
+
+    /// @notice Sets withdrawal period in seconds
+    /// @param _withdrawalPeriod The new withdrawal period in seconds
+    function setWithdrawalPeriod(uint256 _withdrawalPeriod) public onlyAdmin {
+        SUSXStorage storage $ = _getStorage();
+        uint256 oldPeriod = $.withdrawalPeriod;
+        $.withdrawalPeriod = _withdrawalPeriod;
+        emit WithdrawalPeriodSet(oldPeriod, _withdrawalPeriod);
+    }
+
+    /// @notice Sets duration of epoch in seconds
+    /// @param _epochDurationSeconds The new epoch duration in seconds
+    function setEpochDuration(uint256 _epochDurationSeconds) public onlyAdmin {
+        if (_epochDurationSeconds < MIN_EPOCH_DURATION) revert InvalidEpochDuration();
+        SUSXStorage storage $ = _getStorage();
+        uint256 oldDuration = $.epochDuration;
+        $.epochDuration = _epochDurationSeconds;
+        emit EpochDurationSet(oldDuration, _epochDurationSeconds);
+    }
+
     /// @notice Unpause deposit, allowing users to deposit again
-    function unpauseDeposit() external onlyGovernance {
+    function unpauseDeposit() external onlyAdmin {
         SUSXStorage storage $ = _getStorage();
         $.depositPaused = false;
         emit DepositPausedChanged(false);
     }
 
     /// @notice Pause deposit, preventing users from depositing USX
-    function pauseDeposit() external onlyGovernance {
+    function pauseDeposit() external onlyAdmin {
         SUSXStorage storage $ = _getStorage();
         $.depositPaused = true;
         emit DepositPausedChanged(true);
@@ -413,6 +434,10 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
     function governance() public view returns (address) {
         return _getStorage().governance;
+    }
+
+    function admin() public view returns (address) {
+        return _getStorage().admin;
     }
 
     function withdrawalPeriod() public view returns (uint256) {
