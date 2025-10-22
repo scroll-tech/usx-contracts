@@ -104,7 +104,7 @@ contract TreasuryStorage {
 
     // keccak256(abi.encode(uint256(keccak256("treasury.main")) - 1)) & ~bytes32(uint256(0xff));
     bytes32 private constant TREASURY_STORAGE_LOCATION =
-        0x0c53c51c00000000000000000000000000000000000000000000000000000000;
+        0x30a6b51881ffdce4f8931ff36681be302ddc14a14c4388efda56313fdb0ec100;
 
     function _getStorage() internal pure returns (TreasuryStorageStruct storage $) {
         assembly {
