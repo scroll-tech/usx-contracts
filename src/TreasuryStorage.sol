@@ -143,8 +143,20 @@ contract TreasuryStorage {
         return _getStorage().governance;
     }
 
+    function reporter() public view returns (address) {
+        return _getStorage().reporter;
+    }
+
+    function allocator() public view returns (address) {
+        return _getStorage().allocator;
+    }
+
     function assetManager() public view returns (address) {
         return _getStorage().assetManager;
+    }
+
+    function insuranceVault() public view returns (address) {
+        return _getStorage().insuranceVault;
     }
 
     function governanceWarchest() public view returns (address) {
