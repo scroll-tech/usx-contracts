@@ -43,10 +43,7 @@ contract DeployHelper is Script {
         // 3. Verify Treasury configuration
         verifyTreasuryConfiguration();
 
-        // 4. Verify facet functionality
-        verifyFacetFunctionality();
-
-        // 5. Verify contract linking
+        // 4. Verify contract linking
         verifyContractLinking();
 
         console.log("\nALL VERIFICATIONS PASSED!");
@@ -114,112 +111,6 @@ contract DeployHelper is Script {
         require(address(treasury.sUSX()) != address(0), "Treasury StakedUSX not linked");
 
         console.log("Treasury address linking verified");
-    }
-
-    function verifyFacetFunctionality() internal {
-        console.log("\n--- Facet Functionality Verification ---");
-
-        // Test AssetManagerAllocatorFacet
-        testAssetManagerFacet();
-
-        // Test InsuranceBufferFacet
-        testInsuranceBufferFacet();
-
-        // Test RewardDistributorFacet
-        testProfitAndLossFacet();
-
-        console.log("All facet functionality verified");
-    }
-
-    function testAssetManagerFacet() internal {
-        console.log("  Testing AssetManagerAllocatorFacet...");
-
-        // Test maxLeverage function
-        bytes memory maxLeverageData = abi.encodeWithSelector(bytes4(keccak256("maxLeverage()")));
-        (bool success, bytes memory result) = address(treasury).call(maxLeverageData);
-        require(success, "maxLeverage call failed");
-
-        uint256 maxLeverage = abi.decode(result, (uint256));
-        console.log("    maxLeverage:", maxLeverage);
-
-        // Test netDeposits function - USDC is available on Scroll mainnet fork
-        bytes memory netDepositsData = abi.encodeWithSelector(bytes4(keccak256("netDeposits()")));
-        (success, result) = address(treasury).call(netDepositsData);
-        require(success, "netDeposits call failed");
-
-        uint256 netDeposits = abi.decode(result, (uint256));
-        console.log("    netDeposits:", netDeposits);
-
-        // Test checkMaxLeverage function
-        bytes memory checkMaxLeverageData = abi.encodeWithSelector(
-            bytes4(keccak256("checkMaxLeverage(uint256)")),
-            1000000 // 1M USDC allocation
-        );
-        (success, result) = address(treasury).call(checkMaxLeverageData);
-        require(success, "checkMaxLeverage call failed");
-
-        bool isWithinLimit = abi.decode(result, (bool));
-        console.log("    checkMaxLeverage(1M):", isWithinLimit ? "within limit" : "exceeds limit");
-    }
-
-    function testInsuranceBufferFacet() internal {
-        console.log("  Testing InsuranceBufferFacet...");
-
-        // Test bufferTarget function
-        bytes memory bufferTargetData = abi.encodeWithSelector(bytes4(keccak256("bufferTarget()")));
-        (bool success, bytes memory result) = address(treasury).call(bufferTargetData);
-        require(success, "bufferTarget call failed");
-
-        uint256 bufferTarget = abi.decode(result, (uint256));
-        console.log("    bufferTarget:", bufferTarget);
-
-        // Test bufferRenewalRate function
-        bytes memory bufferRenewalRateData = abi.encodeWithSelector(bytes4(keccak256("bufferRenewalRate()")));
-        (success, result) = address(treasury).call(bufferRenewalRateData);
-        require(success, "bufferRenewalRate call failed");
-
-        uint256 bufferRenewalRate = abi.decode(result, (uint256));
-        console.log("    bufferRenewalRate:", bufferRenewalRate);
-
-        // Note: topUpBuffer and slashBuffer are internal functions that get called during other operations
-        // They will be tested as part of the full flow in the actual test suite
-        console.log("    topUpBuffer: internal function (tested in full flow)");
-        console.log("    slashBuffer: internal function (tested in full flow)");
-    }
-
-    function testProfitAndLossFacet() internal {
-        console.log("  Testing RewardDistributorFacet...");
-
-        // Test successFee function
-        bytes memory successFeeData = abi.encodeWithSelector(
-            bytes4(keccak256("successFee(uint256)")),
-            1000000 // 1M profit amount
-        );
-        (bool success, bytes memory result) = address(treasury).call(successFeeData);
-        require(success, "successFee call failed");
-
-        uint256 successFee = abi.decode(result, (uint256));
-        console.log("    successFee:", successFee);
-
-        // Test profitLatestEpoch function
-        bytes memory profitLatestEpochData = abi.encodeWithSelector(bytes4(keccak256("profitLatestEpoch()")));
-        (success, result) = address(treasury).call(profitLatestEpochData);
-        require(success, "profitLatestEpoch call failed");
-
-        uint256 profitLatestEpoch = abi.decode(result, (uint256));
-        console.log("    profitLatestEpoch:", profitLatestEpoch);
-
-        // Test profitPerBlock function
-        bytes memory profitPerBlockData = abi.encodeWithSelector(bytes4(keccak256("profitPerBlock()")));
-        (success, result) = address(treasury).call(profitPerBlockData);
-        require(success, "profitPerBlock call failed");
-
-        uint256 profitPerBlock = abi.decode(result, (uint256));
-        console.log("    profitPerBlock:", profitPerBlock);
-
-        // Note: assetManagerReport is a state-changing function that gets called during other operations
-        // It will be tested as part of the full flow in the actual test suite
-        console.log("    assetManagerReport: state-changing function (tested in full flow)");
     }
 
     function verifyContractLinking() internal view {
