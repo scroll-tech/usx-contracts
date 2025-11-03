@@ -103,9 +103,9 @@ contract RunDeployment is Script {
         console.log("  RewardDistributorFacet");
         console.log("");
         console.log("Configuration:");
-        console.log("  USDC Address:", 0x06eFdBFf2a14a7c8E15944D1F4A48F9F95F663A4);
-        console.log("  Governance:", 0x1000000000000000000000000000000000000001);
-        console.log("  Asset Manager:", 0x3000000000000000000000000000000000000003);
+        console.log("  USDC Address:", deployer.usdcAddress());
+        console.log("  Governance:", deployer.governance());
+        console.log("  Asset Manager:", deployer.assetManager());
         console.log("");
         console.log("Default Values:");
         console.log("  Max Leverage Fraction: 10% (100000)");
