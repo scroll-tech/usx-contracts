@@ -6,8 +6,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IScrollL2ERC20Gateway} from "../interfaces/IScrollERC20Bridge.sol";
 
-contract ScrollERC20Bridge is AccessControl {
+contract ERC20Relayer is AccessControl {
     using SafeERC20 for IERC20;
+
+    /**********
+     * Errors *
+     **********/
+    error ZeroAddress();
 
     /**********
      * Events *
@@ -21,9 +26,9 @@ contract ScrollERC20Bridge is AccessControl {
         address indexed newRecipient
     );
 
-    /// @notice Emitted when the token is bridged from the L1 to the L2
-    /// @param token The address of the token
-    /// @param recipient The address of the recipient
+    /// @notice Emitted when the token is bridged from L2 to L1
+    /// @param token The token address on L2
+    /// @param recipient The recipient address on L1
     /// @param amount The amount of the token bridged
     event Bridged(
         address indexed token,
@@ -46,14 +51,15 @@ contract ScrollERC20Bridge is AccessControl {
     /// @dev This is immutable because it is set in the constructor
     address public immutable gateway;
 
-    /// @notice The address of the token to be bridged
+    /// @notice The token address on L2
+    /// @dev This is immutable because it is set in the constructor
     address public immutable token;
 
     /*********************
      * Storage Variables *
      *********************/
 
-    /// @notice The address of the recipient of the bridged tokens
+    /// @notice The recipient address on L1
     address public recipient;
 
     /***************
@@ -73,8 +79,8 @@ contract ScrollERC20Bridge is AccessControl {
      * Public Mutating Functions *
      *****************************/
 
-    /// @notice Bridges the token from the L1 to the L2
-    /// @dev The caller must have the BRIDGE_ROLE
+    /// @notice Bridges the token from L2 to L1
+    /// @dev The caller must be granted to the BRIDGE_ROLE
     function bridge() external onlyRole(BRIDGE_ROLE) {
         uint256 amount = IERC20(token).balanceOf(address(this));
         IERC20(token).forceApprove(gateway, amount);
@@ -94,20 +100,21 @@ contract ScrollERC20Bridge is AccessControl {
 
     /// @notice Updates the recipient of the bridged tokens
     /// @param newRecipient The address of the new recipient
+    /// @dev This function is only callable by the DEFAULT_ADMIN_ROLE
     function updateRecipient(
         address newRecipient
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _updateRecipient(newRecipient);
     }
 
-    /// @notice Emergency withdraw of the token from the bridge
+    /// @notice Rescue ERC20 tokens locked up in this contract
     /// @dev This function is only callable by the DEFAULT_ADMIN_ROLE
-    function withdraw(
-        address token,
+    function rescueERC20(
+        IERC20 tokenContract,
         address to,
         uint256 amount
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        IERC20(token).safeTransfer(to, amount);
+        tokenContract.safeTransfer(to, amount);
     }
 
     /**********************
@@ -117,6 +124,9 @@ contract ScrollERC20Bridge is AccessControl {
     /// @dev Internal function to update the recipient of the bridged tokens
     /// @param newRecipient The address of the new recipient
     function _updateRecipient(address newRecipient) internal {
+        if (newRecipient == address(0)) {
+            revert ZeroAddress();
+        }
         address oldRecipient = recipient;
         recipient = newRecipient;
 
