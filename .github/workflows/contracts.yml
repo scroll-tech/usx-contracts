@@ -35,9 +35,12 @@ jobs:
           persist-credentials: false
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1.4.0
+        uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
+
+      - name: Show Forge version
+        run: forge --version
 
       - name: Setup LCOV
         uses: hrishikesh-kadam/setup-lcov@6c1aa0cc9e1c02f9f58f01ac599f1064ccc83470 # v1
