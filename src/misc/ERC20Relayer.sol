@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+pragma solidity 0.8.30;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -49,11 +50,11 @@ contract ERC20Relayer is AccessControl {
 
     /// @notice The address of the Scroll L2 ERC20 gateway
     /// @dev This is immutable because it is set in the constructor
-    address public immutable gateway;
+    address public immutable GATEWAY;
 
     /// @notice The token address on L2
     /// @dev This is immutable because it is set in the constructor
-    address public immutable token;
+    address public immutable TOKEN;
 
     /*********************
      * Storage Variables *
@@ -67,8 +68,8 @@ contract ERC20Relayer is AccessControl {
      ***************/
 
     constructor(address _gateway, address _token, address _recipient) {
-        gateway = _gateway;
-        token = _token;
+        GATEWAY = _gateway;
+        TOKEN = _token;
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
@@ -82,16 +83,16 @@ contract ERC20Relayer is AccessControl {
     /// @notice Bridges the token from L2 to L1
     /// @dev The caller must be granted to the BRIDGE_ROLE
     function bridge() external onlyRole(BRIDGE_ROLE) {
-        uint256 amount = IERC20(token).balanceOf(address(this));
-        IERC20(token).forceApprove(gateway, amount);
-        IScrollL2ERC20Gateway(gateway).withdrawERC20(
-            token,
+        uint256 amount = IERC20(TOKEN).balanceOf(address(this));
+        IERC20(TOKEN).forceApprove(GATEWAY, amount);
+        IScrollL2ERC20Gateway(GATEWAY).withdrawERC20(
+            TOKEN,
             recipient,
             amount,
             0
         );
 
-        emit Bridged(token, recipient, amount);
+        emit Bridged(TOKEN, recipient, amount);
     }
 
     /************************

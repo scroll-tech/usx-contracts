@@ -1,4 +1,7 @@
 {
+  "lib/LayerZero-v2": {
+    "rev": "3801b9929281261b907eb3482a82364ad00d7868"
+  },
   "lib/devtools": {
     "rev": "8b1a994804581232e791983cf8ed770c9abcf0fb"
   },
@@ -16,5 +19,8 @@
       "name": "v0.4.0",
       "rev": "cbce1e00305e943aa1661d43f41e5ac72c662b07"
     }
+  },
+  "lib/solidity-bytes-utils": {
+    "rev": "fc502455bb2a7e26a743378df042612dd50d1eb9"
   }
 }
