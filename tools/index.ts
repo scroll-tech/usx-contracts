@@ -2,7 +2,7 @@ import axios from "axios";
 import dotenv from "dotenv";
 import { createWalletClient, http, type Address } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { scroll } from "viem/chains";
+import { mainnet } from "viem/chains";
 
 import { ScrollL1MessengerABI } from "./abi.ts";
 
@@ -89,7 +89,7 @@ async function sendClaimTransaction(
 
   // Create wallet client
   const client = createWalletClient({
-    chain: scroll,
+    chain: mainnet,
     account,
     transport: rpcUrl ? http(rpcUrl) : http(),
   });
