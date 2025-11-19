@@ -58,7 +58,7 @@ async function getClaimInfo(txHash: string): Promise<ClaimInfo> {
         "Transaction already claimed, hash:",
         results[0]?.counterpart_chain_tx?.hash
       );
-      // throw new Error("Transaction already claimed");
+      throw new Error("Transaction already claimed");
     }
 
     const claimInfo = results[0]?.claim_info;
