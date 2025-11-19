@@ -53,7 +53,7 @@ async function getClaimInfo(txHash: string): Promise<ClaimInfo> {
       throw new Error("No transaction found");
     }
 
-    if (results[0]?.counterpart_chain_tx) {
+    if (results[0]?.counterpart_chain_tx && results[0]?.counterpart_chain_tx?.hash !== '') {
       console.log(
         "Transaction already claimed, hash:",
         results[0]?.counterpart_chain_tx?.hash
@@ -124,6 +124,7 @@ async function sendClaimTransaction(
   });
 
   console.log("Transaction sent successfully!, hash:", hash);
+
   return hash;
 }
 
