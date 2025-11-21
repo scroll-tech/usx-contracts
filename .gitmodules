@@ -13,9 +13,10 @@
 [submodule "lib/devtools"]
 	path = lib/devtools
 	url = https://github.com/layerzero-labs/devtools
-[submodule "lib/LayerZero-v2"]
-	path = lib/LayerZero-v2
-	url = https://github.com/layerzero-labs/LayerZero-v2
+[submodule "lib/layerzero-v2"]
+	path = lib/layerzero-v2
+	url = https://github.com/layerzero-labs/layerzero-v2
 [submodule "lib/solidity-bytes-utils"]
 	path = lib/solidity-bytes-utils
 	url = https://github.com/GNSPS/solidity-bytes-utils.git
+
