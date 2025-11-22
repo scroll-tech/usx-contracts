@@ -1,0 +1,8 @@
+@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/
+@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
+openzeppelin-foundry-upgrades/=lib/openzeppelin-foundry-upgrades/src/
+solidity-bytes-utils/=lib/solidity-bytes-utils/
+@layerzerolabs/oapp-evm/=lib/devtools/packages/oapp-evm/
+@layerzerolabs/oft-evm/=lib/devtools/packages/oft-evm/
+@layerzerolabs/lz-evm-messagelib-v2/=lib/LayerZero-v2/packages/layerzero-v2/evm/messagelib/
+@layerzerolabs/lz-evm-protocol-v2/=lib/LayerZero-v2/packages/layerzero-v2/evm/protocol/

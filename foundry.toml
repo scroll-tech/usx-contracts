@@ -10,17 +10,6 @@ ast = true
 build_info = true
 extra_output = ["storageLayout"]
 
-remappings = [
-    '@layerzerolabs/oft-evm/=lib/devtools/packages/oft-evm/',
-    '@layerzerolabs/oapp-evm/=lib/devtools/packages/oapp-evm/',
-    '@layerzerolabs/lz-evm-protocol-v2/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol/',
-    '@layerzerolabs/lz-evm-messagelib-v2/=lib/layerzero-v2/packages/layerzero-v2/evm/messagelib/',
-    "@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/",
-    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
-    "openzeppelin-foundry-upgrades/=lib/openzeppelin-foundry-upgrades/src/",
-    'solidity-bytes-utils/=lib/solidity-bytes-utils/',
-]
-
 # Network configurations
 [rpc_endpoints]
 scroll = "${SCROLL_MAINNET_RPC}"
