@@ -486,4 +486,78 @@ contract StakedUSXTest is LocalDeployTestSetup {
         assertEq(req.user, user);
         assertEq(req.amount, expectedAssets);
     }
+
+    function test_epochDuration_change_during_reward_period_maintains_correct_rewardData() public {
+        // Initial state: epochDuration is 30 days
+        assertEq(susx.epochDuration(), 30 days);
+
+        // User stakes USX to create supply (needed for rewards distribution)
+        _mintUSXTo(user, 1_000e6);
+        _stakeUSX(user, 1_000e18);
+        assertEq(susx.totalSupply(), 1_000e18);
+
+        // First reward distribution
+        uint256 firstRewardAmount = 100e18;
+        uint256 timestampBeforeFirstReward = block.timestamp;
+        
+        vm.prank(treasuryProxy);
+        usx.mintUSX(address(susx), firstRewardAmount);
+        vm.prank(treasuryProxy);
+        susx.notifyRewards(firstRewardAmount);
+
+        // Verify RewardData after first reward
+        StakedUSX.RewardData memory rd1 = susx.rewardData();
+        uint256 expectedRate1 = firstRewardAmount / 30 days;
+        assertEq(uint256(rd1.rate), expectedRate1);
+        assertEq(uint256(rd1.lastUpdate), timestampBeforeFirstReward);
+        assertEq(uint256(rd1.finishAt), timestampBeforeFirstReward + 30 days);
+        // queued should be the rounding error
+        uint256 expectedQueued1 = firstRewardAmount - (uint256(rd1.rate) * 30 days);
+        assertEq(uint256(rd1.queued), expectedQueued1);
+
+        // Advance time by 15 days
+        uint256 timeElapsed = 15 days;
+        vm.warp(block.timestamp + timeElapsed);
+        uint256 timestampAfter15Days = block.timestamp;
+
+        // Calculate remaining rewards from first period
+        uint256 remainingTime = 30 days - timeElapsed; // 15 days remaining
+        uint256 remainingRewards = uint256(rd1.rate) * remainingTime + uint256(rd1.queued);
+
+        // Change epochDuration to 1 day
+        vm.prank(admin);
+        susx.setEpochDuration(1 days);
+        assertEq(susx.epochDuration(), 1 days);
+
+        // Second reward distribution
+        uint256 secondRewardAmount = 50e18;
+        vm.prank(treasuryProxy);
+        usx.mintUSX(address(susx), secondRewardAmount);
+        vm.prank(treasuryProxy);
+        susx.notifyRewards(secondRewardAmount);
+
+        // Verify RewardData after second reward
+        StakedUSX.RewardData memory rd2 = susx.rewardData();
+        
+        // Total amount to distribute = remaining rewards + new rewards
+        uint256 totalAmount = remainingRewards + secondRewardAmount;
+        
+        // New rate should be totalAmount / 1 day (new epochDuration)
+        uint256 expectedRate2 = totalAmount / 1 days;
+        assertEq(uint256(rd2.rate), expectedRate2);
+        
+        // lastUpdate should be the current timestamp
+        assertEq(uint256(rd2.lastUpdate), timestampAfter15Days);
+        
+        // finishAt should be current timestamp + 1 day (new epochDuration)
+        assertEq(uint256(rd2.finishAt), timestampAfter15Days + 1 days);
+        
+        // queued should be the rounding error
+        uint256 expectedQueued2 = totalAmount - (uint256(rd2.rate) * 1 days);
+        assertEq(uint256(rd2.queued), expectedQueued2);
+
+        // Verify that rate * period + queued equals total amount (accounting for rounding)
+        uint256 totalDistributed = (uint256(rd2.rate) * 1 days) + uint256(rd2.queued);
+        assertApproxEqAbs(totalDistributed, totalAmount, 1); // Allow 1 wei rounding error
+    }
 }
