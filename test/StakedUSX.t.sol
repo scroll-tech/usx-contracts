@@ -16,6 +16,8 @@ contract StakedUSXTest is LocalDeployTestSetup {
         deal(address(usdc), user2, 1_000_000e6);
         vm.prank(user2);
         usdc.approve(address(usx), type(uint256).max);
+
+        vm.warp(345600);
     }
 
     /* =========================== Helpers =========================== */
@@ -251,6 +253,114 @@ contract StakedUSXTest is LocalDeployTestSetup {
         vm.stopPrank();
     }
 
+    /* =========================== Deposit Window Tests =========================== */
+
+    function test_isDepositOpen_at_epoch_start_returns_true() public {
+        // setUp warps to 345600 (Monday 00:00:00 UTC, epoch 0 start)
+        assertTrue(susx.isDepositOpen());
+    }
+
+    function test_isDepositOpen_within_window_returns_true() public {
+        // At epoch start + 12 hours (still within 24h window)
+        vm.warp(345600 + 12 hours);
+        assertTrue(susx.isDepositOpen());
+
+        // At epoch start + 23 hours 59 minutes (still within window)
+        vm.warp(345600 + 23 hours + 59 minutes);
+        assertTrue(susx.isDepositOpen());
+    }
+
+    function test_isDepositOpen_before_epoch_start_returns_false() public {
+        // Before epoch 0 start
+        vm.warp(345600+86400*7*2 - 1);
+        assertFalse(susx.isDepositOpen());
+
+        // 1 day before epoch start
+        vm.warp(345600+86400*7*2 - 1 days);
+        assertFalse(susx.isDepositOpen());
+    }
+
+    function test_isDepositOpen_after_window_returns_false() public {
+        // Exactly at epoch start + 1 day (window closed)
+        vm.warp(345600 + 1 days);
+        assertFalse(susx.isDepositOpen());
+
+        // After window closes
+        vm.warp(345600 + 1 days + 1);
+        assertFalse(susx.isDepositOpen());
+
+        // Mid-epoch (e.g., 7 days into epoch)
+        vm.warp(345600 + 7 days);
+        assertFalse(susx.isDepositOpen());
+    }
+
+    function test_isDepositOpen_next_epoch_window_returns_true() public {
+        // Epoch 1 start (14 days after epoch 0)
+        uint256 epoch1Start = 345600 + 14 days;
+        vm.warp(epoch1Start);
+        assertTrue(susx.isDepositOpen());
+
+        // Within epoch 1 window
+        vm.warp(epoch1Start + 12 hours);
+        assertTrue(susx.isDepositOpen());
+
+        // After epoch 1 window
+        vm.warp(epoch1Start + 1 days);
+        assertFalse(susx.isDepositOpen());
+    }
+
+    function test_isDepositOpen_multiple_epochs() public {
+        // Test epoch 2
+        uint256 epoch2Start = 345600 + 28 days; // 2 * 14 days
+        vm.warp(epoch2Start);
+        assertTrue(susx.isDepositOpen());
+
+        vm.warp(epoch2Start + 1 days);
+        assertFalse(susx.isDepositOpen());
+
+        // Test epoch 3
+        uint256 epoch3Start = 345600 + 42 days; // 3 * 14 days
+        vm.warp(epoch3Start);
+        assertTrue(susx.isDepositOpen());
+
+        vm.warp(epoch3Start + 12 hours);
+        assertTrue(susx.isDepositOpen());
+    }
+
+    function test_deposit_succeeds_when_isDepositOpen_returns_true() public {
+        _mintUSXTo(user, 1000e6);
+        vm.startPrank(user);
+        usx.approve(address(susx), type(uint256).max);
+
+        // At epoch start (isDepositOpen should be true)
+        vm.warp(345600);
+        assertTrue(susx.isDepositOpen());
+        susx.deposit(1000e18, user);
+        assertEq(susx.balanceOf(user), 1000e18);
+
+        vm.stopPrank();
+    }
+
+    function test_deposit_reverts_when_isDepositOpen_returns_false() public {
+        _mintUSXTo(user, 1000e6);
+        vm.startPrank(user);
+        usx.approve(address(susx), type(uint256).max);
+
+        // After window closes (isDepositOpen should be false)
+        vm.warp(345600 + 1 days);
+        assertFalse(susx.isDepositOpen());
+        vm.expectRevert(StakedUSX.DepositsPaused.selector);
+        susx.deposit(1000e18, user);
+
+        // Mid-epoch
+        vm.warp(345600 + 7 days);
+        assertFalse(susx.isDepositOpen());
+        vm.expectRevert(StakedUSX.DepositsPaused.selector);
+        susx.deposit(1000e18, user);
+
+        vm.stopPrank();
+    }
+
     /* =========================== Withdrawals & Claims =========================== */
 
     function test_redeem_creates_withdrawal_request_and_updates_state() public {
@@ -442,7 +552,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
         usx.mintUSX(address(susx), rewardAmount);
         vm.prank(treasuryProxy);
         susx.notifyRewards(rewardAmount);
-        vm.warp(block.timestamp + susx.epochDuration() / 3);
+        vm.warp(block.timestamp + 86400*7*2);
 
         // New depositor should mint fewer shares than assets due to price > 1
         uint256 depositAssets = 300e18;

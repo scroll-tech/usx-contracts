@@ -223,6 +223,18 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         return Math.mulDiv(withdrawalAmount, $.withdrawalFeeFraction, FEE_PRECISION, Math.Rounding.Floor);
     }
 
+    /// @notice Returns true if deposits are open, false otherwise
+    function isDepositOpen() public view returns (bool) {
+        // For every two weeks (in UTC), only the first Monday is allowed to deposit
+        // 345600 seconds = 4 days offset to align with Monday 00:00:00 UTC
+        uint256 epoch = (block.timestamp - 345600) / (14 days);
+        uint256 epochStartTime = epoch * (14 days) + 345600;
+        if (block.timestamp < epochStartTime || block.timestamp >= epochStartTime + 1 days) {
+            return false;
+        }
+        return true;
+    }
+
     /*=========================== Governance Functions =========================*/
 
     /// @notice Sets withdrawal fee with precision to 0.001 percent
@@ -319,6 +331,11 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
 
         // Check if deposits are frozen
         if ($.depositPaused) revert DepositsPaused();
+
+        // Check if deposits are open
+        if (!isDepositOpen()) {
+            revert DepositsPaused();
+        }
 
         // Call parent implementation
         super._deposit(caller, receiver, assets, shares);
