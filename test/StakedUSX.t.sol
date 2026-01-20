@@ -144,7 +144,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
         vm.expectRevert(StakedUSX.InvalidWithdrawalFeeFraction.selector);
         susx.setWithdrawalFeeFraction(20001);
 
-        // Only admin can set epoch duration; must be >= 1 day
+        // Only admin can set epoch duration; must be >= 1 hour
         vm.expectRevert(StakedUSX.NotAdmin.selector);
         susx.setEpochDuration(2 days);
         vm.prank(admin);
@@ -154,7 +154,7 @@ contract StakedUSXTest is LocalDeployTestSetup {
         assertEq(susx.epochDuration(), 2 days);
         vm.prank(admin);
         vm.expectRevert(StakedUSX.InvalidEpochDuration.selector);
-        susx.setEpochDuration(12 hours);
+        susx.setEpochDuration(1 hours - 1);
 
         // setGovernance onlyGovernance and non-zero
         vm.expectRevert(StakedUSX.NotGovernance.selector);

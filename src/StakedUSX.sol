@@ -52,7 +52,7 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     /*=========================== Constants =========================*/
 
     /// @dev Minimum epoch duration in seconds
-    uint256 private constant MIN_EPOCH_DURATION = 1 days;
+    uint256 private constant MIN_EPOCH_DURATION = 1 hours;
 
     /// @dev Precision for the fee fractions
     uint256 private constant FEE_PRECISION = 1000000;
