@@ -21,6 +21,7 @@ contract PrivateGatewayCloakTest is Test {
     address internal admin = address(0xA11CE);
     address internal withdrawer = address(0xBEEF);
     address internal counterpart = address(0xC10A); // scroll gateway on the other chain
+    address internal rebalancer = address(0xDEAD);
 
     function setUp() public {
         usdc = new MockUSDC();
@@ -45,6 +46,10 @@ contract PrivateGatewayCloakTest is Test {
         bytes32 withdrawRole = gateway.WITHDRAW_USX_ROLE();
         vm.prank(admin);
         gateway.grantRole(withdrawRole, withdrawer);
+
+        bytes32 rebalanceRole = gateway.REBALANCE_ROLE();
+        vm.prank(admin);
+        gateway.grantRole(rebalanceRole, rebalancer);
     }
 
     function _depositHash(
@@ -290,5 +295,89 @@ contract PrivateGatewayCloakTest is Test {
 
         vm.expectRevert();
         gateway.withdrawTokens(address(usx), receiver, 200e18);
+    }
+
+    function test_updateRebalancer_only_admin_and_emits_event() public {
+        address newRebalancer = address(0xF00D);
+
+        vm.prank(admin);
+        vm.expectEmit(true, true, true, true, address(gateway));
+        emit PrivateGatewayCloak.RebalancerUpdated(
+            address(0),
+            newRebalancer
+        );
+        gateway.updateRebalancer(newRebalancer);
+
+        assertEq(gateway.rebalancer(), newRebalancer);
+
+        vm.expectRevert();
+        gateway.updateRebalancer(address(0xB0B));
+    }
+
+    function test_rebalance_reverts_when_caller_not_authorized() public {
+        deal(address(usdc), address(gateway), 100e6);
+
+        vm.expectRevert();
+        gateway.rebalance();
+    }
+
+    function test_rebalance_reverts_when_no_usdc_balance() public {
+        vm.prank(rebalancer);
+        vm.expectRevert(PrivateGatewayCloak.ErrorNoUSDCBalance.selector);
+        gateway.rebalance();
+    }
+
+    function test_rebalance_reverts_when_rebalancer_not_set() public {
+        deal(address(usdc), address(gateway), 100e6);
+
+        // clear rebalancer address
+        vm.prank(admin);
+        gateway.updateRebalancer(address(0));
+
+        vm.prank(rebalancer);
+        vm.expectRevert(PrivateGatewayCloak.ErrorRebalancerNotSet.selector);
+        gateway.rebalance();
+    }
+
+    function test_rebalance_happy_path_withdraws_usdc_to_rebalancer() public {
+        uint256 amountUSDC = 250e6;
+
+        // fund the gateway with USDC
+        deal(address(usdc), address(gateway), amountUSDC);
+
+        // set rebalancer address
+        vm.prank(admin);
+        gateway.updateRebalancer(rebalancer);
+
+        uint256 gatewayUsdcBefore = usdc.balanceOf(address(gateway));
+        uint256 l2UsdcBefore = usdc.balanceOf(address(l2Gateway));
+
+        vm.prank(rebalancer);
+        gateway.rebalance();
+
+        (
+            address wToken,
+            address wTo,
+            uint256 wAmount,
+            uint256 wGasLimit,
+            uint256 wValue,
+            address wFrom
+        ) = l2Gateway.lastWithdrawal();
+
+        assertEq(wToken, address(usdc));
+        assertEq(wTo, rebalancer);
+        assertEq(wAmount, amountUSDC);
+        assertEq(wGasLimit, 0);
+        assertEq(wValue, 0);
+        assertEq(wFrom, address(gateway));
+
+        assertEq(
+            usdc.balanceOf(address(gateway)),
+            gatewayUsdcBefore - amountUSDC
+        );
+        assertEq(
+            usdc.balanceOf(address(l2Gateway)),
+            l2UsdcBefore + amountUSDC
+        );
     }
 }

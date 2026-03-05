@@ -52,9 +52,20 @@ contract PrivateGatewayCloak is
         uint256 amountUSX
     );
 
+    /// @notice Emitted when the rebalancer is updated
+    /// @param oldRebalancer The old rebalancer
+    /// @param newRebalancer The new rebalancer
+    event RebalancerUpdated(address oldRebalancer, address newRebalancer);
+
     /**********
      * Errors *
      **********/
+
+    /// @dev Thrown when the no USDC balance
+    error ErrorNoUSDCBalance();
+
+    /// @dev Thrown when the rebalancer is not set
+    error ErrorRebalancerNotSet();
 
     /// @dev Thrown when the deposit is already confirmed (duplicate confirm)
     error ErrorDepositAlreadyConfirmed();
@@ -77,6 +88,9 @@ contract PrivateGatewayCloak is
 
     /// @notice The role required to withdraw USX
     bytes32 public constant WITHDRAW_USX_ROLE = keccak256("WITHDRAW_USX_ROLE");
+
+    /// @notice The role required to rebalance the contract
+    bytes32 public constant REBALANCE_ROLE = keccak256("REBALANCE_ROLE");
 
     /***********************
      * Immutable Variables *
@@ -106,6 +120,9 @@ contract PrivateGatewayCloak is
 
     /// @notice Mapping from hash to withdrawn deposits
     mapping(bytes32 => bool) public withdrawnDeposits;
+
+    /// @notice The address of the rebalancer in Scroll.
+    address public rebalancer;
 
     /***************
      * Constructor *
@@ -230,6 +247,35 @@ contract PrivateGatewayCloak is
         );
     }
 
+    /// @notice Rebalances the contract
+    /// @dev The caller must have the REBALANCE_ROLE role to rebalance the contract
+    function rebalance() external onlyRole(REBALANCE_ROLE) {
+        uint256 usdcBalance = IERC20(USDC).balanceOf(address(this));
+        if (usdcBalance == 0) revert ErrorNoUSDCBalance();
+        if (rebalancer == address(0)) revert ErrorRebalancerNotSet();
+
+        // approve just in case
+        IERC20(USDC).forceApprove(erc20Gateway, usdcBalance);
+        IL2ERC20GatewayValidium(erc20Gateway).withdrawERC20(
+            USDC,
+            rebalancer,
+            usdcBalance,
+            0
+        );
+    }
+
+    /************************
+     * Restricted Functions *
+     ************************/
+
+    /// @notice Updates the address of the rebalancer
+    /// @param newRebalancer The address of the new rebalancer
+    function updateRebalancer(
+        address newRebalancer
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _updateRebalancer(newRebalancer);
+    }
+
     /// @notice Withdraws tokens from the contract
     /// @param token The address of the token to withdraw
     /// @param amount The amount of tokens to withdraw
@@ -243,5 +289,16 @@ contract PrivateGatewayCloak is
         } else {
             IERC20(token).safeTransfer(receiver, amount);
         }
+    }
+
+    /**********************
+     * Internal Functions *
+     **********************/
+
+    function _updateRebalancer(address newRebalancer) internal {
+        address oldRebalancer = rebalancer;
+        rebalancer = newRebalancer;
+
+        emit RebalancerUpdated(oldRebalancer, newRebalancer);
     }
 }
