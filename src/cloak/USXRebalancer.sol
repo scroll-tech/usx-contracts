@@ -28,6 +28,14 @@ contract USXRebalancer is
      * Events *
      **********/
 
+    /// @notice Emitted when the expected USX receiver is updated
+    /// @param oldExpectedUSXReceiver The old expected USX receiver
+    /// @param newExpectedUSXReceiver The new expected USX receiver
+    event ExpectedUSXReceiverUpdated(
+        EncryptedReceiver oldExpectedUSXReceiver,
+        EncryptedReceiver newExpectedUSXReceiver
+    );
+
     /**********
      * Errors *
      **********/
@@ -43,6 +51,9 @@ contract USXRebalancer is
 
     /// @dev Thrown when the insufficient USX amount
     error ErrorInsufficientUSXAmount();
+
+    /// @dev Thrown when the USX receiver is invalid
+    error ErrorInvalidUSXReceiver();
 
     /*************
      * Constants *
@@ -88,6 +99,9 @@ contract USXRebalancer is
 
     /// @notice Mapping from swap router to token spender
     mapping(address => address) private spenders;
+
+    /// @notice The expected USX receiver
+    EncryptedReceiver public expectedUSXReceiver;
 
     /***************
      * Constructor *
@@ -233,6 +247,20 @@ contract USXRebalancer is
         }
     }
 
+    /// @notice Updates the expected USX receiver
+    /// @param newExpectedUSXReceiver The new expected USX receiver to update
+    function updateExpectedUSXReceiver(
+        EncryptedReceiver memory newExpectedUSXReceiver
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        EncryptedReceiver memory oldExpectedUSXReceiver = expectedUSXReceiver;
+        expectedUSXReceiver = newExpectedUSXReceiver;
+
+        emit ExpectedUSXReceiverUpdated(
+            oldExpectedUSXReceiver,
+            newExpectedUSXReceiver
+        );
+    }
+
     /**********************
      * Internal Functions *
      **********************/
@@ -244,6 +272,13 @@ contract USXRebalancer is
         uint256 amountUSX,
         EncryptedReceiver memory usxReceiver
     ) internal {
+        if (
+            keccak256(abi.encode(usxReceiver)) !=
+            keccak256(abi.encode(expectedUSXReceiver))
+        ) {
+            revert ErrorInvalidUSXReceiver();
+        }
+
         // approve and deposit USX to the L1 ERC20 gateway validium
         IERC20(USX).forceApprove(erc20Gateway, amountUSX);
         IL1ERC20GatewayValidium(erc20Gateway).depositERC20(

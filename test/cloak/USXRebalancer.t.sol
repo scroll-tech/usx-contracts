@@ -96,6 +96,8 @@ contract USXRebalancerTest is Test {
     function test_rebalanceByMinting_happy_path_mints_and_deposits() public {
         uint256 amountUSDC = 100e6;
         USXRebalancer.EncryptedReceiver memory receiver = _encryptedReceiver();
+        vm.prank(admin);
+        rebalancer.updateExpectedUSXReceiver(receiver);
 
         // fund the rebalancer with USDC
         deal(address(usdc), address(rebalancer), amountUSDC);
@@ -211,6 +213,8 @@ contract USXRebalancerTest is Test {
     function test_rebalanceBySwapping_happy_path_swaps_and_deposits() public {
         uint256 amountUSDC = 200e6;
         USXRebalancer.EncryptedReceiver memory receiver = _encryptedReceiver();
+        vm.prank(admin);
+        rebalancer.updateExpectedUSXReceiver(receiver);
 
         // fund the rebalancer with USDC and the router with enough USX
         deal(address(usdc), address(rebalancer), amountUSDC);
