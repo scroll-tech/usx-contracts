@@ -66,6 +66,11 @@ contract PrivateGatewayScroll is
         uint256 amountUSDC
     );
 
+    /// @notice Emitted when the expected USDC receiver is updated
+    /// @param oldExpectedUSDCReceiver The old expected USDC receiver
+    /// @param newExpectedUSDCReceiver The new expected USDC receiver
+    event ExpectedUSDCReceiverUpdated(EncryptedReceiver oldExpectedUSDCReceiver, EncryptedReceiver newExpectedUSDCReceiver);
+
     /**********
      * Errors *
      **********/
@@ -96,6 +101,9 @@ contract PrivateGatewayScroll is
 
     /// @dev Thrown when the swap failed
     error ErrorSwapFailed();
+
+    /// @dev Thrown when the USDC receiver is invalid
+    error ErrorInvalidUSDCReceiver();
 
     /*************
      * Constants *
@@ -171,6 +179,9 @@ contract PrivateGatewayScroll is
 
     /// @notice The max fee amount of the private gateway scroll contract.
     uint256 public maxFeeAmount;
+
+    /// @notice The expected USDC receiver
+    EncryptedReceiver public expectedUSDCReceiver;
 
     /***************
      * Constructor *
@@ -325,6 +336,7 @@ contract PrivateGatewayScroll is
         if (token == address(0)) {
             if (msg.value != swapAmount) revert ErrorInvalidAmount();
         } else {
+            if (msg.value != 0) revert ErrorInvalidAmount();
             IERC20(token).safeTransferFrom(
                 msg.sender,
                 address(this),
@@ -341,6 +353,9 @@ contract PrivateGatewayScroll is
         if (!success) revert ErrorSwapFailed();
         uint256 usdcAfter = IERC20(USDC).balanceOf(address(this));
         uint256 usdcAmount = usdcAfter - usdcBefore;
+        if (token != address(0)) {
+            IERC20(token).forceApprove(spenders[swapRouter], 0); // remove approval
+        }
 
         _transferUSDC(usdcAmount, usxReceiver, usdcReceiver);
     }
@@ -436,6 +451,17 @@ contract PrivateGatewayScroll is
         }
     }
 
+    /// @notice Updates the expected USDC receiver
+    /// @param newExpectedUSDCReceiver The new expected USDC receiver
+    function updateExpectedUSDCReceiver(
+        EncryptedReceiver memory newExpectedUSDCReceiver
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        EncryptedReceiver memory oldExpectedUSDCReceiver = expectedUSDCReceiver;
+        expectedUSDCReceiver = newExpectedUSDCReceiver;
+
+        emit ExpectedUSDCReceiverUpdated(oldExpectedUSDCReceiver, newExpectedUSDCReceiver);
+    }
+
     /**********************
      * Internal Functions *
      **********************/
@@ -483,12 +509,16 @@ contract PrivateGatewayScroll is
         // - check usxReceiver.keyId is the latest encryption key
         // - check the amount is greater than the minimum amount
         // - the usdcReceiver.keyId will be checked in `IL1ERC20GatewayValidium(erc20Gateway).depositERC20`.
+        // - check the usdcReceiver is the expected USDC receiver, if not, revert.
         (uint256 latestKeyId, ) = getLatestEncryptionKey();
         if (usxReceiver.keyId != latestKeyId) {
             revert ErrorInvalidEncryptionKey();
         }
         if (amount < minUSDCAmount) {
             revert ErrorInvalidAmount();
+        }
+        if (keccak256(abi.encode(usdcReceiver)) != keccak256(abi.encode(expectedUSDCReceiver))) {
+            revert ErrorInvalidUSDCReceiver();
         }
 
         // 2. charge the fee.

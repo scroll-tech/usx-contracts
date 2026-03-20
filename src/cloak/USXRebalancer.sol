@@ -154,7 +154,7 @@ contract USXRebalancer is
         // mint USX with USDC
         uint256 minted = IUSX(USX).balanceOf(address(this));
         IERC20(USDC).forceApprove(USX, amountUSDC);
-        IUSX(USX).mintUSX(address(this), amountUSDC);
+        IUSX(USX).deposit(amountUSDC);
         minted = IUSX(USX).balanceOf(address(this)) - minted;
 
         _transferUSX(minted, usxReceiver);
@@ -171,6 +171,11 @@ contract USXRebalancer is
         bytes memory swapData,
         EncryptedReceiver memory usxReceiver
     ) external payable nonReentrant {
+        // check if the swap router is supported
+        if (!supportedSwapRouters.contains(swapRouter)) {
+            revert ErrorSwapRouterNotSupported();
+        }
+
         uint256 usdcBalance = IERC20(USDC).balanceOf(address(this));
         if (usdcBalance < amountUSDC) revert ErrorInsufficientUSDCBalance();
 
@@ -181,6 +186,7 @@ contract USXRebalancer is
         if (!success) revert ErrorSwapFailed();
         uint256 usxAfter = IERC20(USX).balanceOf(address(this));
         uint256 usxAmount = usxAfter - usxBefore;
+        IERC20(USDC).forceApprove(spenders[swapRouter], 0); // remove approval
 
         if (usxAmount < amountUSDC * 10 ** 12) {
             revert ErrorInsufficientUSXAmount();

@@ -116,7 +116,7 @@ contract USXRebalancerTest is Test {
         ) = l1Gateway.lastDeposit();
 
         // MockUSX mints 1:1 with USDC amount
-        uint256 expectedMinted = amountUSDC;
+        uint256 expectedMinted = amountUSDC * 10 ** 12;
 
         assertEq(depToken, address(usx));
         assertEq(depTo, receiver.receiver);

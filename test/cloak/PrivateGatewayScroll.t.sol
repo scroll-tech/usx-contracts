@@ -257,6 +257,8 @@ contract PrivateGatewayScrollTest is Test {
                 receiver: usdcReceiverBytes,
                 keyId: keyId
             });
+        vm.prank(admin);
+        gateway.updateExpectedUSDCReceiver(usdcReceiver);
 
         uint256 expectedFee = (amount * gateway.feePercentage()) / 1e18;
         assertTrue(expectedFee > gateway.maxFeeAmount());
@@ -294,6 +296,8 @@ contract PrivateGatewayScrollTest is Test {
                 receiver: usdcReceiverBytes,
                 keyId: keyId
             });
+        vm.prank(admin);
+        gateway.updateExpectedUSDCReceiver(usdcReceiver);
 
         uint256 netAmount;
 
@@ -523,6 +527,8 @@ contract PrivateGatewayScrollTest is Test {
                 receiver: hex"33",
                 keyId: keyId
             });
+        vm.prank(admin);
+        gateway.updateExpectedUSDCReceiver(usdcReceiver);
 
         address token = address(0);
         address router = address(swapRouter);
@@ -659,6 +665,8 @@ contract PrivateGatewayScrollTest is Test {
                 receiver: hex"44",
                 keyId: keyId
             });
+        vm.prank(admin);
+        gateway.updateExpectedUSDCReceiver(usdcReceiver);
 
         // use USX mock token as generic ERC20 to be swapped into USDC
         address tokenIn = address(usx);

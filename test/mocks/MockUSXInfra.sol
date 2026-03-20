@@ -22,6 +22,14 @@ contract MockUSX is ERC20, IUSX {
         _burn(from, amount);
     }
 
+    function deposit(uint256 amount) external override {
+      _mint(msg.sender, amount * 10**12);
+    }
+
+    function claimUSDC() external override {}
+
+    function requestUSDC(uint256 amount) external {}
+
     function pause() external override {
         _paused = true;
     }
