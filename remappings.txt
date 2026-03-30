@@ -1,5 +1,6 @@
 @openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/
 @openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
+@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/
 openzeppelin-foundry-upgrades/=lib/openzeppelin-foundry-upgrades/src/
 solidity-bytes-utils/=lib/solidity-bytes-utils/
 @layerzerolabs/oapp-evm/=lib/devtools/packages/oapp-evm/

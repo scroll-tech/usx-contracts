@@ -14,6 +14,12 @@
   "lib/openzeppelin-contracts-upgradeable": {
     "rev": "e725abddf1e01cf05ace496e950fc8e243cc7cab"
   },
+  "lib/openzeppelin-contracts-v4": {
+    "tag": {
+      "name": "v4.9.6",
+      "rev": "dc44c9f1a4c3b10af99492eed84f83ed244203f6"
+    }
+  },
   "lib/openzeppelin-foundry-upgrades": {
     "tag": {
       "name": "v0.4.0",

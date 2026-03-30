@@ -12,6 +12,11 @@ interface IUSX is IERC20 {
     function pause() external;
     function unpause() external;
 
+    // public functions
+    function deposit(uint256 amount) external;
+    function requestUSDC(uint256 amount) external;
+    function claimUSDC() external;
+
     // State getters
     function paused() external view returns (bool);
     function governance() external view returns (address);
