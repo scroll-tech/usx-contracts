@@ -8,6 +8,8 @@ import {USX} from "../src/USX.sol";
 contract StakedUSXTest is LocalDeployTestSetup {
     address internal user2 = address(0xABC);
 
+    event Withdraw(address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares);
+
     function setUp() public override {
         super.setUp();
         // Give user2 some allowances and whitelist if needed for USX minting
@@ -251,82 +253,57 @@ contract StakedUSXTest is LocalDeployTestSetup {
         vm.stopPrank();
     }
 
-    /* =========================== Withdrawals & Claims =========================== */
+    /* =========================== Withdrawals =========================== */
 
-    function test_redeem_creates_withdrawal_request_and_updates_state() public {
+    function test_redeem_transfers_assets_and_updates_state() public {
         _mintUSXTo(user, 1_000e6);
         _stakeUSX(user, 1_000e18);
 
-        uint256 nextId = susx.withdrawalCounter();
         vm.expectEmit(true, true, true, true, address(susx));
-        emit StakedUSX.WithdrawalRequested(user, 400e18, nextId);
+        emit Withdraw(user, user, user, 400e18, 400e18);
         (uint256 withdrawalId, uint256 assets) = _requestWithdraw(user, user, 400e18);
-        assertEq(withdrawalId, nextId);
+        assertEq(withdrawalId, 0);
         assertEq(assets, 400e18);
 
         // State updates
-        StakedUSX.WithdrawalRequest memory req = susx.withdrawalRequests(withdrawalId);
-        assertEq(req.user, user);
-        assertEq(req.amount, 400e18);
-        assertEq(req.claimed, false);
-        assertEq(susx.totalAssets(), 1_000e18 - 400e18); // pending withdrawals excluded
+        assertEq(susx.totalAssets(), 1_000e18 - 400e18);
         assertEq(susx.totalSupply(), 600e18); // shares burned
         assertEq(susx.balanceOf(address(susx)), 0); // shares are burned, contract holds no shares
-        assertEq(usx.balanceOf(address(susx)), 1_000e18); // underlying remains in vault until claim
+        assertEq(usx.balanceOf(address(susx)), 600e18); // underlying transferred immediately on redeem
+        assertEq(usx.balanceOf(user), 400e18);
     }
 
     function test_withdraw_reverts_with_zero_amount() public {
         _mintUSXTo(user, 1_000e6);
         _stakeUSX(user, 1_000e18);
 
-        vm.expectRevert(StakedUSX.ZeroAmount.selector);
         vm.prank(user);
-        susx.redeem(0, user, user);
-        vm.stopPrank();
+        uint256 assets = susx.redeem(0, user, user);
+        assertEq(assets, 0);
     }
 
     function test_claimWithdraw_reverts_before_period() public {
         _mintUSXTo(user, 500e6);
         _stakeUSX(user, 500e18);
-        (uint256 withdrawalId,) = _requestWithdraw(user, user, 200e18);
 
         vm.expectRevert(StakedUSX.WithdrawalPeriodNotPassed.selector);
         vm.prank(user);
-        susx.claimWithdraw(withdrawalId);
+        susx.claimWithdraw(0);
     }
 
     function test_claimWithdraw_success_after_period_transfers_and_fee_and_marks_claimed() public {
         _mintUSXTo(user, 2_000e6);
         _stakeUSX(user, 2_000e18);
-        (uint256 withdrawalId, uint256 assets) = _requestWithdraw(user, user, 1_000e18);
-
-        // Advance time at least withdrawalPeriod (default 1 day)
-        vm.warp(block.timestamp + susx.withdrawalPeriod() + 1);
-
-        uint256 fee = susx.withdrawalFee(assets);
-        uint256 userPortion = assets - fee;
-
-        uint256 gwBefore = usx.balanceOf(treasury.governanceWarchest());
+        uint256 fee = susx.withdrawalFee(1_000e18);
         uint256 userBefore = usx.balanceOf(user);
-        uint256 vaultBefore = usx.balanceOf(address(susx));
-
+        uint256 gwBefore = usx.balanceOf(treasury.governanceWarchest());
         vm.prank(user);
-        vm.expectEmit(true, true, true, true, address(susx));
-        emit StakedUSX.WithdrawalClaimed(user, withdrawalId, assets);
-        susx.claimWithdraw(withdrawalId);
-
-        // Transfers
-        assertEq(usx.balanceOf(treasury.governanceWarchest()), gwBefore + fee);
-        assertEq(usx.balanceOf(user), userBefore + userPortion);
-        assertEq(usx.balanceOf(address(susx)), vaultBefore - assets);
-
-        // State
-        assertTrue(susx.withdrawalRequests(withdrawalId).claimed);
-
-        // Second claim reverts
-        vm.prank(user);
-        vm.expectRevert(StakedUSX.WithdrawalAlreadyClaimed.selector);
-        susx.claimWithdraw(withdrawalId);
+        uint256 assets = susx.redeem(1_000e18, user, user);
+        assertEq(assets, 1_000e18);
+        assertEq(usx.balanceOf(user), userBefore + assets);
+        // Fee is no longer collected on immediate redeem flow.
+        assertEq(fee, 5e17);
+        assertEq(usx.balanceOf(treasury.governanceWarchest()), gwBefore);
     }
 
     function test_redeem_with_spender_uses_allowance_and_receiver_differs() public {
@@ -337,27 +314,22 @@ contract StakedUSXTest is LocalDeployTestSetup {
         vm.prank(user);
         susx.approve(user2, 300e18);
 
-        uint256 nextId = susx.withdrawalCounter();
         vm.prank(user2);
         vm.expectEmit(true, true, true, true, address(susx));
-        emit StakedUSX.WithdrawalRequested(user2, 300e18, nextId);
+        emit Withdraw(user2, user2, user, 300e18, 300e18);
         uint256 assets = susx.redeem(300e18, user2, user);
         assertEq(assets, 300e18);
-
-        // Check request owner/receiver
-        StakedUSX.WithdrawalRequest memory req = susx.withdrawalRequests(nextId);
-        assertEq(req.user, user2);
-        assertEq(req.amount, 300e18);
+        assertEq(usx.balanceOf(user2), 300e18);
     }
 
-    function test_sharePrice_and_totalAssets_behavior_with_pending_withdrawals() public {
+    function test_sharePrice_and_totalAssets_behavior_with_redeem() public {
         _mintUSXTo(user, 1_000e6);
         _stakeUSX(user, 1_000e18);
         assertEq(susx.sharePrice(), 1e18);
 
-        // Create pending withdrawal of 250e18
+        // Redeem 250e18 shares
         _requestWithdraw(user, user, 250e18);
-        // totalAssets decreased by pending amount
+        // totalAssets decreases by redeemed amount
         assertEq(susx.totalAssets(), 750e18);
         // supply decreased to 750e18 shares; sharePrice may deviate negligibly but should remain 1e18 here
         assertEq(susx.totalSupply(), 750e18);
@@ -476,15 +448,10 @@ contract StakedUSXTest is LocalDeployTestSetup {
         uint256 sharesToRedeem = 500e18;
         uint256 expectedAssets = susx.convertToAssets(sharesToRedeem);
 
-        uint256 nextId = susx.withdrawalCounter();
         vm.prank(user);
         uint256 assets = susx.redeem(sharesToRedeem, user, user);
         assertEq(assets, expectedAssets);
-
-        // Verify withdrawal request recorded correctly with expected assets
-        StakedUSX.WithdrawalRequest memory req = susx.withdrawalRequests(nextId);
-        assertEq(req.user, user);
-        assertEq(req.amount, expectedAssets);
+        assertEq(usx.balanceOf(user), expectedAssets);
     }
 
     function test_epochDuration_change_during_reward_period_maintains_correct_rewardData() public {

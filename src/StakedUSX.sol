@@ -324,37 +324,6 @@ contract StakedUSX is ERC4626Upgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
         super._deposit(caller, receiver, assets, shares);
     }
 
-    /// @dev User must wait for withdrawalPeriod to pass before unstaking (withdrawalPeriod)
-    /// @dev Override default ERC4626 for the 2 step withdrawal process in protocol
-    function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares)
-        internal
-        nonReentrant
-        override
-    {
-        if (assets == 0 || shares == 0) revert ZeroAmount();
-
-        if (caller != owner) {
-            _spendAllowance(owner, caller, shares);
-        }
-
-        _burn(owner, shares);
-
-        // Record withdrawal request
-        SUSXStorage storage $ = _getStorage();
-        $.totalPendingWithdrawals += assets;
-        $.withdrawalRequests[$.withdrawalCounter] =
-            WithdrawalRequest({user: receiver, amount: assets, withdrawalTimestamp: block.timestamp, claimed: false});
-
-        // Emit standard ERC4626 Withdraw event for consistency
-        emit Withdraw(caller, receiver, owner, assets, shares);
-
-        // Emit additional withdrawal request event for sUSX-specific functionality
-        emit WithdrawalRequested(receiver, assets, $.withdrawalCounter);
-
-        // Increment withdrawalCounter
-        $.withdrawalCounter++;
-    }
-
     /// @dev Add new rewards to current one.
     ///
     /// @param _data The struct of reward data, will be modified inplace.
